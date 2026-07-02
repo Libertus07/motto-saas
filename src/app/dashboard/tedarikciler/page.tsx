@@ -59,12 +59,25 @@ export default function Tedarikciler() {
     const [showAddModal, setShowAddModal] = useState(false)
     const [newSupplier, setNewSupplier] = useState({ name: '', contact_info: '' })
 
+    // Finance / Accounts
+    const [accounts, setAccounts] = useState<{id: string, name: string, type: string}[]>([])
+    const [paymentAccountId, setPaymentAccountId] = useState<string>('')
+
     const supabase = createClient()
     const router = useRouter()
 
     useEffect(() => {
         fetchSuppliers()
+        fetchAccounts()
     }, [])
+
+    const fetchAccounts = async () => {
+        const { data } = await supabase.from('accounts').select('*').order('created_at')
+        if (data && data.length > 0) {
+            setAccounts(data)
+            setPaymentAccountId(data[0].id)
+        }
+    }
 
     const fetchSuppliers = async () => {
         setLoading(true)
@@ -128,7 +141,7 @@ export default function Tedarikciler() {
         if (amount <= 0) return
 
         try {
-            // Ödeme kaydını ekle
+            // 1. Ödeme kaydını ekle
             await supabase.from('supplier_transactions').insert({
                 supplier_id: selectedSupplier.id,
                 transaction_date: new Date().toISOString().split('T')[0],
@@ -137,9 +150,26 @@ export default function Tedarikciler() {
                 note: paymentNote || 'Manuel Ödeme'
             })
 
-            // Tedarikçi bakiyesini güncelle
+            // 2. Tedarikçi bakiyesini güncelle
             const newDebt = parseFloat((selectedSupplier.total_debt || 0).toString()) - amount
             await supabase.from('suppliers').update({ total_debt: newDebt }).eq('id', selectedSupplier.id)
+
+            // 3. Finans Hesabından düş (Eğer hesap seçildiyse)
+            if (paymentAccountId) {
+                await supabase.from('account_movements').insert({
+                    account_id: paymentAccountId,
+                    movement_type: 'cikis',
+                    amount: amount,
+                    description: `${selectedSupplier.name} firmasına ödeme yapıldı.`,
+                    source_type: 'supplier_payment',
+                    source_id: selectedSupplier.id
+                })
+
+                const { data: currAcc } = await supabase.from('accounts').select('balance').eq('id', paymentAccountId).single()
+                if (currAcc) {
+                    await supabase.from('accounts').update({ balance: Number(currAcc.balance) - amount }).eq('id', paymentAccountId)
+                }
+            }
 
             // UI Güncelle
             setShowPaymentModal(false)
@@ -366,13 +396,13 @@ export default function Tedarikciler() {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {trx.transaction_type === 'invoice' ? (
-                                                        <span className="bg-red-900/30 text-red-400 px-2 py-1 rounded text-xs font-bold border border-red-500/20">Fatura/Alış (+ Borç)</span>
+                                                        <span className="inline-block bg-red-900/30 text-red-400 px-2 py-1 rounded text-xs font-bold border border-red-500/20 whitespace-nowrap">Fatura/Alış (+ Borç)</span>
                                                     ) : (
-                                                        <span className="bg-green-900/30 text-green-400 px-2 py-1 rounded text-xs font-bold border border-green-500/20">Ödeme Yapıldı (- Borç)</span>
+                                                        <span className="inline-block bg-green-900/30 text-green-400 px-2 py-1 rounded text-xs font-bold border border-green-500/20 whitespace-nowrap">Ödeme Yapıldı (- Borç)</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-stone-300 text-sm">{trx.note}</td>
-                                                <td className={`px-4 py-3 text-right font-bold ${trx.transaction_type === 'invoice' ? 'text-red-400' : 'text-green-400'}`}>
+                                                <td className={`px-4 py-3 text-right font-bold whitespace-nowrap ${trx.transaction_type === 'invoice' ? 'text-red-400' : 'text-green-400'}`}>
                                                     {trx.transaction_type === 'invoice' ? '+' : '-'}₺{parseFloat(trx.amount.toString()).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
@@ -514,6 +544,19 @@ export default function Tedarikciler() {
                                     placeholder="Örn: 5000"
                                     className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-2xl font-bold text-green-400 focus:outline-none focus:border-green-400"
                                 />
+                            </div>
+                            <div>
+                                <label className="text-stone-400 text-sm mb-1 block">Ödemenin Çıkacağı Hesap</label>
+                                <select
+                                    value={paymentAccountId}
+                                    onChange={e => setPaymentAccountId(e.target.value)}
+                                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-green-400"
+                                >
+                                    <option value="">-- Hesap Seçin (Opsiyonel) --</option>
+                                    {accounts.map(acc => (
+                                        <option key={acc.id} value={acc.id}>{acc.name} ({acc.type === 'cash' ? 'Nakit' : 'Banka'})</option>
+                                    ))}
+                                </select>
                             </div>
                             <div>
                                 <label className="text-stone-400 text-sm mb-1 block">Açıklama / Not</label>

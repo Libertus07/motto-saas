@@ -13,9 +13,13 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [userName, setUserName] = useState('Yükleniyor...')
   const [userRole, setUserRole] = useState('Yönetici')
+  const [businessName, setBusinessName] = useState('Motto SaaS')
+  const [businessLogo, setBusinessLogo] = useState('')
+  const [loadingSettings, setLoadingSettings] = useState(true)
 
   useEffect(() => {
-    async function getUser() {
+    async function fetchData() {
+      // Kullanıcı Bilgisi
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
          setUserName(user.email?.split('@')[0] || 'Kullanıcı')
@@ -24,8 +28,18 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
          setUserName('Test Kullanıcısı')
          setUserRole('Geliştirici Modu')
       }
+      
+      // İşletme Ayarları
+      const { data: settingsData } = await supabase.from('settings').select('key, value')
+      if (settingsData) {
+        const bName = settingsData.find(s => s.key === 'business_name')?.value
+        const bLogo = settingsData.find(s => s.key === 'business_logo')?.value
+        if (bName) setBusinessName(bName)
+        if (bLogo) setBusinessLogo(bLogo)
+      }
+      setLoadingSettings(false)
     }
-    getUser()
+    fetchData()
   }, [])
 
   const handleLogout = async () => {
@@ -40,6 +54,8 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
     { name: 'Yarı Mamuller', icon: '🥣', path: '/dashboard/yari-mamuller' },
     { name: 'Fiyat Motoru', icon: '⚙️', path: '/dashboard/fiyat-motoru' },
     { name: 'Stok Takibi', icon: '📦', path: '/dashboard/stok' },
+    { name: 'Finans', icon: '💳', path: '/dashboard/finans' },
+    { name: 'Yatırımlar', icon: '📈', path: '/dashboard/yatirimlar' },
     { name: 'Giderler', icon: '💸', path: '/dashboard/giderler' },
     { name: 'Tedarikçiler', icon: '🏢', path: '/dashboard/tedarikciler' },
     { name: 'Raporlar', icon: '📊', path: '/dashboard/raporlar' },
@@ -50,11 +66,26 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
   return (
     <div className="w-64 bg-stone-900 border-r border-stone-800 flex flex-col h-full shadow-2xl md:shadow-none">
       <div className="p-6 border-b border-stone-800 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="text-3xl">☕</div>
-          <div>
-            <h1 className="font-bold text-amber-500 text-lg">Motto SaaS</h1>
-            <p className="text-stone-500 text-xs">Restoran Zekası</p>
+        <div className="flex items-center gap-3 w-full">
+          {loadingSettings ? (
+            <div className="w-10 h-10 rounded-lg bg-stone-800 animate-pulse shrink-0 border border-stone-700/50" />
+          ) : businessLogo ? (
+            <img src={businessLogo} alt="Logo" className="w-10 h-10 rounded-lg object-contain bg-white/5 p-1 shrink-0 border border-stone-700/50" />
+          ) : (
+            <div className="text-3xl">☕</div>
+          )}
+          <div className="min-w-0 flex-1">
+            {loadingSettings ? (
+              <div className="space-y-1.5 py-1">
+                <div className="h-4 bg-stone-800 rounded w-24 animate-pulse" />
+                <div className="h-3 bg-stone-800 rounded w-16 animate-pulse" />
+              </div>
+            ) : (
+              <>
+                <h1 className="font-bold text-amber-500 text-lg truncate" title={businessName}>{businessName}</h1>
+                <p className="text-stone-500 text-xs">Restoran Zekası</p>
+              </>
+            )}
           </div>
         </div>
         {onCloseMobile && (

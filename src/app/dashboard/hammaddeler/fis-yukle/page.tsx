@@ -376,7 +376,7 @@ export default function FisYukle() {
 
             {/* Header */}
             <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex items-center gap-3">
-                <button onClick={() => router.push('/dashboard/hammaddeler')} className="text-stone-400 hover:text-white">← Geri</button>
+                <button onClick={() => router.back()} className="text-stone-400 hover:text-white">← Geri</button>
                 <span className="text-stone-600">|</span>
                 <span className="text-2xl">📸</span>
                 <h1 className="font-bold text-amber-400">Fiş Yükle & Otomatik Güncelle</h1>

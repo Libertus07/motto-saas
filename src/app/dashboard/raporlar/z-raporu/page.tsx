@@ -30,8 +30,9 @@ export default function ZRaporuYukle() {
     const [fileType, setFileType] = useState<'image' | 'pdf' | 'xml' | 'json' | null>(null)
     const [loading, setLoading] = useState(false)
     const [analyzing, setAnalyzing] = useState(false)
-    const [parsedData, setParsedData] = useState<{ date: string, total_revenue: number, items: ParsedSaleItem[], expenses: ParsedExpenseItem[] } | null>(null)
+    const [parsedData, setParsedData] = useState<{ date: string, total_revenue: number, payment_methods?: { cash: number, credit_card: number, other: number }, items: ParsedSaleItem[], expenses: ParsedExpenseItem[] } | null>(null)
     const [products, setProducts] = useState<Product[]>([])
+    const [accounts, setAccounts] = useState<{id: string, name: string, type: string}[]>([])
 
     // Yeni ürün ekleme modalı
     const [newProductModal, setNewProductModal] = useState<{ isOpen: boolean, itemIndex: number, name: string, price: number, category: string } | null>(null)
@@ -41,11 +42,13 @@ export default function ZRaporuYukle() {
     const router = useRouter()
 
     useEffect(() => {
-        const fetchProducts = async () => {
-            const { data } = await supabase.from('products').select('id, name, category')
-            setProducts(data || [])
+        const fetchProductsAndAccounts = async () => {
+            const { data: prodData } = await supabase.from('products').select('id, name, category')
+            setProducts(prodData || [])
+            const { data: accData } = await supabase.from('accounts').select('id, name, type')
+            setAccounts(accData || [])
         }
-        fetchProducts()
+        fetchProductsAndAccounts()
     }, [])
 
     const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)))
@@ -150,6 +153,7 @@ export default function ZRaporuYukle() {
         setParsedData({
             date: new Date().toISOString().split('T')[0],
             total_revenue: 0,
+            payment_methods: { cash: 0, credit_card: 0, other: 0 },
             items: [{
                 product_name: '',
                 quantity: 1,
@@ -220,6 +224,62 @@ export default function ZRaporuYukle() {
                 }))
                 const { error: expError } = await supabase.from('expenses').insert(expenseInserts)
                 if (expError) throw expError
+            }
+
+            // 1.8 Finans / Hesaplara Para Giriş - Çıkışları
+            if (parsedData.payment_methods) {
+                const cashAccount = accounts.find(a => a.type === 'cash')
+                const bankAccount = accounts.find(a => a.type === 'bank')
+                const accountMovements = []
+
+                if (cashAccount && parsedData.payment_methods.cash > 0) {
+                    accountMovements.push({
+                        account_id: cashAccount.id,
+                        movement_type: 'giris',
+                        amount: parsedData.payment_methods.cash,
+                        description: `${reportDate} Z-Raporu Nakit Hasılat`,
+                        source_type: 'z_report',
+                        source_id: batchId
+                    })
+                }
+
+                if (bankAccount && parsedData.payment_methods.credit_card > 0) {
+                    accountMovements.push({
+                        account_id: bankAccount.id,
+                        movement_type: 'giris',
+                        amount: parsedData.payment_methods.credit_card,
+                        description: `${reportDate} Z-Raporu Kredi Kartı Hasılat`,
+                        source_type: 'z_report',
+                        source_id: batchId
+                    })
+                }
+
+                if (cashAccount && parsedData.expenses && parsedData.expenses.length > 0) {
+                    const totalExpense = parsedData.expenses.reduce((acc, exp) => acc + Number(exp.amount), 0)
+                    if (totalExpense > 0) {
+                        accountMovements.push({
+                            account_id: cashAccount.id,
+                            movement_type: 'cikis',
+                            amount: totalExpense,
+                            description: `${reportDate} Z-Raporu Kasadan Giderler`,
+                            source_type: 'z_report',
+                            source_id: batchId
+                        })
+                    }
+                }
+
+                if (accountMovements.length > 0) {
+                    await supabase.from('account_movements').insert(accountMovements)
+                    
+                    // Hesap bakiyelerini manuel güncelle
+                    for (const m of accountMovements) {
+                        const { data: currAcc } = await supabase.from('accounts').select('balance').eq('id', m.account_id).single()
+                        if (currAcc) {
+                            const amountChange = m.movement_type === 'giris' ? Number(m.amount) : -Number(m.amount)
+                            await supabase.from('accounts').update({ balance: Number(currAcc.balance) + amountChange }).eq('id', m.account_id)
+                        }
+                    }
+                }
             }
 
             // 2. Stoktan Düşüm (Sadece eşleşen ürünler için BOM hesapla)
@@ -386,17 +446,35 @@ export default function ZRaporuYukle() {
                                     />
                                 </div>
                             </div>
-                            <div className="text-left md:text-right w-full md:w-auto flex flex-col sm:flex-row gap-4 justify-end">
+                            <div className="text-left md:text-right w-full md:w-auto flex flex-col sm:flex-row gap-4 justify-end flex-wrap mt-4 md:mt-0">
                                 <div>
+                                    <p className="text-stone-400 text-sm mb-1">Nakit Tahsilat (₺)</p>
+                                    <input 
+                                        type="number"
+                                        value={parsedData.payment_methods?.cash || 0}
+                                        onChange={(e) => setParsedData({...parsedData, payment_methods: { ...parsedData.payment_methods, cash: parseFloat(e.target.value) || 0 } as any})}
+                                        className="w-24 bg-stone-900 border border-stone-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400 font-bold"
+                                    />
+                                </div>
+                                <div>
+                                    <p className="text-stone-400 text-sm mb-1">Kart/POS Tahsilat (₺)</p>
+                                    <input 
+                                        type="number"
+                                        value={parsedData.payment_methods?.credit_card || 0}
+                                        onChange={(e) => setParsedData({...parsedData, payment_methods: { ...parsedData.payment_methods, credit_card: parseFloat(e.target.value) || 0 } as any})}
+                                        className="w-24 bg-stone-900 border border-stone-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400 font-bold"
+                                    />
+                                </div>
+                                <div className="border-l border-stone-700/50 pl-4">
                                     <p className="text-stone-400 text-sm mb-1">Toplam Ciro</p>
-                                    <div className="text-2xl font-bold text-white bg-stone-900 px-4 py-2 rounded-lg border border-stone-800 inline-block">
+                                    <div className="text-xl font-bold text-white bg-stone-900 px-4 py-2 rounded-lg border border-stone-800 inline-block">
                                         ₺{parsedData.items.reduce((acc, item) => acc + (Number(item.total_price) || 0), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                                     </div>
                                 </div>
                                 <div>
-                                    <p className="text-green-400 text-sm mb-1 font-bold">Net Kasa (Ciro - Giderler)</p>
-                                    <div className="text-3xl font-bold text-green-400 bg-stone-900 px-4 py-2 rounded-lg border border-green-500/30 inline-block">
-                                        ₺{(parsedData.items.reduce((acc, item) => acc + (Number(item.total_price) || 0), 0) - (parsedData.expenses || []).reduce((acc, exp) => acc + (Number(exp.amount) || 0), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                    <p className="text-green-400 text-sm mb-1 font-bold">Kalan Net Kasa</p>
+                                    <div className="text-2xl font-bold text-green-400 bg-stone-900 px-4 py-2 rounded-lg border border-green-500/30 inline-block">
+                                        ₺{((parsedData.payment_methods?.cash || 0) - (parsedData.expenses || []).reduce((acc, exp) => acc + (Number(exp.amount) || 0), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                                     </div>
                                 </div>
                             </div>

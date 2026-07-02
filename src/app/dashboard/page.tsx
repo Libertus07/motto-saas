@@ -8,7 +8,7 @@ export default function Dashboard() {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({
+    const [stats, setStats] = useState({
     totalProducts: 0,
     totalIngredients: 0,
     criticalStockCount: 0,
@@ -19,7 +19,10 @@ export default function Dashboard() {
     totalCogs: 0,
     netProfit: 0,
     targetMargin: 35,
-    criticalItems: [] as any[]
+    criticalItems: [] as any[],
+    totalCash: 0,
+    totalBank: 0,
+    totalInvestments: 0
   })
 
   useEffect(() => { fetchStats() }, [])
@@ -30,14 +33,26 @@ export default function Dashboard() {
       { data: materials },
       { data: expenses },
       { data: sales },
-      { data: settings }
+      { data: settings },
+      { data: accounts },
+      { data: investments }
     ] = await Promise.all([
       supabase.from('products').select('id, sale_price, calculated_cost'),
       supabase.from('materials').select('id, name, stock_quantity, unit, critical_stock_level, price_per_unit'),
       supabase.from('expenses').select('amount, period, expense_date'),
       supabase.from('sales').select('quantity, total_price, sale_date, products(calculated_cost)'),
-      supabase.from('settings').select('*')
+      supabase.from('settings').select('*'),
+      supabase.from('accounts').select('type, balance'),
+      supabase.from('investments').select('asset_type, quantity, average_cost')
     ])
+
+    // Canlı Kurlar
+    let rates: any = null
+    try {
+      const res = await fetch('/api/exchange-rates')
+      const data = await res.json()
+      if (data.success) rates = data.rates
+    } catch (e) { console.error('Kurlar çekilemedi', e) }
 
     const criticalItems = (materials || []).filter(
       i => (i.stock_quantity || 0) <= (i.critical_stock_level || 0) && (i.critical_stock_level || 0) > 0
@@ -87,6 +102,13 @@ export default function Dashboard() {
     const totalStockValue = (materials || []).reduce((t, i) =>
       t + (i.stock_quantity || 0) * i.price_per_unit, 0)
 
+    const totalCash = (accounts || []).filter(a => a.type === 'cash').reduce((t, a) => t + Number(a.balance), 0)
+    const totalBank = (accounts || []).filter(a => a.type === 'bank').reduce((t, a) => t + Number(a.balance), 0)
+    const totalInvestments = (investments || []).reduce((t, inv) => {
+        const rate = rates ? rates[inv.asset_type] : inv.average_cost
+        return t + (Number(inv.quantity) * rate)
+    }, 0)
+
     setStats({
       totalProducts: products?.length || 0,
       totalIngredients: materials?.length || 0,
@@ -98,7 +120,10 @@ export default function Dashboard() {
       totalCogs,
       netProfit,
       targetMargin,
-      criticalItems
+      criticalItems,
+      totalCash,
+      totalBank,
+      totalInvestments
     })
     setLoading(false)
   }
@@ -115,8 +140,12 @@ export default function Dashboard() {
     { icon: '💰', title: 'Giderler', desc: 'Kira, personel, faturalar', path: '/dashboard/giderler' },
     { icon: '📦', title: 'Stok Takibi', desc: 'Giriş, çıkış, sayım', path: '/dashboard/stok' },
     { icon: '🧠', title: 'Fiyat Motoru', desc: 'Olması gereken fiyat hesabı', path: '/dashboard/fiyat-motoru' },
+    { icon: '💳', title: 'Finans & Kasa', desc: 'Nakit ve banka hesapları', path: '/dashboard/finans' },
+    { icon: '📈', title: 'Yatırımlar', desc: 'Altın ve döviz portföyü', path: '/dashboard/yatirimlar' },
     { icon: '🏢', title: 'Tedarikçiler', desc: 'Toptancılar ve cari (borç) takibi', path: '/dashboard/tedarikciler' },
     { icon: '📊', title: 'Raporlar', desc: 'Karlılık ve veri girişi', path: '/dashboard/raporlar' },
+    { icon: '🕵️‍♂️', title: 'İşlem Geçmişi', desc: 'Tüm sistem aktiviteleri', path: '/dashboard/islem-gecmisi' },
+    { icon: '⚙️', title: 'Ayarlar', desc: 'Sistem ve hesap yapılandırması', path: '/dashboard/ayarlar' },
   ]
 
   return (
@@ -169,7 +198,33 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Varlıklarım (Finans Özeti) */}
+        <h3 className="text-lg font-bold mb-4 text-amber-500 flex items-center gap-2"><span>💼</span> Varlıklarım (Finans Özeti)</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-stone-900 border border-stone-800 rounded-xl p-6 relative overflow-hidden">
+             <div className="absolute -right-4 -top-4 text-7xl opacity-5">💵</div>
+             <p className="text-stone-400 text-sm mb-1 font-bold">Nakit Kasa</p>
+             <h2 className="text-2xl font-bold text-white">₺{stats.totalCash.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</h2>
+          </div>
+          <div className="bg-stone-900 border border-stone-800 rounded-xl p-6 relative overflow-hidden">
+             <div className="absolute -right-4 -top-4 text-7xl opacity-5">🏦</div>
+             <p className="text-stone-400 text-sm mb-1 font-bold">Banka Hesapları</p>
+             <h2 className="text-2xl font-bold text-white">₺{stats.totalBank.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</h2>
+          </div>
+          <div className="bg-stone-900 border border-stone-800 rounded-xl p-6 relative overflow-hidden cursor-pointer hover:border-amber-500/50 transition-colors" onClick={() => router.push('/dashboard/yatirimlar')}>
+             <div className="absolute -right-4 -top-4 text-7xl opacity-5">📈</div>
+             <p className="text-stone-400 text-sm mb-1 font-bold">Yatırımlar Değeri (Canlı)</p>
+             <h2 className="text-2xl font-bold text-amber-500">₺{stats.totalInvestments.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</h2>
+          </div>
+          <div className="bg-stone-800 border border-amber-500/30 rounded-xl p-6 relative overflow-hidden shadow-[0_0_20px_rgba(245,158,11,0.1)]">
+             <div className="absolute -right-4 -top-4 text-7xl opacity-5">👑</div>
+             <p className="text-amber-400/80 text-sm mb-1 font-bold">TOPLAM NET VARLIK</p>
+             <h2 className="text-3xl font-black text-amber-500">₺{(stats.totalCash + stats.totalBank + stats.totalInvestments).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</h2>
+          </div>
+        </div>
+
         {/* Özet Kartları */}
+        <h3 className="text-lg font-bold mb-4 text-stone-300 flex items-center gap-2"><span>📊</span> Operasyonel Metrikler</h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           
           <div className={`col-span-1 md:col-span-4 bg-stone-900 border ${stats.netProfit >= 0 ? 'border-green-900/50' : 'border-red-900/50'} rounded-xl p-6 relative overflow-hidden`}>

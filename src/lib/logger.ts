@@ -38,14 +38,14 @@ export async function logActivity(
             module: moduleName,
             action_type: actionType,
             description,
-            user_id: user?.email || 'Bilinmeyen Kullanıcı',
+            user_id: user?.id || 'Bilinmeyen Kullanıcı',
             details: enrichedDetails
         })
         
         if (error) {
-            console.error('Loglama tablosuna eklenemedi:', error)
+            console.error('Loglama tablosuna eklenemedi:', JSON.stringify(error, null, 2))
         }
-    } catch (error) {
-        console.error('Loglama kritik hatası:', error)
+    } catch (error: any) {
+        console.error('Loglama kritik hatası:', error?.message || error)
     }
 }

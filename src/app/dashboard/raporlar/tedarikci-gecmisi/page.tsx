@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
@@ -22,7 +22,7 @@ type StockMovement = {
 }
 
 type GroupedReceipt = {
-    id: string // batch_id or timestamp
+    id: string
     date: string
     supplierName: string
     totalAmount: number
@@ -31,11 +31,33 @@ type GroupedReceipt = {
     items: StockMovement[]
 }
 
+type GroupedSupplier = {
+    supplierName: string
+    totalAmount: number
+    receiptCount: number
+    receipts: GroupedReceipt[]
+}
+
+type GroupedMonth = {
+    monthKey: string
+    monthLabel: string
+    totalAmount: number
+    receiptCount: number
+    receipts: GroupedReceipt[]
+}
+
 export default function TedarikciGecmisi() {
-    const [groupedReceipts, setGroupedReceipts] = useState<GroupedReceipt[]>([])
+    const [allReceipts, setAllReceipts] = useState<GroupedReceipt[]>([])
     const [loading, setLoading] = useState(true)
     const [deletingId, setDeletingId] = useState<string | null>(null)
-    const [expandedId, setExpandedId] = useState<string | null>(null)
+    
+    const [expandedMain, setExpandedMain] = useState<string | null>(null) // Ay veya Tedarikçi
+    const [expandedReceipt, setExpandedReceipt] = useState<string | null>(null) // Fişin içi
+    
+    // Filters & Sorting
+    const [groupBy, setGroupBy] = useState<'date' | 'supplier'>('date')
+    const [selectedMonth, setSelectedMonth] = useState<string>('all')
+    const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'amount_desc'>('date_desc')
     
     const supabase = createClient()
     const router = useRouter()
@@ -46,8 +68,6 @@ export default function TedarikciGecmisi() {
 
     const fetchReceipts = async () => {
         setLoading(true)
-        // Fiş yüklemelerini stock_movements üzerinden tespit edeceğiz
-        // "Yapay Zeka Fiş Yükleme" notu ile başlayan girişleri alıyoruz.
         const { data, error } = await supabase
             .from('stock_movements')
             .select(`
@@ -76,11 +96,9 @@ export default function TedarikciGecmisi() {
             return
         }
 
-        // Fişleri batch_id'ye veya oluşturulma zamanına göre grupla
         const groups: Record<string, GroupedReceipt> = {}
         
         data?.forEach((item: any) => {
-            // Eski kayıtlarda batch_id olmayacağı için tarihi ID olarak kullan (dakika bazında yuvarla)
             const dateObj = new Date(item.created_at)
             const timeKey = `${dateObj.getFullYear()}-${dateObj.getMonth()}-${dateObj.getDate()}_${dateObj.getHours()}:${dateObj.getMinutes()}`
             const groupId = item.batch_id || timeKey
@@ -98,17 +116,92 @@ export default function TedarikciGecmisi() {
             }
             groups[groupId].items.push(item)
             groups[groupId].totalAmount += (item.quantity * item.unit_price)
-            groups[groupId].totalItems += 1 // Kalem sayısı
+            groups[groupId].totalItems += 1
         })
 
         const sortedGroups = Object.values(groups).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        setGroupedReceipts(sortedGroups)
+        setAllReceipts(sortedGroups)
         setLoading(false)
     }
 
-    const toggleExpand = (id: string) => {
-        setExpandedId(expandedId === id ? null : id)
+    // Ay Listesi (Filtre için)
+    const availableMonths = useMemo(() => {
+        const months = new Set<string>()
+        allReceipts.forEach(receipt => {
+            const dateObj = new Date(receipt.date)
+            const year = dateObj.getFullYear()
+            const month = (dateObj.getMonth() + 1).toString().padStart(2, '0')
+            months.add(`${year}-${month}`)
+        })
+        return Array.from(months).sort((a, b) => b.localeCompare(a))
+    }, [allReceipts])
+
+    const formatMonthLabel = (monthKey: string) => {
+        const [year, month] = monthKey.split('-')
+        const dateObj = new Date(parseInt(year), parseInt(month) - 1, 1)
+        const name = dateObj.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+        return name.charAt(0).toUpperCase() + name.slice(1)
     }
+
+    // Verileri Hesapla ve Grupla
+    const displayData = useMemo(() => {
+        let filtered = [...allReceipts]
+
+        // Ay Filtresi
+        if (selectedMonth !== 'all') {
+            filtered = filtered.filter(r => r.date.startsWith(selectedMonth))
+        }
+
+        // Genel Sıralama (Fişlerin Sıralaması)
+        filtered.sort((a, b) => {
+            if (sortBy === 'date_desc') return new Date(b.date).getTime() - new Date(a.date).getTime()
+            if (sortBy === 'date_asc') return new Date(a.date).getTime() - new Date(b.date).getTime()
+            if (sortBy === 'amount_desc') return b.totalAmount - a.totalAmount
+            return 0
+        })
+
+        if (groupBy === 'supplier') {
+            const supplierMap: Record<string, GroupedSupplier> = {}
+            filtered.forEach(receipt => {
+                const sName = receipt.supplierName
+                if (!supplierMap[sName]) {
+                    supplierMap[sName] = {
+                        supplierName: sName,
+                        totalAmount: 0,
+                        receiptCount: 0,
+                        receipts: []
+                    }
+                }
+                supplierMap[sName].receipts.push(receipt)
+                supplierMap[sName].totalAmount += receipt.totalAmount
+                supplierMap[sName].receiptCount += 1
+            })
+            
+            return Object.values(supplierMap).sort((a, b) => b.totalAmount - a.totalAmount) // Tedarikçileri ciroya göre sırala
+        } else {
+            // groupBy date
+            const monthMap: Record<string, GroupedMonth> = {}
+            filtered.forEach(receipt => {
+                const dateObj = new Date(receipt.date)
+                const monthKey = `${dateObj.getFullYear()}-${(dateObj.getMonth() + 1).toString().padStart(2, '0')}`
+                
+                if (!monthMap[monthKey]) {
+                    monthMap[monthKey] = {
+                        monthKey,
+                        monthLabel: formatMonthLabel(monthKey),
+                        totalAmount: 0,
+                        receiptCount: 0,
+                        receipts: []
+                    }
+                }
+                monthMap[monthKey].receipts.push(receipt)
+                monthMap[monthKey].totalAmount += receipt.totalAmount
+                monthMap[monthKey].receiptCount += 1
+            })
+
+            return Object.values(monthMap).sort((a, b) => b.monthKey.localeCompare(a.monthKey))
+        }
+    }, [allReceipts, groupBy, selectedMonth, sortBy])
 
     const handleDelete = async (receipt: GroupedReceipt) => {
         if (!receipt.batchId) {
@@ -132,7 +225,7 @@ export default function TedarikciGecmisi() {
             if (data.error) throw new Error(data.error)
             
             alert('Fiş başarıyla silindi ve işlemler geri alındı.')
-            fetchReceipts() // Listeyi yenile
+            fetchReceipts()
         } catch (err: any) {
             alert('Silme işlemi başarısız: ' + err.message)
         } finally {
@@ -141,8 +234,8 @@ export default function TedarikciGecmisi() {
     }
 
     return (
-        <div className="min-h-full bg-stone-950 text-white">
-            <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex items-center gap-3 sticky top-0 z-10">
+        <div className="min-h-full bg-stone-950 text-white pb-20">
+            <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex items-center gap-3 sticky top-0 z-20">
                 <button onClick={() => router.push('/dashboard/raporlar')} className="text-stone-400 hover:text-white transition-colors">
                     ← Geri
                 </button>
@@ -151,10 +244,51 @@ export default function TedarikciGecmisi() {
                 <h1 className="font-bold text-green-400 text-lg">Geçmiş Tedarikçi Fişleri</h1>
             </header>
 
-            <main className="p-6 max-w-4xl mx-auto">
-                <div className="mb-6">
-                    <h2 className="text-xl font-bold mb-2">İşlenmiş Fişler</h2>
-                    <p className="text-stone-400 text-sm">Sisteme yüklediğiniz tedarikçi fatura ve fişleri (sadece yapay zeka ile okunanlar). Eski fişleri sadece görüntüleyebilirsiniz, yenileri silebilirsiniz.</p>
+            <main className="p-6 max-w-5xl mx-auto">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
+                    <div>
+                        <h2 className="text-2xl font-bold mb-2">İşlenmiş Fişler</h2>
+                        <p className="text-stone-400 text-sm max-w-xl">Yapay zeka ile yüklediğiniz tedarikçi fişleri kategorize edilmiştir. Fişleri aylara veya tedarikçilere göre görüntüleyebilirsiniz.</p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 bg-stone-900 p-2 rounded-xl border border-stone-800">
+                        {/* Gruplama Türü */}
+                        <div className="flex bg-stone-800 rounded-lg p-1">
+                            <button 
+                                onClick={() => { setGroupBy('date'); setExpandedMain(null) }}
+                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${groupBy === 'date' ? 'bg-stone-700 text-white shadow-sm' : 'text-stone-400 hover:text-stone-200'}`}
+                            >
+                                Aya Göre
+                            </button>
+                            <button 
+                                onClick={() => { setGroupBy('supplier'); setExpandedMain(null) }}
+                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${groupBy === 'supplier' ? 'bg-stone-700 text-white shadow-sm' : 'text-stone-400 hover:text-stone-200'}`}
+                            >
+                                Tedarikçiye Göre
+                            </button>
+                        </div>
+
+                        <select 
+                            value={selectedMonth} 
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-stone-200 focus:outline-none focus:border-green-400"
+                        >
+                            <option value="all">Tüm Aylar</option>
+                            {availableMonths.map(m => (
+                                <option key={m} value={m}>{formatMonthLabel(m)}</option>
+                            ))}
+                        </select>
+
+                        <select 
+                            value={sortBy} 
+                            onChange={(e) => setSortBy(e.target.value as any)}
+                            className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-stone-200 focus:outline-none focus:border-green-400"
+                        >
+                            <option value="date_desc">En Yeniler Önce</option>
+                            <option value="date_asc">En Eskiler Önce</option>
+                            <option value="amount_desc">En Yüksek Tutarlılar</option>
+                        </select>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -162,104 +296,139 @@ export default function TedarikciGecmisi() {
                         <div className="animate-spin text-green-400 text-4xl mb-4">⚙️</div>
                         <p className="text-stone-400">Veriler yükleniyor...</p>
                     </div>
-                ) : groupedReceipts.length === 0 ? (
+                ) : displayData.length === 0 ? (
                     <div className="bg-stone-900 border border-stone-800 rounded-2xl p-12 text-center">
                         <div className="text-6xl mb-4 opacity-50">📂</div>
                         <h3 className="text-xl font-bold mb-2">Kayıt Bulunamadı</h3>
-                        <p className="text-stone-500">Henüz sisteme işlenmiş bir tedarikçi fişi bulunmuyor.</p>
+                        <p className="text-stone-500">Seçili kriterlere uygun fiş bulunmuyor.</p>
                     </div>
                 ) : (
-                    <div className="space-y-4">
-                        {groupedReceipts.map((group) => {
-                            const isExpanded = expandedId === group.id
-                            
-                            // Tarihi formatla
-                            const dateObj = new Date(group.date)
-                            const dateStr = dateObj.toLocaleDateString('tr-TR', { 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            })
+                    <div className="space-y-6">
+                        {displayData.map((mainGroup: any, idx) => {
+                            const mainKey = groupBy === 'supplier' ? mainGroup.supplierName : mainGroup.monthKey;
+                            const mainTitle = groupBy === 'supplier' ? mainGroup.supplierName : mainGroup.monthLabel;
+                            const isMainExpanded = expandedMain === mainKey || (expandedMain === null && idx === 0);
 
                             return (
-                                <div key={group.id} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden transition-all duration-200">
-                                    {/* Accordion Header */}
-                                    <div className="w-full px-6 py-4 flex items-center justify-between hover:bg-stone-800/50 transition-colors">
-                                        <button 
-                                            onClick={() => toggleExpand(group.id)}
-                                            className="flex-1 text-left"
-                                        >
-                                            <h3 className="font-bold text-lg text-green-400">{group.supplierName}</h3>
-                                            <p className="text-sm text-stone-400 mt-1">
-                                                {dateStr} • <span className="font-bold text-white">{group.totalItems}</span> kalem ürün
-                                            </p>
-                                        </button>
+                                <div key={mainKey} className="bg-stone-900/50 border border-stone-800 rounded-2xl overflow-hidden">
+                                    {/* Main Accordion Header */}
+                                    <div 
+                                        onClick={() => setExpandedMain(isMainExpanded ? null : mainKey)}
+                                        className="w-full px-6 py-5 flex items-center justify-between cursor-pointer hover:bg-stone-800/50 transition-colors border-b border-stone-800/0"
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 bg-green-500/10 text-green-500 rounded-xl flex items-center justify-center text-xl font-bold">
+                                                {groupBy === 'supplier' ? '🏢' : '📅'}
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-xl text-white">{mainTitle}</h3>
+                                                <p className="text-sm text-stone-400 mt-1">
+                                                    <span className="font-bold text-green-400">{mainGroup.receiptCount}</span> adet fiş bulundu
+                                                </p>
+                                            </div>
+                                        </div>
                                         
                                         <div className="flex items-center gap-6">
-                                            <div className="text-right">
-                                                <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Toplam Fiş Tutarı</p>
-                                                <p className="text-xl font-bold text-white">₺{group.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                                            <div className="text-right hidden sm:block">
+                                                <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Toplam Alış Tutarı</p>
+                                                <p className="text-2xl font-bold text-white">₺{mainGroup.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
                                             </div>
-                                            
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleDelete(group) }}
-                                                    disabled={deletingId === group.id || !group.batchId}
-                                                    className={`p-2 rounded-lg transition-colors border ${
-                                                        !group.batchId ? 'bg-stone-800 border-stone-700 text-stone-500 cursor-not-allowed opacity-50' :
-                                                        'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20'
-                                                    }`}
-                                                    title={!group.batchId ? "Eski kayıt silinemez" : "Fişi Sil ve Geri Al"}
-                                                >
-                                                    {deletingId === group.id ? '⏳' : '🗑️'}
-                                                </button>
-                                                <button 
-                                                    onClick={() => toggleExpand(group.id)}
-                                                    className={`text-stone-500 p-2 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                                                >
-                                                    ▼
-                                                </button>
+                                            <div className={`text-stone-500 p-2 transform transition-transform duration-200 ${isMainExpanded ? 'rotate-180' : ''}`}>
+                                                ▼
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Accordion Body */}
-                                    {isExpanded && (
-                                        <div className="border-t border-stone-800 bg-stone-950/50">
-                                            <div className="overflow-x-auto w-full">
-<table className="w-full text-sm text-left">
-                                                <thead className="bg-stone-900/50 text-stone-400 border-b border-stone-800">
-                                                    <tr>
-                                                        <th className="px-6 py-3 font-medium">Hammadde</th>
-                                                        <th className="px-6 py-3 font-medium text-center">Birim Fiyat</th>
-                                                        <th className="px-6 py-3 font-medium text-center">Miktar</th>
-                                                        <th className="px-6 py-3 font-medium text-right">Toplam</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-stone-800">
-                                                    {group.items.map((item) => (
-                                                        <tr key={item.id} className="hover:bg-stone-900 transition-colors">
-                                                            <td className="px-6 py-3 font-medium text-stone-200">
-                                                                {item.materials?.name || 'Bilinmeyen'}
-                                                            </td>
-                                                            <td className="px-6 py-3 text-center text-stone-400">
-                                                                ₺{item.unit_price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
-                                                            </td>
-                                                            <td className="px-6 py-3 text-center">
-                                                                <span className="inline-block bg-stone-800 text-green-400 px-2 py-1 rounded-md font-bold">
-                                                                    {item.quantity} {item.materials?.unit || ''}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-6 py-3 text-right font-medium text-white">
-                                                                ₺{(item.quantity * item.unit_price).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-</div>
+                                    {/* İçerik (Fişler) */}
+                                    {isMainExpanded && (
+                                        <div className="bg-stone-950 p-4 sm:p-6 space-y-4 border-t border-stone-800">
+                                            {mainGroup.receipts.map((receipt: GroupedReceipt) => {
+                                                const isReceiptExpanded = expandedReceipt === receipt.id;
+                                                const dateObj = new Date(receipt.date)
+                                                const dateStr = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+                                                return (
+                                                    <div key={receipt.id} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden transition-all duration-200">
+                                                        <div className="w-full px-5 py-3 flex items-center justify-between hover:bg-stone-800/30 transition-colors">
+                                                            <button 
+                                                                onClick={() => setExpandedReceipt(isReceiptExpanded ? null : receipt.id)}
+                                                                className="flex-1 text-left flex items-center gap-3"
+                                                            >
+                                                                <div className="bg-stone-800 px-3 py-1.5 rounded-lg text-green-400 font-bold tracking-wider text-sm whitespace-nowrap">
+                                                                    {dateObj.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}
+                                                                </div>
+                                                                <div>
+                                                                    <h4 className="font-bold text-stone-200">{groupBy === 'supplier' ? dateStr : receipt.supplierName}</h4>
+                                                                    <p className="text-xs text-stone-500 mt-0.5">{groupBy === 'supplier' ? 'Fiş Tarihi' : dateStr} • {receipt.totalItems} kalem ürün</p>
+                                                                </div>
+                                                            </button>
+                                                            
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="text-right">
+                                                                    <p className="text-lg font-bold text-white">₺{receipt.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                                                                </div>
+                                                                
+                                                                <div className="flex items-center gap-1">
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleDelete(receipt) }}
+                                                                        disabled={deletingId === receipt.id || !receipt.batchId}
+                                                                        className={`p-2 rounded-lg transition-colors border ${
+                                                                            !receipt.batchId ? 'bg-stone-800 border-stone-800 text-stone-600 cursor-not-allowed opacity-50' :
+                                                                            'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20'
+                                                                        }`}
+                                                                        title={!receipt.batchId ? "Eski kayıt silinemez" : "Fişi Sil"}
+                                                                    >
+                                                                        {deletingId === receipt.id ? '⏳' : '🗑️'}
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => setExpandedReceipt(isReceiptExpanded ? null : receipt.id)}
+                                                                        className={`text-stone-500 p-2 transform transition-transform duration-200 ${isReceiptExpanded ? 'rotate-180' : ''}`}
+                                                                    >
+                                                                        ▼
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {isReceiptExpanded && (
+                                                            <div className="border-t border-stone-800 bg-stone-900/50">
+                                                                <div className="overflow-x-auto w-full">
+                                                                    <table className="w-full text-sm text-left">
+                                                                        <thead className="bg-stone-800/30 text-stone-400 border-b border-stone-800">
+                                                                            <tr>
+                                                                                <th className="px-5 py-2.5 font-medium">Hammadde</th>
+                                                                                <th className="px-5 py-2.5 font-medium text-center">Birim Fiyat</th>
+                                                                                <th className="px-5 py-2.5 font-medium text-center">Miktar</th>
+                                                                                <th className="px-5 py-2.5 font-medium text-right">Toplam Tutar</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-stone-800/50">
+                                                                            {receipt.items.map((item) => (
+                                                                                <tr key={item.id} className="hover:bg-stone-800/50 transition-colors">
+                                                                                    <td className="px-5 py-2.5 font-medium text-stone-300">
+                                                                                        {item.materials?.name || 'Bilinmeyen'}
+                                                                                    </td>
+                                                                                    <td className="px-5 py-2.5 text-center text-stone-400">
+                                                                                        ₺{item.unit_price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                                                    </td>
+                                                                                    <td className="px-5 py-2.5 text-center">
+                                                                                        <span className="inline-block bg-stone-800 text-green-400 px-2 py-0.5 rounded text-xs font-bold min-w-[2rem]">
+                                                                                            {item.quantity} {item.materials?.unit || ''}
+                                                                                        </span>
+                                                                                    </td>
+                                                                                    <td className="px-5 py-2.5 text-right font-medium text-white">
+                                                                                        ₺{(item.quantity * item.unit_price).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                                                    </td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
                                     )}
                                 </div>

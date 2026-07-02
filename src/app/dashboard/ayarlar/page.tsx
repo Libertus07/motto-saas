@@ -9,6 +9,7 @@ type Tab = 'profil' | 'genel' | 'finansal' | 'bildirimler' | 'ekip' | 'entegrasy
 
 type Settings = {
   // Genel
+  business_logo: string
   business_name: string
   business_address: string
   business_phone: string
@@ -39,6 +40,7 @@ type Settings = {
 }
 
 const DEFAULT_SETTINGS: Settings = {
+  business_logo: '',
   business_name: '',
   business_address: '',
   business_phone: '',
@@ -463,8 +465,61 @@ function ProfilTab() {
 }
 
 function GenelTab({ s, set, onSave, saving }: { s: Settings; set: (k: keyof Settings, v: any) => void; onSave: () => void; saving: boolean }) {
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const supabase = createClient()
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingLogo(true)
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+    
+    const { data, error } = await supabase.storage
+      .from('motto_assets')
+      .upload(`logos/${fileName}`, file, { upsert: true })
+
+    if (error) {
+      alert('Logo yüklenirken hata oluştu: ' + error.message)
+      setUploadingLogo(false)
+      return
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('motto_assets')
+      .getPublicUrl(`logos/${fileName}`)
+
+    set('business_logo', publicUrl)
+    setUploadingLogo(false)
+  }
+
   return (
     <div className="space-y-6">
+      <SectionCard title="İşletme Logosu" description="Menüde ve faturalarda gösterilecek logonuz.">
+        <div className="flex items-center gap-6">
+          <div className="w-24 h-24 rounded-2xl bg-stone-800 border-2 border-dashed border-stone-700 flex items-center justify-center overflow-hidden shrink-0 relative p-2">
+            {s.business_logo ? (
+              <img src={s.business_logo} alt="Logo" className="w-full h-full object-contain" />
+            ) : (
+              <span className="text-3xl">🏢</span>
+            )}
+            {uploadingLogo && (
+              <div className="absolute inset-0 bg-stone-900/70 flex items-center justify-center backdrop-blur-sm">
+                 <span className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1">
+            <label className="bg-stone-800 hover:bg-stone-700 text-white font-medium px-4 py-2 rounded-lg cursor-pointer transition-colors text-sm border border-stone-700 inline-block mb-2">
+              {s.business_logo ? 'Logoyu Değiştir' : 'Logo Yükle'}
+              <input type="file" accept="image/png, image/jpeg, image/jpg, image/svg+xml" onChange={handleLogoUpload} disabled={uploadingLogo} className="hidden" />
+            </label>
+            <p className="text-stone-500 text-xs">PNG, JPG veya SVG. Kare veya yatay format önerilir.</p>
+          </div>
+        </div>
+      </SectionCard>
+
       <SectionCard title="İşletme Profili" description="Faturalar ve raporlarda görünecek işletme bilgileri.">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormRow label="İşletme Adı">
@@ -521,7 +576,8 @@ function FinansalTab({ s, set, onSave, saving, categories, setCategories }: {
     const updated = [...categories, newCat.trim()]
     setCategories(updated)
     set('material_categories', updated)
-    await supabase.from('settings').upsert({ key: 'material_categories', value: updated }, { onConflict: 'key' })
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('settings').upsert({ key: 'material_categories', value: updated, user_id: user?.id }, { onConflict: 'key' })
     await logActivity('Ayarlar', 'EKLEME', `Yeni hammadde kategorisi eklendi`, { detay: newCat.trim() })
     setNewCat('')
   }
@@ -530,7 +586,8 @@ function FinansalTab({ s, set, onSave, saving, categories, setCategories }: {
     const updated = categories.filter(c => c !== cat)
     setCategories(updated)
     set('material_categories', updated)
-    await supabase.from('settings').upsert({ key: 'material_categories', value: updated }, { onConflict: 'key' })
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('settings').upsert({ key: 'material_categories', value: updated, user_id: user?.id }, { onConflict: 'key' })
     await logActivity('Ayarlar', 'SILME', `Hammadde kategorisi silindi`, { detay: cat })
   }
 
@@ -776,7 +833,7 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Ayarlar() {
-  const [activeTab, setActiveTab] = useState<Tab>('profil')
+  const [activeTab, setActiveTab] = useState<Tab>('genel')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
@@ -841,8 +898,9 @@ export default function Ayarlar() {
     }
 
     if (changes.length > 0) {
+      const { data: { user } } = await supabase.auth.getUser()
       for (const [key, value] of entries) {
-        await supabase.from('settings').upsert({ key, value }, { onConflict: 'key' })
+        await supabase.from('settings').upsert({ key, value, user_id: user?.id }, { onConflict: 'key' })
       }
       const changeText = changes.join(' | ')
       await logActivity('Ayarlar', 'GUNCELLEME', `Sistem genel ayarları güncellendi.`, { detay: changeText })
@@ -851,11 +909,17 @@ export default function Ayarlar() {
 
     setToast('Ayarlar başarıyla kaydedildi.')
     setSaving(false)
+    
+    // Sidebar gibi componentlerin global state kullanmadığı için
+    // menüdeki Logo ve İşletme Adı gibi verilerin yenilenmesini sağla
+    setTimeout(() => {
+      window.location.reload()
+    }, 1500)
   }
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
-    { id: 'profil', label: 'Profilim', icon: '👤' },
     { id: 'genel', label: 'Genel', icon: '🏪' },
+    { id: 'profil', label: 'Profilim', icon: '👤' },
     { id: 'finansal', label: 'Finansal', icon: '💰' },
     { id: 'bildirimler', label: 'Bildirimler', icon: '🔔' },
     { id: 'ekip', label: 'Ekip', icon: '👥' },
