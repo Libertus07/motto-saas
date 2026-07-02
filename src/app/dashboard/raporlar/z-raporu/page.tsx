@@ -122,7 +122,7 @@ export default function ZRaporuYukle() {
                 name: newProductModal.name,
                 category: newProductModal.category,
                 sale_price: newProductModal.price
-            }).select('id, name').single()
+            }).select('*').single()
 
             if (error) throw error
 

@@ -17,6 +17,7 @@ type Expense = {
   amount: number
   period: string
   category: string
+  expense_date?: string
 }
 
 type ProductSales = {

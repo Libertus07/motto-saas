@@ -13,6 +13,7 @@ export default function Dashboard() {
     totalIngredients: 0,
     criticalStockCount: 0,
     monthlyExpenses: 0,
+    lowMarginProducts: 0,
     totalStockValue: 0,
     grossRevenue: 0,
     totalCogs: 0,
