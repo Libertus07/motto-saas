@@ -146,7 +146,8 @@ export default function YatirimlarPage() {
 
     useEffect(() => {
         if (rates && buyForm.asset_type && buyForm.asset_type !== 'real_estate') {
-            setBuyForm(prev => ({ ...prev, price_per_unit: rates[prev.asset_type as keyof Rates].toString() }))
+            const assetType = buyForm.asset_type as 'gold' | 'usd' | 'eur';
+            setBuyForm(prev => ({ ...prev, price_per_unit: rates[assetType].toString() }))
         }
     }, [buyForm.asset_type, rates])
 
@@ -321,7 +322,7 @@ export default function YatirimlarPage() {
             setBuyForm({ 
                 ...buyForm, 
                 quantity: '', 
-                price_per_unit: rates && !isRE ? rates[buyForm.asset_type as keyof Rates].toString() : '',
+                price_per_unit: rates && !isRE ? rates[buyForm.asset_type as 'gold' | 'usd' | 'eur'].toString() : '',
                 notes: '',
                 document_url: ''
             })
