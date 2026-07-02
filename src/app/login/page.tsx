@@ -81,12 +81,6 @@ export default function LoginPage() {
             {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
           </button>
           
-          <button
-            onClick={() => { window.location.href = '/dashboard' }}
-            className="w-full bg-stone-800 hover:bg-stone-700 text-stone-300 font-bold py-3 rounded-lg transition-colors border border-stone-700 block text-center mt-4"
-          >
-            🚀 Geliştirici Modu (Şifresiz Geç)
-          </button>
         </div>
       </div>
     </div>
