@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createClient } from '@supabase/supabase-js';
+import { requireUser } from '@/lib/supabase-server';
 
 export async function POST(req: Request) {
     try {
+        const { user, supabase } = await requireUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 });
+        }
+
         const { productName, materials, subRecipes, option } = await req.json();
 
         if (!productName) {
@@ -20,13 +25,6 @@ export async function POST(req: Request) {
 
         const materialsContext = materials?.map((m: any) => `- ${m.id} | ${m.name} | ${m.unit} | ₺${m.price_per_unit}`).join('\n') || 'Yok';
         const subRecipesContext = subRecipes?.map((s: any) => `- ${s.id} | ${s.name} | Porsiyon Maliyeti: ₺${(s.total_cost / (s.yield_quantity || 1)).toFixed(2)}`).join('\n') || 'Yok';
-
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        if (!supabaseUrl || !supabaseKey) {
-            return NextResponse.json({ error: 'Supabase URL or Key missing' }, { status: 500 });
-        }
-        const supabase = createClient(supabaseUrl, supabaseKey);
 
         const { data: settings } = await supabase.from('settings').select('*');
         const takeawayRatioSetting = settings?.find(s => s.key === 'takeaway_ratio')?.value || '60';
@@ -68,8 +66,9 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra markdown (\`\`\`json v
 
         return NextResponse.json(parsed);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('AI Recipe Builder error:', error);
-        return NextResponse.json({ error: 'Yapay zeka reçete oluştururken bir hata oluştu: ' + error.message }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
+        return NextResponse.json({ error: 'Yapay zeka reçete oluştururken bir hata oluştu: ' + message }, { status: 500 });
     }
 }

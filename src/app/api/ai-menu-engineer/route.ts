@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { requireUser } from '@/lib/supabase-server';
 
 export async function POST(req: Request) {
     try {
+        const { user } = await requireUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 });
+        }
+
         const { products } = await req.json();
 
         if (!products || products.length === 0) {
@@ -54,8 +60,9 @@ Yanıtını SADECE aşağıdaki JSON formatında ver, ekstra markdown (\`\`\`jso
 
         return NextResponse.json(parsed);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('AI Menu Engineer error:', error);
-        return NextResponse.json({ error: 'Yapay zeka analiz yaparken bir hata oluştu: ' + error.message }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
+        return NextResponse.json({ error: 'Yapay zeka analiz yaparken bir hata oluştu: ' + message }, { status: 500 });
     }
 }

@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { requireUser } from '@/lib/supabase-server';
 
 export async function POST(req: Request) {
     try {
+        const { user } = await requireUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 });
+        }
+
         const { materials, categories } = await req.json();
 
         if (!materials || materials.length === 0) {
@@ -55,8 +61,9 @@ Yanıtı SADECE şu JSON formatında ver:
         const suggestions = JSON.parse(text);
         return NextResponse.json({ suggestions });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Auto-categorize error:', error);
-        return NextResponse.json({ error: error.message || 'Bilinmeyen hata' }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { requireUser } from '@/lib/supabase-server'
 
 export async function POST(req: Request) {
     try {
+        const { user, supabase } = await requireUser()
+        if (!user) {
+            return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 })
+        }
+
         const body = await req.json()
         const { batch_id } = body
 
         if (!batch_id) {
             return NextResponse.json({ error: 'Batch ID gerekli' }, { status: 400 })
         }
-
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        )
 
         // 1. Bu batch_id'ye ait stok girişlerini bul
         const { data: movements, error: movErr } = await supabase
@@ -96,8 +96,9 @@ export async function POST(req: Request) {
         }
 
         return NextResponse.json({ success: true })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Delete Receipt Error:', error)
-        return NextResponse.json({ error: error.message || 'Silme işlemi başarısız' }, { status: 500 })
+        const message = error instanceof Error ? error.message : 'Silme işlemi başarısız'
+        return NextResponse.json({ error: message }, { status: 500 })
     }
 }

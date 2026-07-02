@@ -1,8 +1,32 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { requireUser } from '@/lib/supabase-server';
+
+function isSafeImageUrl(url: string): boolean {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:') return false;
+        const host = parsed.hostname;
+        if (
+            host === 'localhost' ||
+            host.startsWith('127.') ||
+            host.startsWith('10.') ||
+            host.startsWith('192.168.') ||
+            host.startsWith('169.254.') ||
+            /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+        ) return false;
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 export async function POST(req: Request) {
     try {
+        const { user } = await requireUser();
+        if (!user) {
+            return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 });
+        }
         const { image, fileText, fileType, existingProducts } = await req.json();
 
         if (!image && !fileText) {
@@ -14,6 +38,9 @@ export async function POST(req: Request) {
 
         if (image) {
             if (image.startsWith('http://') || image.startsWith('https://')) {
+                if (!isSafeImageUrl(image)) {
+                    return NextResponse.json({ error: 'İzin verilmeyen veya güvensiz URL.' }, { status: 400 });
+                }
                 const fetchRes = await fetch(image);
                 if (!fetchRes.ok) {
                     return NextResponse.json({ error: 'URL den dosya indirilemedi.' }, { status: 400 });
@@ -85,8 +112,9 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (\`\`
 
         return NextResponse.json(parsed);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Z-Report parsing error:', error);
-        return NextResponse.json({ error: 'Yapay zeka Z Raporunu okurken bir hata oluştu: ' + error.message }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
+        return NextResponse.json({ error: 'Yapay zeka Z Raporunu okurken bir hata oluştu: ' + message }, { status: 500 });
     }
 }
