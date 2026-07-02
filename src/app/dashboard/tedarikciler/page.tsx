@@ -268,7 +268,8 @@ export default function Tedarikciler() {
                     
                     <div className="flex-1 overflow-y-auto">
                         {loading ? <p className="p-4 text-stone-400">Yükleniyor...</p> : (
-                            <table className="w-full">
+                            <div className="overflow-x-auto w-full">
+<table className="w-full">
                                 <thead>
                                     <tr className="border-b border-stone-800 bg-stone-900">
                                         <th className="text-left px-4 py-3 text-stone-400 text-sm">Firma Adı</th>
@@ -292,6 +293,7 @@ export default function Tedarikciler() {
                                     ))}
                                 </tbody>
                             </table>
+</div>
                         )}
                     </div>
                 </div>
@@ -343,7 +345,8 @@ export default function Tedarikciler() {
 
                         <div className="flex-1 overflow-y-auto">
                             {activeTab === 'hareketler' && (
-                                <table className="w-full">
+                                <div className="overflow-x-auto w-full">
+<table className="w-full">
                                     <thead>
                                         <tr className="border-b border-stone-800 bg-stone-900 sticky top-0">
                                             <th className="text-left px-4 py-3 text-stone-400 text-sm">Tarih</th>
@@ -384,6 +387,7 @@ export default function Tedarikciler() {
                                         ))}
                                     </tbody>
                                 </table>
+</div>
                             )}
 
                             {activeTab === 'urunler' && (
@@ -419,7 +423,8 @@ export default function Tedarikciler() {
 
                                                 {isExpanded && (
                                                     <div className="border-t border-stone-800 bg-stone-950/50">
-                                                        <table className="w-full text-sm text-left">
+                                                        <div className="overflow-x-auto w-full">
+<table className="w-full text-sm text-left">
                                                             <thead className="bg-stone-900/50 text-stone-400 border-b border-stone-800">
                                                                 <tr>
                                                                     <th className="px-4 py-2 font-medium">Hammadde</th>
@@ -442,6 +447,7 @@ export default function Tedarikciler() {
                                                                 })}
                                                             </tbody>
                                                         </table>
+</div>
                                                     </div>
                                                 )}
                                             </div>

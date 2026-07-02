@@ -341,7 +341,8 @@ export default function Raporlar() {
                             <div className="px-5 py-3 border-b border-stone-800">
                                 <h3 className="font-bold text-stone-300">Tüm Ürünler — Detaylı Karlılık</h3>
                             </div>
-                            <table className="w-full">
+                            <div className="overflow-x-auto w-full">
+<table className="w-full">
                                 <thead>
                                     <tr className="border-b border-stone-800">
                                         <th className="text-left px-4 py-3 text-stone-400 text-sm">Ürün</th>
@@ -373,6 +374,7 @@ export default function Raporlar() {
                                         ))}
                                 </tbody>
                             </table>
+</div>
                         </div>
 
                     </div>

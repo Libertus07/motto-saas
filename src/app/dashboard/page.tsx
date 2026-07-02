@@ -120,26 +120,8 @@ export default function Dashboard() {
   ]
 
   return (
-    <div className="min-h-full bg-stone-950 text-white">
-
-      {/* Header */}
-      <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">☕</span>
-          <div>
-            <h1 className="font-bold text-amber-400">Motto Coffee</h1>
-            <p className="text-xs text-stone-400">Yönetim Paneli</p>
-          </div>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="text-stone-400 hover:text-white text-sm transition-colors"
-        >
-          Çıkış Yap
-        </button>
-      </header>
-
-      <main className="p-6">
+    <div className="min-h-full text-white">
+      <main className="p-0">
         <h2 className="text-xl font-bold mb-6">Hoş geldiniz 👋</h2>
 
         {/* Uyarılar ve Alışveriş Listesi */}

@@ -459,7 +459,8 @@ export default function Stok() {
                         {/* Stok Durumu */}
                         {activeTab === 'stok' && (
                             <div className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
-                                <table className="w-full">
+                                <div className="overflow-x-auto w-full">
+<table className="w-full">
                                     <thead>
                                         <tr className="border-b border-stone-800">
                                             <th className="text-left px-4 py-3 text-stone-400 text-sm">Hammadde</th>
@@ -583,13 +584,15 @@ export default function Stok() {
                                         </tr>
                                     </tfoot>
                                 </table>
+</div>
                             </div>
                         )}
 
                         {/* Hareketler */}
                         {activeTab === 'hareket' && (
                             <div className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
-                                <table className="w-full">
+                                <div className="overflow-x-auto w-full">
+<table className="w-full">
                                     <thead>
                                         <tr className="border-b border-stone-800">
                                             <th className="text-left px-4 py-3 text-stone-400 text-sm">Tarih</th>
@@ -630,6 +633,7 @@ export default function Stok() {
                                         })}
                                     </tbody>
                                 </table>
+</div>
                             </div>
                         )}
 
@@ -652,7 +656,8 @@ export default function Stok() {
                                     </div>
                                 </div>
                                 <div className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
-                                    <table className="w-full">
+                                    <div className="overflow-x-auto w-full">
+<table className="w-full">
                                         <thead>
                                             <tr className="border-b border-stone-800">
                                                 <th className="text-left px-4 py-3 text-stone-400 text-sm">Hammadde</th>
@@ -700,6 +705,7 @@ export default function Stok() {
                                             })}
                                         </tbody>
                                     </table>
+</div>
                                 </div>
                                 <button
                                     onClick={handleSayim}
@@ -809,7 +815,8 @@ export default function Stok() {
                                                         
                                                         {isExpanded && (
                                                             <div className="overflow-x-auto border-t border-stone-800">
-                                                                <table className="w-full text-left">
+                                                                <div className="overflow-x-auto w-full">
+<table className="w-full text-left">
                                                                     <thead className="bg-stone-800/20 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-800">
                                                                         <tr>
                                                                             <th className="px-6 py-3 font-medium">Saat</th>
@@ -850,6 +857,7 @@ export default function Stok() {
                                                                         })}
                                                                     </tbody>
                                                                 </table>
+</div>
                                                             </div>
                                                         )}
                                                     </div>

@@ -274,7 +274,8 @@ export default function Giderler() {
           </div>
         ) : (
           <div className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
-            <table className="w-full">
+            <div className="overflow-x-auto w-full">
+<table className="w-full">
               <thead>
                 <tr className="border-b border-stone-800">
                   <th className="text-left px-4 py-3 text-stone-400 text-sm">Gider</th>
@@ -307,6 +308,7 @@ export default function Giderler() {
                 ))}
               </tbody>
             </table>
+</div>
           </div>
         )}
       </main>

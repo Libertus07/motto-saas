@@ -219,7 +219,8 @@ export default function GecmisRaporlar() {
                                     {/* Accordion Body */}
                                     {isExpanded && (
                                         <div className="border-t border-stone-800 bg-stone-950/50">
-                                            <table className="w-full text-sm text-left">
+                                            <div className="overflow-x-auto w-full">
+<table className="w-full text-sm text-left">
                                                 <thead className="bg-stone-900/50 text-stone-400 border-b border-stone-800">
                                                     <tr>
                                                         <th className="px-6 py-3 font-medium">Satılan Ürün</th>
@@ -245,6 +246,7 @@ export default function GecmisRaporlar() {
                                                     ))}
                                                 </tbody>
                                             </table>
+</div>
                                         </div>
                                     )}
                                 </div>

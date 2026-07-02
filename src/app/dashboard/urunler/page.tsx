@@ -411,7 +411,8 @@ export default function Urunler() {
                   {/* İçerik */}
                   {isOpen && (
                     <div className="border-t border-stone-800">
-                      <table className="w-full">
+                      <div className="overflow-x-auto w-full">
+<table className="w-full">
                         <thead>
                           <tr className="bg-stone-950/40 border-b border-stone-800">
                             <th className="text-left px-5 py-2.5 text-stone-500 text-xs font-medium">Ürün Adı</th>
@@ -487,6 +488,7 @@ export default function Urunler() {
                           })}
                         </tbody>
                       </table>
+</div>
                     </div>
                   )}
                 </div>

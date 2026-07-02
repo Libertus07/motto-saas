@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 
-export default function Sidebar() {
+export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -48,13 +48,25 @@ export default function Sidebar() {
   ]
 
   return (
-    <div className="w-64 bg-stone-900 border-r border-stone-800 flex flex-col hidden md:flex">
-      <div className="p-6 border-b border-stone-800 flex items-center gap-3">
-        <div className="text-3xl">☕</div>
-        <div>
-          <h1 className="font-bold text-amber-500 text-lg">Motto SaaS</h1>
-          <p className="text-stone-500 text-xs">Restoran Zekası</p>
+    <div className="w-64 bg-stone-900 border-r border-stone-800 flex flex-col h-full shadow-2xl md:shadow-none">
+      <div className="p-6 border-b border-stone-800 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="text-3xl">☕</div>
+          <div>
+            <h1 className="font-bold text-amber-500 text-lg">Motto SaaS</h1>
+            <p className="text-stone-500 text-xs">Restoran Zekası</p>
+          </div>
         </div>
+        {onCloseMobile && (
+          <button 
+            onClick={onCloseMobile}
+            className="md:hidden text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
       
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
@@ -64,6 +76,9 @@ export default function Sidebar() {
             <Link 
               key={item.path} 
               href={item.path}
+              onClick={() => {
+                if (onCloseMobile) onCloseMobile();
+              }}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                 isActive 
                   ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
@@ -77,13 +92,21 @@ export default function Sidebar() {
         })}
       </nav>
       
-      <div className="p-4 border-t border-stone-800 relative">
+      <div className="p-4 border-t border-stone-800 relative mt-auto">
         {showProfileMenu && (
           <div className="absolute bottom-full left-4 right-4 mb-2 bg-stone-800 border border-stone-700 rounded-xl shadow-2xl overflow-hidden z-50">
-             <Link href="/dashboard/ayarlar?tab=profil" className="flex items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors border-b border-stone-700/50">
+             <Link 
+               href="/dashboard/ayarlar?tab=profil" 
+               onClick={() => { setShowProfileMenu(false); if (onCloseMobile) onCloseMobile(); }}
+               className="flex items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors border-b border-stone-700/50"
+             >
                 <span className="text-lg">👤</span> Profilim
              </Link>
-             <Link href="/dashboard/ayarlar?tab=genel" className="flex items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors border-b border-stone-700/50">
+             <Link 
+               href="/dashboard/ayarlar?tab=genel" 
+               onClick={() => { setShowProfileMenu(false); if (onCloseMobile) onCloseMobile(); }}
+               className="flex items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors border-b border-stone-700/50"
+             >
                 <span className="text-lg">⚙️</span> Hesap Ayarları
              </Link>
              <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left font-bold">
