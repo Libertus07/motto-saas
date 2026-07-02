@@ -836,7 +836,7 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Ayarlar() {
   const { showAlert } = useNotification()
-  const [activeTab, setActiveTab] = useState<'genel' | 'kullanici' | 'kasa' | 'kategori' | 'entegrasyon'>('genel')
+  const [activeTab, setActiveTab] = useState<Tab>('genel')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
