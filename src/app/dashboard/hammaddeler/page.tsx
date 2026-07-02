@@ -4,6 +4,7 @@ import { useState, useEffect, Fragment } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
+import { useNotification } from '@/components/NotificationProvider'
 
 type Material = {
   id: string
@@ -34,6 +35,7 @@ type EditRow = {
 }
 
 export default function Hammaddeler() {
+  const { showAlert, showConfirm } = useNotification()
   const [materials, setMaterials] = useState<Material[]>([])
   const [categories, setCategories] = useState<string[]>(['Diğer'])
   const [loading, setLoading] = useState(true)
@@ -195,7 +197,7 @@ export default function Hammaddeler() {
       setAutoCatSuggestions(suggestions)
       setAutoCatModalOpen(true)
     } catch (e: any) {
-      alert('Hata: ' + e.message)
+      await showAlert('Hata: ' + e.message, 'error')
     }
     setAutoCatLoading(false)
   }
@@ -303,7 +305,8 @@ export default function Hammaddeler() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Bu hammaddeyi silmek istediğinize emin misiniz?')) return
+    const confirmed = await showConfirm('Bu hammaddeyi silmek istediğinize emin misiniz?', 'Hammaddeyi Sil 🗑️')
+    if (!confirmed) return
     await supabase.from('materials').delete().eq('id', id)
     fetchMaterials()
     logActivity('Hammadde', 'SILME', `Bir hammadde sistemden silindi.`, { materialId: id })

@@ -21,7 +21,7 @@ export async function POST(req: Request) {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const materialsContext = materials?.map((m: any) => `- ${m.id} | ${m.name} | ${m.unit} | ₺${m.price_per_unit}`).join('\n') || 'Yok';
         const subRecipesContext = subRecipes?.map((s: any) => `- ${s.id} | ${s.name} | Porsiyon Maliyeti: ₺${(s.total_cost / (s.yield_quantity || 1)).toFixed(2)}`).join('\n') || 'Yok';
@@ -37,11 +37,11 @@ Kullanıcının verdiği ürün ismine göre standart bir reçete oluşturman ge
 Kullanıcının sistemindeki mevcut hammaddeler:
 ${materialsContext}
 
-Kullanıcının sistemindeki mevcut yarı mamuller (soslar, karışımlar vb.):
+Kullanıcının sistemindeki mevcut üretim reçeteleri (soslar, karışımlar vb.):
 ${subRecipesContext}
 
 KURALLAR:
-1. Sana verilen HAMMADDELER veya YARI MAMULLER listesindeki malzemeleri kullanmak ZORUNDASIN. Olmayan bir malzemeyi ID'siz kafandan uydurma.
+1. Sana verilen HAMMADDELER veya ÜRETİM REÇETELERİ listesindeki malzemeleri kullanmak ZORUNDASIN. Olmayan bir malzemeyi ID'siz kafandan uydurma.
 2. Birimler (unit) çok önemlidir. Örneğin süt 'Litre' ise, bir kahveye 200ml süt konuyorsa quantity 0.2 olmalıdır.
 3. Sunum ve Paketleme (Take Away):
    - Kullanıcı İstatistiksel Ortalama Yöntemini seçtiği için, bu sunum malzemelerinden ${takeawayRatioDecimal} adet ekle. (Örneğin Take Away oranı tahmini %${takeawayRatioPercent} olarak kabul edildi). Yani Karton Bardak: ${takeawayRatioDecimal} adet. Eğer bu tür ürünler listede yoksa yoksay.

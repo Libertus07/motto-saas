@@ -64,7 +64,7 @@ export async function POST(req: Request) {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const prompt = `Lütfen bu POS Gün Sonu (Z Raporu), satış faturası, XML veya JSON dosyasını analiz et.
 Satılan ürün kalemlerini, satış adetlerini ve satış tutarlarını çıkar.

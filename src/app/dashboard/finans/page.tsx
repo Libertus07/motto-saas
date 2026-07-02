@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
+import { logActivity } from '@/lib/logger'
+import { useNotification } from '@/components/NotificationProvider'
 
 type Account = {
     id: string
@@ -21,6 +24,8 @@ type AccountMovement = {
 }
 
 export default function FinansPage() {
+    const { showAlert, showConfirm } = useNotification()
+    const router = useRouter()
     const [accounts, setAccounts] = useState<Account[]>([])
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null)
     const [movements, setMovements] = useState<AccountMovement[]>([])
@@ -139,10 +144,92 @@ export default function FinansPage() {
             // Güncel bakiyeyi selectedAccount state'ine de yansıt
             setSelectedAccount({ ...selectedAccount, balance: selectedAccount.balance + amountChange })
 
+            // Audit Log
+            const changeDesc = `Manuel ${manualForm.movement_type === 'giris' ? 'Para Girişi' : 'Para Çıkışı'} İşlemi (${selectedAccount.name})`
+            await logActivity('Finans', 'EKLEME', changeDesc, {
+                detay: `Tutar (${manualForm.movement_type === 'giris' ? '+' : '-'}₺${amount}) | Açıklama (${manualForm.description})`
+            })
+
         } catch (error: any) {
-            alert('İşlem başarısız: ' + error.message)
+            await showAlert('İşlem başarısız: ' + error.message, 'error')
         } finally {
             setSaving(false)
+        }
+    }
+
+    const handleDeleteMovement = async (move: AccountMovement) => {
+        const confirmed = await showConfirm(
+            `Bu kasa hareketini silmek istediğinize emin misiniz?\n\nBu işlem sonucunda ${move.movement_type === 'giris' ? 'giren tutar kasanızdan düşülecektir' : 'çıkan tutar kasanıza geri iade edilecektir'}.`,
+            'Kasa Hareketi Sil 🗑️'
+        )
+        if (!confirmed) return
+
+        try {
+            // 1. Kasa bakiyesini geri al (Rollback)
+            const amountChange = move.movement_type === 'giris' ? -Number(move.amount) : Number(move.amount)
+            
+            const { error: accError } = await supabase
+                .from('accounts')
+                .update({ balance: Number(selectedAccount!.balance) + amountChange })
+                .eq('id', selectedAccount!.id)
+            
+            if (accError) throw accError
+
+            // 2. Hareketi sil
+            const { error: delError } = await supabase
+                .from('account_movements')
+                .delete()
+                .eq('id', move.id)
+            
+            if (delError) throw delError
+
+            // 3. Log
+            await logActivity('Finans', 'SILME', `Manuel para hareketi silindi: ${move.description}`, {
+                detay: `Silinen Tutar (₺${move.amount}) | Tür (${move.movement_type}) | Hesap (${selectedAccount!.name})`
+            })
+
+            await showAlert('Kasa hareketi başarıyla silindi ve bakiye güncellendi.', 'success')
+            
+            setSelectedMovement(null)
+            fetchAccounts()
+            if (selectedAccount) {
+                fetchMovements(selectedAccount.id)
+            }
+
+        } catch (error: any) {
+            await showAlert('Silme işlemi başarısız: ' + error.message, 'error')
+        }
+    }
+
+    const handleRedirectToModule = async (move: AccountMovement) => {
+        let path = ''
+        let moduleName = ''
+        
+        if (move.source_type === 'z_report') {
+            path = '/dashboard/raporlar/gecmis'
+            moduleName = 'Z-Raporu Geçmişi'
+        } else if (move.source_type === 'supplier_payment' || move.source_type === 'supplier') {
+            path = '/dashboard/raporlar/tedarikci-gecmisi'
+            moduleName = 'Tedarikçi Geçmişi'
+        } else if (move.source_type === 'expense') {
+            path = '/dashboard/giderler'
+            moduleName = 'Giderler Modülü'
+        } else if (move.source_type === 'investment' || move.source_type === 'investment_rent') {
+            path = '/dashboard/raporlar/yatirim-gecmisi'
+            moduleName = 'Yatırım Geçmişi'
+        }
+
+        if (path) {
+            const confirmed = await showConfirm(
+                `Bu işlem otomatik olarak oluşturulmuştur.\n\nİşlemi silmek veya düzenlemek için ${moduleName} sayfasına gitmek ister misiniz?`,
+                'Modüle Git 🚀'
+            )
+            if (confirmed) {
+                setSelectedMovement(null)
+                router.push(path)
+            }
+        } else {
+            await showAlert('Bu işlemin ait olduğu kaynak modül bulunamadı.', 'warning')
         }
     }
 
@@ -414,10 +501,26 @@ export default function FinansPage() {
                             </div>
                         </div>
 
-                        <div className="mt-8">
+                        <div className="mt-8 flex gap-3">
+                            {selectedMovement.source_type === 'manual' ? (
+                                <button 
+                                    onClick={() => handleDeleteMovement(selectedMovement)}
+                                    className="flex-1 bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/20 py-3 rounded-xl text-sm font-bold transition-colors active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                    🗑️ İşlemi Sil
+                                </button>
+                            ) : (
+                                <button 
+                                    onClick={() => handleRedirectToModule(selectedMovement)}
+                                    className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 py-3 rounded-xl text-sm font-bold transition-colors active:scale-95 flex items-center justify-center gap-2"
+                                    title="Sistem tarafından otomatik oluşturulan işlemlerin kaynağına git"
+                                >
+                                    🔗 Kaynağa Git
+                                </button>
+                            )}
                             <button 
                                 onClick={() => setSelectedMovement(null)}
-                                className="w-full bg-stone-800 hover:bg-stone-700 text-white py-3 rounded-xl text-sm font-bold transition-colors"
+                                className="flex-1 bg-stone-800 hover:bg-stone-700 text-white py-3 rounded-xl text-sm font-bold transition-colors"
                             >
                                 Kapat
                             </button>

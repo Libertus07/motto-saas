@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
+import { useNotification } from '@/components/NotificationProvider'
 
 type Expense = {
   id: string
@@ -15,6 +16,7 @@ type Expense = {
 }
 
 export default function Giderler() {
+  const { showConfirm } = useNotification()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -111,7 +113,8 @@ export default function Giderler() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Bu gideri silmek istediğinize emin misiniz?')) return
+    const confirmed = await showConfirm('Bu gideri silmek istediğinize emin misiniz?', 'Gideri Sil 🗑️')
+    if (!confirmed) return
     await supabase.from('expenses').delete().eq('id', id)
     fetchExpenses()
     logActivity('Giderler', 'SILME', `Bir gider kaydı sistemden silindi.`, { expenseId: id })

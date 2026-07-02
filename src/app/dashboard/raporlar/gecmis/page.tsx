@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
+import { useNotification } from '@/components/NotificationProvider'
 
 type SaleItem = {
     id: string
@@ -12,6 +13,7 @@ type SaleItem = {
     total_price: number
     batch_id: string | null
     product_id: string | null
+    document_url?: string | null
     product_name?: string
 }
 
@@ -20,6 +22,7 @@ type GroupedSale = {
     batchId: string | null
     totalRevenue: number
     totalItems: number
+    documentUrl?: string | null
     items: SaleItem[]
 }
 
@@ -37,6 +40,8 @@ export default function GecmisRaporlar() {
     const [deletingDate, setDeletingDate] = useState<string | null>(null)
     const [expandedMonth, setExpandedMonth] = useState<string | null>(null)
     const [expandedDate, setExpandedDate] = useState<string | null>(null)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const { showAlert, showConfirm } = useNotification()
     
     // Filters & Sorting
     const [selectedMonth, setSelectedMonth] = useState<string>('all')
@@ -59,7 +64,8 @@ export default function GecmisRaporlar() {
                 quantity,
                 total_price,
                 batch_id,
-                product_id
+                product_id,
+                document_url
             `)
             .order('sale_date', { ascending: false })
             .order('created_at', { ascending: false })
@@ -91,6 +97,7 @@ export default function GecmisRaporlar() {
                     batchId: item.batch_id,
                     totalRevenue: 0,
                     totalItems: 0,
+                    documentUrl: item.document_url || null,
                     items: []
                 }
             }
@@ -183,13 +190,15 @@ export default function GecmisRaporlar() {
 
     const handleDelete = async (group: GroupedSale) => {
         if (!group.batchId) {
-            alert('Bu Z-Raporu eski bir versiyona ait (Batch ID eksik) olduğu için otomatik olarak geri alınamaz.')
+            await showAlert('Bu Z-Raporu eski bir versiyona ait (Batch ID eksik) olduğu için otomatik olarak geri alınamaz.', 'warning')
             return
         }
 
-        if (!confirm(`Emin misiniz?\n\n${group.date} tarihli bu rapor silindiğinde:\n- Satışlar silinecek.\n- Düşülen hammadde stokları geri eklenecek.\n\nBu işlem geri alınamaz!`)) {
-            return
-        }
+        const confirmed = await showConfirm(
+            `Emin misiniz?\n\n${group.date} tarihli bu rapor silindiğinde:\n- Satışlar silinecek.\n- Düşülen hammadde stokları geri eklenecek.\n\nBu işlem geri alınamaz!`,
+            'Z-Raporunu Sil 🗑'
+        )
+        if (!confirmed) return
 
         setDeletingDate(group.date)
         try {
@@ -204,10 +213,10 @@ export default function GecmisRaporlar() {
             
             logActivity('Z-Raporu', 'SILME', `${group.date} tarihli Z-Raporu silindi ve içerisindeki ${group.totalItems} kalem ürünün stokları geri yüklendi.`, { batchId: group.batchId })
             
-            alert('Z-Raporu başarıyla silindi ve stoklar geri alındı.')
+            await showAlert('Z-Raporu başarıyla silindi ve stoklar geri alındı.', 'success')
             fetchSales()
         } catch (err: any) {
-            alert('Silme işlemi başarısız: ' + err.message)
+            await showAlert('Silme işlemi başarısız: ' + err.message, 'error')
         } finally {
             setDeletingDate(null)
         }
@@ -333,6 +342,15 @@ export default function GecmisRaporlar() {
                                                                 </div>
                                                                 
                                                                 <div className="flex items-center gap-1">
+                                                                    {day.documentUrl && (
+                                                                        <button 
+                                                                            onClick={(e) => { e.stopPropagation(); setPreviewUrl(day.documentUrl!); }}
+                                                                            className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg text-sm flex items-center justify-center transition-colors border border-stone-700 active:scale-95"
+                                                                            title="Z-Raporu Belgesini Gör"
+                                                                        >
+                                                                            🖼️
+                                                                        </button>
+                                                                    )}
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); handleDelete(day) }}
                                                                         disabled={deletingDate === day.date || !day.batchId}
@@ -397,6 +415,36 @@ export default function GecmisRaporlar() {
                     </div>
                 )}
             </main>
+
+            {/* Belge Önizleme Modalı */}
+            {previewUrl && (
+                <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[999] p-4" onClick={() => setPreviewUrl(null)}>
+                    <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center" onClick={e => e.stopPropagation()}>
+                        <button 
+                            onClick={() => setPreviewUrl(null)} 
+                            className="absolute -top-12 right-0 text-white hover:text-stone-300 text-sm font-bold bg-stone-900 border border-stone-800 px-4 py-2 rounded-xl flex items-center gap-2 active:scale-95 transition-all"
+                        >
+                            ✕ Kapat
+                        </button>
+                        
+                        <div className="bg-stone-900 border border-stone-800 p-2 rounded-2xl shadow-2xl overflow-hidden max-w-full max-h-[80vh] flex items-center justify-center">
+                            {previewUrl.startsWith('data:application/pdf') || previewUrl.endsWith('.pdf') ? (
+                                <iframe 
+                                    src={previewUrl} 
+                                    className="w-[80vw] h-[70vh] rounded-lg border-0"
+                                    title="Belge Önizleme"
+                                />
+                            ) : (
+                                <img 
+                                    src={previewUrl} 
+                                    alt="Belge Önizleme" 
+                                    className="max-w-full max-h-[75vh] object-contain rounded-lg"
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

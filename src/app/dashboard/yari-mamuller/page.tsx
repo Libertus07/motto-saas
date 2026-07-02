@@ -4,6 +4,7 @@ import { useState, useEffect, Fragment } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
+import { useNotification } from '@/components/NotificationProvider'
 
 type Material = {
   id: string
@@ -28,6 +29,7 @@ type SubRecipe = {
 }
 
 export default function YariMamuller() {
+  const { showConfirm } = useNotification()
   const [subRecipes, setSubRecipes] = useState<SubRecipe[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [loading, setLoading] = useState(true)
@@ -132,7 +134,7 @@ export default function YariMamuller() {
       }
     }
     resetForm(); fetchData()
-    logActivity('Yarı Mamul', editingId ? 'GUNCELLEME' : 'EKLEME', `${form.name} isimli yarı mamul (üretim reçetesi) ${editingId ? 'güncellendi' : 'sisteme eklendi'}.`, { detay: details })
+    logActivity('Üretim Reçetesi', editingId ? 'GUNCELLEME' : 'EKLEME', `${form.name} isimli üretim reçetesi ${editingId ? 'güncellendi' : 'sisteme eklendi'}.`, { detay: details })
   }
 
   const handleEdit = async (recipe: SubRecipe) => {
@@ -153,10 +155,11 @@ export default function YariMamuller() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Bu yarı mamulü silmek istediğinize emin misiniz?')) return
+    const confirmed = await showConfirm('Bu üretim reçetesini silmek istediğinize emin misiniz?', 'Üretim Reçetesini Sil 🗑️')
+    if (!confirmed) return
     await supabase.from('sub_recipes').delete().eq('id', id)
     fetchData()
-    logActivity('Yarı Mamul', 'SILME', `Bir yarı mamul sistemden silindi.`, { recipeId: id })
+    logActivity('Üretim Reçetesi', 'SILME', `Bir üretim reçetesi sistemden silindi.`, { recipeId: id })
   }
 
   const liveCost = calculateLiveCost()
@@ -169,12 +172,12 @@ export default function YariMamuller() {
   const renderForm = (isInline = false) => (
     <div className={isInline ? '' : 'bg-stone-900 border border-amber-400 rounded-xl p-6 mb-6'}>
       {!isInline && (
-        <h2 className="font-bold text-lg mb-4">Yeni Yarı Mamul (Tepsi/Tencere) Ekle</h2>
+        <h2 className="font-bold text-lg mb-4">Yeni Üretim Reçetesi (Tepsi/Tencere) Ekle</h2>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="md:col-span-1">
-          <label className="text-stone-400 text-sm mb-1 block">Yarı Mamul Adı *</label>
+          <label className="text-stone-400 text-sm mb-1 block">Üretim Reçetesi Adı *</label>
           <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400" placeholder="örn: Tepsi Profiterol" />
         </div>
         <div>
@@ -247,13 +250,13 @@ export default function YariMamuller() {
       <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-2xl">🥣</span>
-          <h1 className="font-bold text-amber-400">Yarı Mamuller (Üretim)</h1>
+          <h1 className="font-bold text-amber-400">Üretim Reçeteleri</h1>
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(true) }}
           className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-4 py-2 rounded-lg text-sm transition-colors"
         >
-          + Yeni Yarı Mamul
+          + Yeni Üretim Reçetesi
         </button>
       </header>
 
@@ -266,7 +269,7 @@ export default function YariMamuller() {
         ) : subRecipes.length === 0 ? (
           <div className="text-center py-16 text-stone-500">
             <div className="text-5xl mb-4">🥣</div>
-            <p>Henüz yarı mamul eklenmemiş.</p>
+            <p>Henüz üretim reçetesi eklenmemiş.</p>
             <p className="text-sm mt-1">Örneğin kendi yaptığınız pastaları buradan tepsi bazlı girebilirsiniz.</p>
           </div>
         ) : (
@@ -275,7 +278,7 @@ export default function YariMamuller() {
 <table className="w-full">
               <thead>
                 <tr className="border-b border-stone-800">
-                  <th className="text-left px-4 py-3 text-stone-400 text-sm">Yarı Mamul Adı</th>
+                  <th className="text-left px-4 py-3 text-stone-400 text-sm">Üretim Reçetesi Adı</th>
                   <th className="text-right px-4 py-3 text-stone-400 text-sm">Toplam (Fire Dahil) Maliyet</th>
                   <th className="text-right px-4 py-3 text-stone-400 text-sm">Çıkan Porsiyon</th>
                   <th className="text-right px-4 py-3 text-stone-400 text-sm">Porsiyon Maliyeti</th>

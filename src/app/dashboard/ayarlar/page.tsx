@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
+import { useNotification } from '@/components/NotificationProvider'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type Tab = 'profil' | 'genel' | 'finansal' | 'bildirimler' | 'ekip' | 'entegrasyonlar'
@@ -481,7 +482,7 @@ function GenelTab({ s, set, onSave, saving }: { s: Settings; set: (k: keyof Sett
       .upload(`logos/${fileName}`, file, { upsert: true })
 
     if (error) {
-      alert('Logo yüklenirken hata oluştu: ' + error.message)
+      await showAlert('Logo yüklenirken hata oluştu: ' + error.message, 'error')
       setUploadingLogo(false)
       return
     }
@@ -833,7 +834,8 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Ayarlar() {
-  const [activeTab, setActiveTab] = useState<Tab>('genel')
+  const { showAlert } = useNotification()
+  const [activeTab, setActiveTab] = useState<'genel' | 'kullanici' | 'kasa' | 'kategori' | 'entegrasyon'>('genel')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')

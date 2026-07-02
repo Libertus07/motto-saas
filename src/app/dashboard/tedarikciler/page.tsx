@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
+import { useNotification } from '@/components/NotificationProvider'
 
 type Supplier = {
     id: string
@@ -31,6 +32,7 @@ type SupplierMovement = {
     quantity: number
     unit_price: number
     batch_id?: string
+    document_url?: string
     materials: { name: string, unit: string }
 }
 
@@ -39,16 +41,19 @@ type GroupedReceipt = {
     date: string
     totalAmount: number
     totalItems: number
+    documentUrl?: string
     items: SupplierMovement[]
 }
 
 export default function Tedarikciler() {
+    const { showAlert, showConfirm } = useNotification()
     const [suppliers, setSuppliers] = useState<Supplier[]>([])
     const [loading, setLoading] = useState(true)
     const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
     const [transactions, setTransactions] = useState<Transaction[]>([])
     const [groupedReceipts, setGroupedReceipts] = useState<GroupedReceipt[]>([])
     const [expandedBatch, setExpandedBatch] = useState<string | null>(null)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<'hareketler' | 'urunler' | 'bilgiler'>('hareketler')
     
     // Modal & Forms
@@ -102,7 +107,7 @@ export default function Tedarikciler() {
                 .order('created_at', { ascending: false }),
             supabase
                 .from('stock_movements')
-                .select('id, created_at, quantity, unit_price, batch_id, materials(name, unit)')
+                .select('id, created_at, quantity, unit_price, batch_id, document_url, materials(name, unit)')
                 .eq('supplier_id', supplier.id)
                 .order('created_at', { ascending: false })
         ])
@@ -122,8 +127,12 @@ export default function Tedarikciler() {
                     date: dateStr,
                     totalAmount: 0,
                     totalItems: 0,
+                    documentUrl: item.document_url,
                     items: []
                 }
+            }
+            if (item.document_url) {
+                groups[key].documentUrl = item.document_url
             }
             groups[key].items.push(item)
             groups[key].totalAmount += (item.quantity || 0) * (item.unit_price || 0)
@@ -179,15 +188,20 @@ export default function Tedarikciler() {
             viewTransactions({ ...selectedSupplier, total_debt: newDebt })
             
             logActivity('Tedarikçi', 'EKLEME', `${selectedSupplier.name} firmasına ${amount} TL ödeme eklendi.`, { amount, note: paymentNote })
-            alert('Ödeme başarıyla kaydedildi!')
+            await showAlert('Ödeme başarıyla kaydedildi!', 'success')
         } catch (error) {
-            alert('Hata oluştu')
+            await showAlert('Hata oluştu', 'error')
         }
     }
 
     const handleDeleteTransaction = async (trx: Transaction) => {
         if (!selectedSupplier) return;
-        if (!confirm('Bu hareketi silmek istediğinize emin misiniz? (Fişten gelen ürünler silinmez, sadece cari hesap geri alınır)')) return;
+        
+        const confirmed = await showConfirm(
+            'Bu hareketi silmek istediğinize emin misiniz? (Fişten gelen ürünler silinmez, sadece cari hesap geri alınır)',
+            'İşlemi Sil 🗑️'
+        )
+        if (!confirmed) return;
 
         try {
             // 1. İşlemi sil
@@ -210,9 +224,9 @@ export default function Tedarikciler() {
             viewTransactions({ ...selectedSupplier, total_debt: newDebt });
             
             logActivity('Tedarikçi', 'SILME', `${selectedSupplier.name} firmasına ait ${trx.amount} TL tutarındaki cari işlem silindi.`, { transaction: trx })
-            alert('İşlem silindi ve bakiye güncellendi!');
+            await showAlert('İşlem silindi ve bakiye güncellendi!', 'success');
         } catch (error) {
-            alert('Silme işlemi başarısız oldu.');
+            await showAlert('Silme işlemi başarısız oldu.', 'error');
         }
     }
 
@@ -241,10 +255,10 @@ export default function Tedarikciler() {
         const { error } = await supabase.from('suppliers').update(updates).eq('id', selectedSupplier.id);
         
         if (error) {
-            alert('Güncellenirken hata oluştu.');
+            await showAlert('Güncellenirken hata oluştu.', 'error');
         } else {
             logActivity('Tedarikçi', 'GUNCELLEME', `${selectedSupplier.name} firmasının bilgileri güncellendi.`, { detay: details })
-            alert('Tedarikçi bilgileri başarıyla güncellendi!');
+            await showAlert('Tedarikçi bilgileri başarıyla güncellendi!', 'success');
             fetchSuppliers();
             setSelectedSupplier({ ...selectedSupplier, ...updates } as Supplier);
         }
@@ -260,7 +274,7 @@ export default function Tedarikciler() {
         }).select().single()
 
         if (error) {
-            alert('Hata oluştu')
+            await showAlert('Hata oluştu', 'error')
             return
         }
 
@@ -269,7 +283,7 @@ export default function Tedarikciler() {
         fetchSuppliers()
         
         logActivity('Tedarikçi', 'EKLEME', `${newSupplier.name} isimli yeni tedarikçi sisteme eklendi.`)
-        alert('Tedarikçi başarıyla eklendi!')
+        await showAlert('Tedarikçi başarıyla eklendi!', 'success')
     }
 
     return (
@@ -445,6 +459,15 @@ export default function Tedarikciler() {
                                                             <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Fiş Toplamı</p>
                                                             <p className="font-bold text-red-400">₺{group.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
                                                         </div>
+                                                        {group.documentUrl && (
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); setPreviewUrl(group.documentUrl!); }}
+                                                                className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg text-sm flex items-center justify-center transition-colors border border-stone-700 active:scale-95 ml-2"
+                                                                title="Belgeyi Gör"
+                                                            >
+                                                                🖼️
+                                                            </button>
+                                                        )}
                                                         <div className={`text-stone-500 p-2 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
                                                             ▼
                                                         </div>
@@ -622,6 +645,36 @@ export default function Tedarikciler() {
                         >
                             Tedarikçiyi Kaydet
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Belge Önizleme Modalı */}
+            {previewUrl && (
+                <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[999] p-4" onClick={() => setPreviewUrl(null)}>
+                    <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center" onClick={e => e.stopPropagation()}>
+                        <button 
+                            onClick={() => setPreviewUrl(null)} 
+                            className="absolute -top-12 right-0 text-white hover:text-stone-300 text-sm font-bold bg-stone-900 border border-stone-800 px-4 py-2 rounded-xl flex items-center gap-2 active:scale-95 transition-all"
+                        >
+                            ✕ Kapat
+                        </button>
+                        
+                        <div className="bg-stone-900 border border-stone-800 p-2 rounded-2xl shadow-2xl overflow-hidden max-w-full max-h-[80vh] flex items-center justify-center">
+                            {previewUrl.startsWith('data:application/pdf') || previewUrl.endsWith('.pdf') ? (
+                                <iframe 
+                                    src={previewUrl} 
+                                    className="w-[80vw] h-[70vh] rounded-lg border-0"
+                                    title="Belge Önizleme"
+                                />
+                            ) : (
+                                <img 
+                                    src={previewUrl} 
+                                    alt="Belge Önizleme" 
+                                    className="max-w-full max-h-[75vh] object-contain rounded-lg"
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

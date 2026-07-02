@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 import type { Metadata, Viewport } from "next";
+import { NotificationProvider } from "@/components/NotificationProvider";
 
 export const metadata: Metadata = {
   title: "Motto SaaS - Restoran Zekası",
@@ -37,7 +38,11 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <NotificationProvider>
+          {children}
+        </NotificationProvider>
+      </body>
     </html>
   );
 }

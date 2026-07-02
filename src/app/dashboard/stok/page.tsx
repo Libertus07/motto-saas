@@ -4,6 +4,7 @@ import { useState, useEffect, Fragment, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
+import { useNotification } from '@/components/NotificationProvider'
 
 type Material = {
     id: string
@@ -26,6 +27,7 @@ type Movement = {
 }
 
 export default function Stok() {
+    const { showAlert } = useNotification()
     const [materials, setMaterials] = useState<Material[]>([])
     const [movements, setMovements] = useState<Movement[]>([])
     const [loading, setLoading] = useState(true)
@@ -183,7 +185,7 @@ export default function Stok() {
         fetchData()
         
         logActivity('Stok', 'GUNCELLEME', `Stok sayım düzeltmesi yapıldı. Eksik/Fazla ürünlerin kaydı oluşturuldu.`, sayimDetails.length > 0 ? { detay: sayimDetails.join(', ') } : undefined)
-        alert('Sayım tamamlandı!')
+        await showAlert('Sayım tamamlandı!', 'success')
     }
 
     const criticalMaterials = materials.filter(i => (i.stock_quantity || 0) <= (i.critical_stock_level || 0) && (i.critical_stock_level || 0) > 0)

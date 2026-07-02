@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { useNotification } from '@/components/NotificationProvider'
 
 type Product = {
     id: string
@@ -20,6 +21,7 @@ type Expense = {
 }
 
 export default function Raporlar() {
+    const { showAlert } = useNotification()
     const [products, setProducts] = useState<Product[]>([])
     const [expenses, setExpenses] = useState<Expense[]>([])
     const [sales, setSales] = useState<any[]>([])
@@ -80,12 +82,12 @@ export default function Raporlar() {
             if (!data.error) {
                 setAiReport(data)
             } else {
-                alert(data.error)
+                await showAlert(data.error, 'error')
                 setAiModalOpen(false)
             }
         } catch (e) {
             console.error(e)
-            alert('Yapay zeka ile bağlantı kurulamadı.')
+            await showAlert('Yapay zeka ile bağlantı kurulamadı.', 'error')
             setAiModalOpen(false)
         }
         setAiLoading(false)
@@ -170,8 +172,9 @@ export default function Raporlar() {
                 {loading ? <p className="text-stone-400">Yükleniyor...</p> : (
                     <div className="space-y-6">
 
-                        {/* Akıllı Veri Girişi */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Akıllı Veri Girişi & Fiş Arşivi */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {/* Üst Satır - Yüklemeler */}
                             <div 
                                 onClick={() => router.push('/dashboard/hammaddeler/fis-yukle')}
                                 className="bg-stone-900 border border-stone-800 hover:border-amber-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
@@ -193,23 +196,45 @@ export default function Raporlar() {
                                 </div>
                             </div>
                             <div 
-                                onClick={() => router.push('/dashboard/raporlar/gecmis')}
-                                className="bg-stone-900 border border-stone-800 hover:border-green-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
+                                onClick={() => router.push('/dashboard/raporlar/yatirim-fisi')}
+                                className="bg-stone-900 border border-stone-800 hover:border-purple-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
                             >
-                                <div className="text-4xl">📅</div>
+                                <div className="text-4xl">💰</div>
                                 <div>
-                                    <h3 className="font-bold text-green-400 text-lg">Geçmiş Z Raporları</h3>
-                                    <p className="text-stone-400 text-sm">Daha önce işlenen raporları tarih bazlı incele.</p>
+                                    <h3 className="font-bold text-purple-400 text-lg">Yatırım Fişi Yükle</h3>
+                                    <p className="text-stone-400 text-sm">Altın, döviz veya varlık fişlerinizi okutarak portföyünüze ekleyin.</p>
+                                </div>
+                            </div>
+
+                            {/* Alt Satır - Arşivler */}
+                            <div 
+                                onClick={() => router.push('/dashboard/raporlar/tedarikci-gecmisi')}
+                                className="bg-stone-900 border border-stone-800 hover:border-amber-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
+                            >
+                                <div className="text-4xl">📂</div>
+                                <div>
+                                    <h3 className="font-bold text-amber-400 text-lg">Geçmiş Fişler</h3>
+                                    <p className="text-stone-400 text-sm">Geçmiş tedarikçi ve hammadde faturalarını incele.</p>
                                 </div>
                             </div>
                             <div 
-                                onClick={() => router.push('/dashboard/raporlar/tedarikci-gecmisi')}
-                                className="bg-stone-900 border border-stone-800 hover:border-green-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
+                                onClick={() => router.push('/dashboard/raporlar/gecmis')}
+                                className="bg-stone-900 border border-stone-800 hover:border-blue-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
                             >
-                                <div className="text-4xl">🧾</div>
+                                <div className="text-4xl">📅</div>
                                 <div>
-                                    <h3 className="font-bold text-green-400 text-lg">Geçmiş Fişler</h3>
-                                    <p className="text-stone-400 text-sm">Geçmiş tedarikçi fişlerini gör ve yönet.</p>
+                                    <h3 className="font-bold text-blue-400 text-lg">Geçmiş Z Raporları</h3>
+                                    <p className="text-stone-400 text-sm">Daha önce işlenen gün sonu satış raporlarını gör.</p>
+                                </div>
+                            </div>
+                            <div 
+                                onClick={() => router.push('/dashboard/raporlar/yatirim-gecmisi')}
+                                className="bg-stone-900 border border-stone-800 hover:border-purple-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
+                            >
+                                <div className="text-4xl">🗂️</div>
+                                <div>
+                                    <h3 className="font-bold text-purple-400 text-lg">Geçmiş Yatırım Fişleri</h3>
+                                    <p className="text-stone-400 text-sm">Yüklediğiniz tüm yatırım ve dekont arşivine göz atın.</p>
                                 </div>
                             </div>
                         </div>

@@ -135,7 +135,7 @@ export default function Dashboard() {
 
   const modules = [
     { icon: '🧪', title: 'Hammaddeler', desc: 'Malzeme listesi ve fiyatlar', path: '/dashboard/hammaddeler' },
-    { icon: '🥣', title: 'Yarı Mamuller', desc: 'Kendi üretiminiz pastalar/tepsiler', path: '/dashboard/yari-mamuller' },
+    { icon: '🥣', title: 'Üretim Reçeteleri', desc: 'Kendi üretiminiz pastalar/tepsiler', path: '/dashboard/yari-mamuller' },
     { icon: '📋', title: 'Ürünler & Reçeteler', desc: 'Menü ve maliyet hesabı', path: '/dashboard/urunler' },
     { icon: '💰', title: 'Giderler', desc: 'Kira, personel, faturalar', path: '/dashboard/giderler' },
     { icon: '📦', title: 'Stok Takibi', desc: 'Giriş, çıkış, sayım', path: '/dashboard/stok' },

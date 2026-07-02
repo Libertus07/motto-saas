@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { logActivity } from '@/lib/logger'
 
 type StockMovement = {
     id: string
@@ -12,6 +13,7 @@ type StockMovement = {
     created_at: string
     batch_id: string | null
     note: string
+    document_url?: string | null
     materials: {
         name: string
         unit: string
@@ -28,6 +30,7 @@ type GroupedReceipt = {
     totalAmount: number
     totalItems: number
     batchId: string | null
+    documentUrl?: string | null
     items: StockMovement[]
 }
 
@@ -50,6 +53,7 @@ export default function TedarikciGecmisi() {
     const [allReceipts, setAllReceipts] = useState<GroupedReceipt[]>([])
     const [loading, setLoading] = useState(true)
     const [deletingId, setDeletingId] = useState<string | null>(null)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     
     const [expandedMain, setExpandedMain] = useState<string | null>(null) // Ay veya Tedarikçi
     const [expandedReceipt, setExpandedReceipt] = useState<string | null>(null) // Fişin içi
@@ -78,6 +82,7 @@ export default function TedarikciGecmisi() {
                 created_at,
                 batch_id,
                 note,
+                document_url,
                 materials (
                     name,
                     unit
@@ -111,6 +116,7 @@ export default function TedarikciGecmisi() {
                     totalAmount: 0,
                     totalItems: 0,
                     batchId: item.batch_id,
+                    documentUrl: item.document_url || null,
                     items: []
                 }
             }
@@ -224,6 +230,8 @@ export default function TedarikciGecmisi() {
             const data = await res.json()
             if (data.error) throw new Error(data.error)
             
+            await logActivity('Tedarikçi', 'SILME', `Tedarikçi geçmiş fişi silindi ve içerisindeki stok/cari hareketler geri alındı.`, { batchId: receipt.batchId, totalAmount: receipt.totalAmount })
+
             alert('Fiş başarıyla silindi ve işlemler geri alındı.')
             fetchReceipts()
         } catch (err: any) {
@@ -369,6 +377,15 @@ export default function TedarikciGecmisi() {
                                                                 </div>
                                                                 
                                                                 <div className="flex items-center gap-1">
+                                                                    {receipt.documentUrl && (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); setPreviewUrl(receipt.documentUrl!); }}
+                                                                            className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg flex items-center justify-center transition-colors border border-stone-700 active:scale-95"
+                                                                            title="Fiş Belgesini Gör"
+                                                                        >
+                                                                            🖼️
+                                                                        </button>
+                                                                    )}
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); handleDelete(receipt) }}
                                                                         disabled={deletingId === receipt.id || !receipt.batchId}
@@ -437,6 +454,27 @@ export default function TedarikciGecmisi() {
                     </div>
                 )}
             </main>
+
+            {/* Belge Önizleme Modalı */}
+            {previewUrl && (
+                <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[999] p-4" onClick={() => setPreviewUrl(null)}>
+                    <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center" onClick={e => e.stopPropagation()}>
+                        <button
+                            onClick={() => setPreviewUrl(null)}
+                            className="absolute -top-12 right-0 text-white hover:text-stone-300 text-sm font-bold bg-stone-900 border border-stone-800 px-4 py-2 rounded-xl flex items-center gap-2 active:scale-95 transition-all"
+                        >
+                            ✕ Kapat
+                        </button>
+                        <div className="bg-stone-900 border border-stone-800 p-2 rounded-2xl shadow-2xl overflow-hidden max-w-full max-h-[80vh] flex items-center justify-center">
+                            {previewUrl.startsWith('data:application/pdf') || previewUrl.endsWith('.pdf') ? (
+                                <iframe src={previewUrl} className="w-[80vw] h-[70vh] rounded-lg border-0" title="Belge Önizleme" />
+                            ) : (
+                                <img src={previewUrl} alt="Belge Önizleme" className="max-w-full max-h-[75vh] object-contain rounded-lg" />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

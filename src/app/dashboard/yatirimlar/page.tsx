@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
+import * as XLSX from 'xlsx'
+import { logActivity } from '@/lib/logger'
+import { useNotification } from '@/components/NotificationProvider'
 
 type Account = {
     id: string
@@ -40,6 +43,7 @@ type Rates = {
 } | null
 
 export default function YatirimlarPage() {
+    const { showAlert, showConfirm } = useNotification()
     const [accounts, setAccounts] = useState<Account[]>([])
     const [investments, setInvestments] = useState<Investment[]>([])
     const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -151,51 +155,75 @@ export default function YatirimlarPage() {
         if (!file) return
 
         if (file.size > 4 * 1024 * 1024) {
-            alert('Dosya çok büyük. Lütfen 4MB altı bir belge yükleyin.')
+            await showAlert('Dosya çok büyük. Lütfen 4MB altı bir belge yükleyin.', 'warning')
             return
         }
 
         setIsAnalyzing(true)
         try {
+            const fileExt = file.name.split('.').pop()?.toLowerCase()
             const reader = new FileReader()
-            reader.readAsDataURL(file)
-            
-            reader.onloadend = async () => {
-                const base64data = reader.result as string
-                
-                const response = await fetch('/api/analyze-investment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: base64data })
-                })
 
-                const data = await response.json()
-                if (data.error) throw new Error(data.error)
+            reader.onloadend = async (evt) => {
+                try {
+                    let payload: any = {}
+                    let base64data = ''
 
-                setBuyForm(prev => ({
-                    ...prev,
-                    asset_type: data.asset_type || prev.asset_type,
-                    quantity: data.quantity ? data.quantity.toString() : prev.quantity,
-                    price_per_unit: data.price_per_unit ? data.price_per_unit.toString() : prev.price_per_unit,
-                    purchase_date: data.purchase_date || prev.purchase_date,
-                    notes: data.notes || prev.notes,
-                    document_url: base64data
-                }))
-                alert('Belge yapay zeka tarafından başarıyla okundu! Lütfen bilgileri kontrol edin.')
-                setIsBuyModalOpen(true)
+                    if (fileExt === 'xlsx' || fileExt === 'xls') {
+                        const data = new Uint8Array(evt.target?.result as ArrayBuffer)
+                        const workbook = XLSX.read(data, { type: 'array' })
+                        const firstSheetName = workbook.SheetNames[0]
+                        const worksheet = workbook.Sheets[firstSheetName]
+                        const json = XLSX.utils.sheet_to_json(worksheet)
+                        payload = { fileText: JSON.stringify(json) }
+                    } else {
+                        base64data = reader.result as string
+                        payload = { image: base64data }
+                    }
+                    
+                    const response = await fetch('/api/analyze-investment', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    })
+
+                    const data = await response.json()
+                    if (data.error) throw new Error(data.error)
+
+                    setBuyForm(prev => ({
+                        ...prev,
+                        asset_type: data.asset_type || prev.asset_type,
+                        quantity: data.quantity ? data.quantity.toString() : prev.quantity,
+                        price_per_unit: data.price_per_unit ? data.price_per_unit.toString() : prev.price_per_unit,
+                        purchase_date: data.purchase_date || prev.purchase_date,
+                        notes: data.notes || prev.notes,
+                        document_url: base64data || ''
+                    }))
+                    await showAlert('Belge yapay zeka tarafından başarıyla okundu! Lütfen bilgileri kontrol edin.', 'success')
+                    setIsBuyModalOpen(true)
+                } catch (error: any) {
+                    await showAlert('Hata: ' + error.message, 'error')
+                } finally {
+                    setIsAnalyzing(false)
+                }
+            }
+
+            if (fileExt === 'xlsx' || fileExt === 'xls') {
+                reader.readAsArrayBuffer(file)
+            } else {
+                reader.readAsDataURL(file)
             }
         } catch (error: any) {
-            alert('Hata: ' + error.message)
-        } finally {
+            await showAlert('Hata: ' + error.message, 'error')
             setIsAnalyzing(false)
         }
     }
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, formSetter: any, formState: any) => {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, formSetter: any, formState: any) => {
         const file = e.target.files?.[0]
         if (file) {
             if (file.size > 2 * 1024 * 1024) {
-                alert('Dosya boyutu çok büyük! Maksimum 2MB yükleyebilirsiniz.')
+                await showAlert('Dosya boyutu çok büyük! Maksimum 2MB yükleyebilirsiniz.', 'warning')
                 return
             }
             const reader = new FileReader()
@@ -220,19 +248,6 @@ export default function YatirimlarPage() {
         try {
             const selectedAcc = accounts.find(a => a.id === buyForm.account_id)
             if (!selectedAcc) throw new Error('Hesap bulunamadı.')
-
-            const { error: moveError } = await supabase.from('account_movements').insert({
-                account_id: buyForm.account_id,
-                movement_type: 'cikis',
-                amount: totalAmount,
-                description: `Yatırım Alımı: ${isRE ? 'Gayrimenkul' : `${qty} ${buyForm.asset_type.toUpperCase()}`} alındı.`,
-                source_type: 'investment'
-            })
-            if (moveError) throw moveError
-
-            await supabase.from('accounts').update({
-                balance: selectedAcc.balance - totalAmount
-            }).eq('id', buyForm.account_id)
 
             let invId = ''
             const existingInv = isRE ? null : investments.find(i => i.asset_type === buyForm.asset_type)
@@ -273,6 +288,21 @@ export default function YatirimlarPage() {
                 invId = newInv.id
             }
 
+            // Kasa hareketini ekle ve source_id olarak invId ata
+            const { error: moveError } = await supabase.from('account_movements').insert({
+                account_id: buyForm.account_id,
+                movement_type: 'cikis',
+                amount: totalAmount,
+                description: `Yatırım Alımı: ${isRE ? 'Gayrimenkul' : `${qty} ${buyForm.asset_type.toUpperCase()}`} alındı.`,
+                source_type: 'investment',
+                source_id: invId
+            })
+            if (moveError) throw moveError
+
+            await supabase.from('accounts').update({
+                balance: selectedAcc.balance - totalAmount
+            }).eq('id', buyForm.account_id)
+
             await supabase.from('investment_transactions').insert({
                 investment_id: invId,
                 transaction_type: 'buy',
@@ -282,7 +312,11 @@ export default function YatirimlarPage() {
                 account_id: buyForm.account_id
             })
 
-            alert('Yatırım başarıyla eklendi!')
+            await logActivity('Yatırımlar', 'EKLEME', `Yeni Yatırım Alımı: ${isRE ? 'Gayrimenkul' : `${qty} birim ${buyForm.asset_type.toUpperCase()}`}`, {
+                detay: `Tutar (₺${totalAmount}) | Fiyat (₺${price}) | Not (${buyForm.notes || '-'})`
+            })
+
+            await showAlert('Yatırım başarıyla eklendi!', 'success')
             setIsBuyModalOpen(false)
             setBuyForm({ 
                 ...buyForm, 
@@ -294,7 +328,7 @@ export default function YatirimlarPage() {
             fetchData()
 
         } catch (error: any) {
-            alert('Hata: ' + error.message)
+            await showAlert('Hata: ' + error.message, 'error')
         } finally {
             setSaving(false)
         }
@@ -331,13 +365,17 @@ export default function YatirimlarPage() {
                 account_id: rentForm.account_id
             })
 
-            alert('Kira başarıyla tahsil edildi!')
+            await logActivity('Yatırımlar', 'EKLEME', `Kira Tahsilatı: ${selectedInvestment.name}`, {
+                detay: `Kira Bedeli (₺${amount}) | Tahsil Edilen Hesap (${selectedAcc.name})`
+            })
+
+            await showAlert('Kira başarıyla tahsil edildi!', 'success')
             setIsRentModalOpen(false)
             setRentForm({ ...rentForm, amount: '' })
             fetchData()
 
         } catch (error: any) {
-            alert('Hata: ' + error.message)
+            await showAlert('Hata: ' + error.message, 'error')
         } finally {
             setSaving(false)
         }
@@ -355,12 +393,16 @@ export default function YatirimlarPage() {
                 updated_at: new Date().toISOString()
             }).eq('id', selectedInvestment.id)
 
-            alert('Gayrimenkul değeri başarıyla güncellendi!')
+            await logActivity('Yatırımlar', 'GUNCELLEME', `Değer Güncellemesi: ${selectedInvestment.name}`, {
+                detay: `Yeni Değer (₺${newVal}) | Eski Değer (₺${selectedInvestment.current_manual_value || 0})`
+            })
+
+            await showAlert('Gayrimenkul değeri başarıyla güncellendi!', 'success')
             setIsValueModalOpen(false)
             setValueForm({ current_value: '' })
             fetchData()
         } catch(error: any) {
-            alert('Hata: ' + error.message)
+            await showAlert('Hata: ' + error.message, 'error')
         } finally {
             setSaving(false)
         }
@@ -385,25 +427,77 @@ export default function YatirimlarPage() {
                 updated_at: new Date().toISOString()
             }).eq('id', selectedInvestment.id)
 
-            alert('Yatırım başarıyla güncellendi!')
+            await logActivity('Yatırımlar', 'GUNCELLEME', `Yatırım Düzenleme: ${editForm.name}`, {
+                detay: `Miktar (${qty}) | Maliyet (₺${cost})`
+            })
+
+            await showAlert('Yatırım başarıyla güncellendi!', 'success')
             setIsEditModalOpen(false)
             fetchData()
         } catch(error: any) {
-            alert('Hata: ' + error.message)
+            await showAlert('Hata: ' + error.message, 'error')
         } finally {
             setSaving(false)
         }
     }
 
     const handleDeleteInvestment = async (id: string) => {
-        if (!confirm('Bu yatırımı silmek istediğinize emin misiniz? (Geçmiş hesap hareketleriniz silinmeyecektir)')) return
+        const confirmed = await showConfirm(
+            'Bu yatırımı silmek istediğinize emin misiniz?\n\nBu işlem yatırımı cüzdanınızdan kaldıracak ve ödenen tüm tutarları kasalarınıza/bankanıza iade edecektir.',
+            'Yatırımı Sil 🗑️'
+        )
+        if (!confirmed) return
         setLoading(true)
         try {
-            await supabase.from('investments').delete().eq('id', id)
-            alert('Yatırım silindi.')
+            // 1. Yatırıma bağlı tüm kasa hareketlerini (account_movements) bul
+            const { data: movements, error: movGetError } = await supabase
+                .from('account_movements')
+                .select('*')
+                .eq('source_type', 'investment')
+                .eq('source_id', id)
+            
+            if (movGetError) {
+                console.error("Kasa hareketleri bulunamadı:", movGetError)
+            }
+
+            // 2. Her bir kasa hareketi için bakiye iadesi yap
+            if (movements && movements.length > 0) {
+                for (const mov of movements) {
+                    const { data: accData } = await supabase
+                        .from('accounts')
+                        .select('balance')
+                        .eq('id', mov.account_id)
+                        .single()
+                    
+                    if (accData) {
+                        // Alım çıkış hareketiydi, iade için bakiyeyi arttırıyoruz
+                        const newBalance = Number(accData.balance) + Number(mov.amount)
+                        await supabase
+                            .from('accounts')
+                            .update({ balance: newBalance })
+                            .eq('id', mov.account_id)
+                    }
+                    
+                    // Kasa hareketini sil
+                    await supabase.from('account_movements').delete().eq('id', mov.id)
+                }
+            }
+
+            // 3. Yatırımı sil
+            const invToDelete = investments.find(i => i.id === id)
+            const { error: delError } = await supabase.from('investments').delete().eq('id', id)
+            if (delError) throw delError
+            
+            if (invToDelete) {
+                await logActivity('Yatırımlar', 'SILME', `Yatırım Silindi (Bakiye İade Edildi): ${invToDelete.name}`, {
+                    detay: `Silinen Varlık Tipi (${invToDelete.asset_type}) | Miktar (${invToDelete.quantity})`
+                })
+            }
+
+            await showAlert('Yatırım başarıyla silindi ve ilişkili ödemeler kasalarınıza iade edildi.', 'success')
             fetchData()
         } catch(error: any) {
-            alert('Hata: ' + error.message)
+            await showAlert('Hata: ' + error.message, 'error')
             setLoading(false)
         }
     }
@@ -614,17 +708,7 @@ export default function YatirimlarPage() {
                     </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
-                    <label className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 font-bold px-6 py-3 rounded-xl transition-colors cursor-pointer flex items-center gap-2 justify-center">
-                        <span>🪄</span>
-                        {isAnalyzing ? 'Belge Okunuyor...' : 'Yatırım Fişi Yükle'}
-                        <input 
-                            type="file" 
-                            accept="image/*,application/pdf"
-                            onChange={handleAnalyzeReceipt}
-                            disabled={isAnalyzing}
-                            className="hidden"
-                        />
-                    </label>
+
                     <button 
                         onClick={() => setIsBuyModalOpen(true)}
                         className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-3 rounded-xl transition-colors shadow-[0_0_20px_rgba(245,158,11,0.2)] whitespace-nowrap"
@@ -989,7 +1073,7 @@ export default function YatirimlarPage() {
                                     <label className="text-stone-400 text-sm mb-1 block">Belge Güncelle</label>
                                     <input 
                                         type="file"
-                                        accept="image/*,application/pdf"
+                                        accept="image/*,application/pdf,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                                         onChange={(e) => handleFileUpload(e, setEditForm, editForm)}
                                         className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-3 text-stone-400 focus:outline-none focus:border-amber-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-stone-950 hover:file:bg-amber-400"
                                     />

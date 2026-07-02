@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
+import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 
@@ -76,6 +77,20 @@ export default function FisYukle() {
                 setFileType(fileExt as 'xml' | 'json')
             }
             reader.readAsText(file)
+        } else if (fileExt === 'xlsx' || fileExt === 'xls') {
+            const reader = new FileReader()
+            reader.onload = (evt) => {
+                const data = new Uint8Array(evt.target?.result as ArrayBuffer)
+                const workbook = XLSX.read(data, { type: 'array' })
+                const firstSheetName = workbook.SheetNames[0]
+                const worksheet = workbook.Sheets[firstSheetName]
+                const json = XLSX.utils.sheet_to_json(worksheet)
+                
+                setImage(null)
+                setFileText(JSON.stringify(json))
+                setFileType('json') // AI'a json olarak gönderiyoruz
+            }
+            reader.readAsArrayBuffer(file)
         } else {
             const reader = new FileReader()
             reader.onload = () => {
@@ -223,6 +238,7 @@ export default function FisYukle() {
 
     const applyChanges = async () => {
         setLoading(true)
+        const { data: { user } } = await supabase.auth.getUser()
         const selectedItems = parsedItems.filter(i => i.selected)
         const batchId = crypto.randomUUID()
 
@@ -354,15 +370,21 @@ export default function FisYukle() {
                     if (currentSup && currentSup.length > 0) currentSupplierId = currentSup[0].id;
                 }
 
-                await supabase.from('stock_movements').insert({
+                const { error: smError } = await supabase.from('stock_movements').insert({
                     batch_id: batchId,
                     material_id: actualMaterialId,
                     supplier_id: currentSupplierId,
                     movement_type: 'giris',
                     quantity: item.quantity,
                     unit_price: item.unitPrice,
-                    note: `Yapay Zeka Fiş Yükleme${parsedSupplier ? ` (${parsedSupplier.name})` : ''}`
+                    note: `Yapay Zeka Fiş Yükleme${parsedSupplier ? ` (${parsedSupplier.name})` : ''}`,
+                    document_url: image || null,
+                    user_id: user?.id
                 })
+                
+                if (smError) {
+                    console.error('Stok hareketi eklenirken hata:', smError)
+                }
             }
         }
 
@@ -394,7 +416,7 @@ export default function FisYukle() {
                             <label className="block w-full border-2 border-dashed border-stone-700 hover:border-amber-400 rounded-xl p-8 text-center cursor-pointer transition-colors relative">
                                 <input
                                     type="file"
-                                    accept="image/*,application/pdf,text/xml,.xml,application/json,.json"
+                                    accept="image/*,application/pdf,text/xml,.xml,application/json,.json,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                                     capture="environment"
                                     onChange={handleImageUpload}
                                     className="hidden"
@@ -417,14 +439,14 @@ export default function FisYukle() {
                                 {fileText && fileType === 'json' && (
                                     <div className="py-12">
                                         <div className="text-6xl mb-3">🤖</div>
-                                        <p className="text-stone-300 font-bold">JSON Seçildi</p>
+                                        <p className="text-stone-300 font-bold">JSON / Excel Seçildi</p>
                                     </div>
                                 )}
                                 {!image && !fileText && (
                                     <div>
                                         <div className="text-5xl mb-3">📂</div>
                                         <p className="text-stone-400">Dosya seç veya sürükle</p>
-                                        <p className="text-stone-600 text-sm mt-1">JPG, PNG, PDF, XML, JSON desteklenir</p>
+                                        <p className="text-stone-600 text-sm mt-1">JPG, PNG, PDF, XML, JSON, XLSX desteklenir</p>
                                     </div>
                                 )}
                             </label>
@@ -637,7 +659,7 @@ export default function FisYukle() {
                                                 <label className="text-stone-500 text-xs mb-1 block">Miktar</label>
                                                 <input
                                                     type="number"
-                                                    value={item.quantity}
+                                                    value={Number.isNaN(item.quantity) ? '' : item.quantity}
                                                     onChange={e => updateItem(index, 'quantity', parseFloat(e.target.value))}
                                                     className="w-full bg-stone-800 border border-stone-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400"
                                                 />
@@ -658,7 +680,7 @@ export default function FisYukle() {
                                                 <label className="text-stone-500 text-xs mb-1 block">Birim Fiyat (₺)</label>
                                                 <input
                                                     type="number"
-                                                    value={item.unitPrice}
+                                                    value={Number.isNaN(item.unitPrice) ? '' : item.unitPrice}
                                                     onChange={e => updateItem(index, 'unitPrice', parseFloat(e.target.value))}
                                                     className="w-full bg-stone-800 border border-stone-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400"
                                                 />

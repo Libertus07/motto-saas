@@ -4,6 +4,7 @@ import React, { useState, useEffect, Fragment } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
+import { useNotification } from '@/components/NotificationProvider'
 
 type Material = { id: string; name: string; unit: string; price_per_unit: number }
 type SubRecipe = { id: string; name: string; yield_quantity: number; yield_unit: string; wastage_percent: number; cost_per_yield?: number }
@@ -15,6 +16,7 @@ type Product = {
 type BulkRow = { id: string; sale_price: string; estimated_monthly_sales: string; category: string }
 
 export default function Urunler() {
+  const { showAlert, showConfirm } = useNotification()
   const [products, setProducts] = useState<Product[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [subRecipes, setSubRecipes] = useState<SubRecipe[]>([])
@@ -149,7 +151,7 @@ export default function Urunler() {
         return { id: s.id, name: prod?.name || s.id, current: prod?.category || 'Diğer', suggested: s.suggested_category }
       }).filter((s: any) => s.suggested !== s.current)
       setAutoCatSuggestions(suggestions); setAutoCatModalOpen(true)
-    } catch (e: any) { alert('Hata: ' + e.message) }
+    } catch (e: any) { await showAlert('Hata: ' + e.message, 'error') }
     setAutoCatLoading(false)
   }
   const handleApplyAutoCat = async (approved: { id: string; suggested: string }[]) => {
@@ -216,13 +218,14 @@ export default function Urunler() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Bu ürünü silmek istediğinize emin misiniz?')) return
+    const confirmed = await showConfirm('Bu ürünü silmek istediğinize emin misiniz?', 'Ürünü Sil 🗑️')
+    if (!confirmed) return
     await supabase.from('products').delete().eq('id', id); fetchData()
     logActivity('Ürünler', 'SILME', `Ürün sistemden silindi.`, { productId: id })
   }
 
   const handleAiRecipeBuild = async () => {
-    if (!form.name) { alert('Lütfen önce Ürün Adı girin.'); return }
+    if (!form.name) { await showAlert('Lütfen önce Ürün Adı girin.', 'warning'); return }
     setIsBuildingAiRecipe(true)
     try {
       const res = await fetch('/api/ai-recipe-builder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productName: form.name, materials: materials.map(m => ({ id: m.id, name: m.name, unit: m.unit })), subRecipes: subRecipes.map(sr => ({ id: sr.id, name: sr.name, yield_unit: sr.yield_unit })), option: 1 }) })
@@ -230,10 +233,13 @@ export default function Urunler() {
       if (!res.ok) throw new Error(data.error)
       if (data.ingredients && Array.isArray(data.ingredients)) {
         const newItems: ProductIngredient[] = data.ingredients.map((ing: any) => ({ type: ing.type || 'material', item_id: ing.id, quantity: Number(ing.quantity) || 0 }))
-        if (recipeItems.length > 0 && !confirm('Mevcut reçete silinip yapay zeka reçetesi eklenecek. Onaylıyor musunuz?')) { setIsBuildingAiRecipe(false); return }
+        if (recipeItems.length > 0) {
+          const confirmed = await showConfirm('Mevcut reçete silinip yapay zeka reçetesi eklenecek. Onaylıyor musunuz?', 'Reçeteyi Güncelle 🤖')
+          if (!confirmed) { setIsBuildingAiRecipe(false); return }
+        }
         setRecipeItems(newItems)
       }
-    } catch (err: any) { alert(err.message) }
+    } catch (err: any) { await showAlert(err.message, 'error') }
     setIsBuildingAiRecipe(false)
   }
 
@@ -283,16 +289,16 @@ export default function Urunler() {
           <div className="flex flex-wrap gap-2">
             <button onClick={handleAiRecipeBuild} disabled={isBuildingAiRecipe} className="text-stone-900 font-bold bg-amber-400 hover:bg-amber-500 px-3 py-2 md:py-1 rounded-lg text-sm disabled:opacity-50 flex-1 md:flex-none text-center">{isBuildingAiRecipe ? '⏳ Hesaplanıyor...' : '✨ Yapay Zeka Hesaplasın'}</button>
             <button onClick={() => addRecipeItem('material')} className="text-stone-300 text-sm bg-stone-800 hover:bg-stone-700 px-3 py-2 md:py-1 rounded-lg flex-1 md:flex-none text-center">+ Hammadde</button>
-            <button onClick={() => addRecipeItem('sub_recipe')} className="text-amber-400 text-sm border border-amber-400 hover:bg-amber-950 px-3 py-2 md:py-1 rounded-lg flex-1 md:flex-none text-center">+ Yarı Mamul</button>
+            <button onClick={() => addRecipeItem('sub_recipe')} className="text-amber-400 text-sm border border-amber-400 hover:bg-amber-950 px-3 py-2 md:py-1 rounded-lg flex-1 md:flex-none text-center">+ Üretim Reçetesi</button>
           </div>
         </div>
         {recipeItems.length === 0 ? (
-          <p className="text-stone-500 text-sm">İçerik boş. Hammadde veya yarı mamul ekleyin.</p>
+          <p className="text-stone-500 text-sm">İçerik boş. Hammadde veya üretim reçetesi ekleyin.</p>
         ) : (
           <div className="space-y-2">
             {recipeItems.map((item, index) => (
               <div key={index} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:items-center bg-stone-800/50 p-3 md:p-2 rounded-lg border border-stone-800 mb-2">
-                <div className="col-span-2 mb-1 md:mb-0"><span className={`text-xs px-2 py-1 rounded-md ${item.type === 'sub_recipe' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>{item.type === 'sub_recipe' ? 'Yarı Mamul' : 'Hammadde'}</span></div>
+                <div className="col-span-2 mb-1 md:mb-0"><span className={`text-xs px-2 py-1 rounded-md ${item.type === 'sub_recipe' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>{item.type === 'sub_recipe' ? 'Üretim Reçetesi' : 'Hammadde'}</span></div>
                 <div className="col-span-5">
                   {item.type === 'material' ? (
                     <select value={item.item_id} onChange={e => updateRecipeItem(index, 'item_id', e.target.value)} className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-400">

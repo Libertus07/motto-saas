@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
+import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
+import { useNotification } from '@/components/NotificationProvider'
 
 type Product = {
     id: string
@@ -25,6 +27,7 @@ type ParsedExpenseItem = {
 }
 
 export default function ZRaporuYukle() {
+    const { showAlert } = useNotification()
     const [imageUrl, setImageUrl] = useState<string | null>(null)
     const [fileText, setFileText] = useState<string | null>(null)
     const [fileType, setFileType] = useState<'image' | 'pdf' | 'xml' | 'json' | null>(null)
@@ -69,6 +72,20 @@ export default function ZRaporuYukle() {
                 setFileType(fileExt as 'xml' | 'json')
             }
             reader.readAsText(file)
+        } else if (fileExt === 'xlsx' || fileExt === 'xls') {
+            const reader = new FileReader()
+            reader.onload = (evt) => {
+                const data = new Uint8Array(evt.target?.result as ArrayBuffer)
+                const workbook = XLSX.read(data, { type: 'array' })
+                const firstSheetName = workbook.SheetNames[0]
+                const worksheet = workbook.Sheets[firstSheetName]
+                const json = XLSX.utils.sheet_to_json(worksheet)
+                
+                setImageUrl(null)
+                setFileText(JSON.stringify(json))
+                setFileType('json')
+            }
+            reader.readAsArrayBuffer(file)
         } else {
             const reader = new FileReader()
             reader.onload = () => {
@@ -107,7 +124,7 @@ export default function ZRaporuYukle() {
 
             setParsedData({ ...data, items: mappedItems })
         } catch (error: any) {
-            alert(error.message)
+            await showAlert(error.message, 'error')
         } finally {
             setAnalyzing(false)
         }
@@ -115,16 +132,19 @@ export default function ZRaporuYukle() {
 
     const handleCreateProduct = async () => {
         if (!newProductModal || !newProductModal.name || !newProductModal.category) {
-            alert('Lütfen ürün adı ve kategorisini girin.')
+            await showAlert('Lütfen ürün adı ve kategorisini girin.', 'warning')
             return
         }
 
         setSavingProduct(true)
         try {
+            const { data: { user } } = await supabase.auth.getUser()
             const { data, error } = await supabase.from('products').insert({
+                id: crypto.randomUUID(),
                 name: newProductModal.name,
                 category: newProductModal.category,
-                sale_price: newProductModal.price
+                sale_price: newProductModal.price,
+                user_id: user?.id
             }).select('*').single()
 
             if (error) throw error
@@ -143,7 +163,7 @@ export default function ZRaporuYukle() {
                 setNewProductModal(null)
             }
         } catch (err: any) {
-            alert('Ürün eklenirken hata oluştu: ' + err.message)
+            await showAlert('Ürün eklenirken hata oluştu: ' + err.message, 'error')
         } finally {
             setSavingProduct(false)
         }
@@ -198,6 +218,7 @@ export default function ZRaporuYukle() {
         try {
             const reportDate = parsedData.date || new Date().toISOString().split('T')[0]
             const batchId = crypto.randomUUID()
+            const { data: { user } } = await supabase.auth.getUser()
 
             // 1. Satışları Sales tablosuna kaydet
             const salesInserts = parsedData.items.map(item => ({
@@ -206,7 +227,8 @@ export default function ZRaporuYukle() {
                 product_id: item.matchedProductId || null,
                 quantity: item.quantity,
                 unit_price: item.quantity > 0 ? Number((item.total_price / item.quantity).toFixed(2)) : 0,
-                total_price: item.total_price
+                total_price: item.total_price,
+                document_url: imageUrl || null
             }))
 
             const { error: salesError } = await supabase.from('sales').insert(salesInserts)
@@ -302,7 +324,7 @@ export default function ZRaporuYukle() {
                             const totalQty = sale.quantity * ingredient.quantity
                             stockDeductions[ingredient.material_id] = (stockDeductions[ingredient.material_id] || 0) + totalQty
                         } else if (ingredient.sub_recipe_id && ingredient.sub_recipes) {
-                            // Yarı mamul
+                            // Üretim reçetesi (Yarı mamul)
                             const subRecipe = ingredient.sub_recipes
                             const subIngredients = subRecipe.sub_recipe_ingredients || []
                             
@@ -340,10 +362,10 @@ export default function ZRaporuYukle() {
             }
 
             logActivity('Z-Raporu', 'EKLEME', `${reportDate} tarihli Z-Raporu sisteme eklendi ve ${matchedSales.length} ürün/hammadde stoğu düşüldü.`, { batchId })
-            alert('Z Raporu başarıyla işlendi ve stoklar düşüldü!')
+            await showAlert('Z Raporu başarıyla işlendi ve stoklar düşüldü!', 'success')
             router.push('/dashboard/raporlar')
         } catch (err: any) {
-            alert('Kayıt sırasında hata oluştu: ' + err.message)
+            await showAlert('Kayıt sırasında hata oluştu: ' + err.message, 'error')
         } finally {
             setLoading(false)
         }
@@ -371,14 +393,14 @@ export default function ZRaporuYukle() {
                             <label className="block w-full border-2 border-dashed border-stone-700 hover:border-amber-400 rounded-xl p-8 text-center cursor-pointer transition-colors relative bg-stone-900/50">
                                 <input
                                     type="file"
-                                    accept="image/*,application/pdf,text/xml,.xml,application/json,.json"
+                                    accept="image/*,application/pdf,text/xml,.xml,application/json,.json,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                                     onChange={handleImageUpload}
                                     className="hidden"
                                 />
                                 <div className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-lg transition-colors inline-block">
                                     Belge Seç / Çek
                                 </div>
-                                <p className="text-stone-600 text-sm mt-3">JPG, PNG, PDF, XML, JSON desteklenir</p>
+                                <p className="text-stone-600 text-sm mt-3">JPG, PNG, PDF, XML, JSON, XLSX desteklenir</p>
                             </label>
                             
                             <div className="flex items-center gap-4 my-6">
@@ -417,7 +439,7 @@ export default function ZRaporuYukle() {
                                     {fileText && fileType === 'json' && (
                                         <div className="py-12 text-center">
                                             <div className="text-6xl mb-3">🤖</div>
-                                            <p className="text-stone-300 font-bold">JSON Seçildi</p>
+                                            <p className="text-stone-300 font-bold">JSON / Excel Seçildi</p>
                                         </div>
                                     )}
                                 </div>

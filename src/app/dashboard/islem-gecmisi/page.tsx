@@ -85,7 +85,7 @@ export default function IslemGecmisi() {
         const map: Record<string, string> = {
             'Ürünler': '/dashboard/urunler',
             'Tedarikçi': '/dashboard/tedarikciler',
-            'Yarı Mamul': '/dashboard/yari-mamuller',
+            'Üretim Reçetesi': '/dashboard/yari-mamuller',
             'Hammadde': '/dashboard/hammaddeler',
             'Stok': '/dashboard/stok',
             'Giderler': '/dashboard/giderler',
@@ -194,14 +194,14 @@ export default function IslemGecmisi() {
                                                                 {new Date(log.created_at).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                                                             </td>
                                                             <td className="px-6 py-4">
-                                                                <span className="bg-stone-800 text-stone-300 px-2 py-1 rounded text-xs border border-stone-700">
+                                                                <span className="inline-block whitespace-nowrap bg-stone-800 text-stone-300 px-2 py-1 rounded text-xs border border-stone-700">
                                                                     {log.module}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-6 py-4">
-                                                                {log.action_type === 'EKLEME' && <span className="text-green-400 font-bold text-[10px] uppercase tracking-wider bg-green-500/10 px-2 py-1 rounded border border-green-500/20">➕ Ekleme</span>}
-                                                                {log.action_type === 'SILME' && <span className="text-red-400 font-bold text-[10px] uppercase tracking-wider bg-red-500/10 px-2 py-1 rounded border border-red-500/20">🗑️ Silme</span>}
-                                                                {log.action_type === 'GUNCELLEME' && <span className="text-blue-400 font-bold text-[10px] uppercase tracking-wider bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">🔄 Güncelleme</span>}
+                                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                                {log.action_type === 'EKLEME' && <span className="inline-block whitespace-nowrap text-green-400 font-bold text-[10px] uppercase tracking-wider bg-green-500/10 px-2 py-1 rounded border border-green-500/20">➕ Ekleme</span>}
+                                                                {log.action_type === 'SILME' && <span className="inline-block whitespace-nowrap text-red-400 font-bold text-[10px] uppercase tracking-wider bg-red-500/10 px-2 py-1 rounded border border-red-500/20">🗑️ Silme</span>}
+                                                                {log.action_type === 'GUNCELLEME' && <span className="inline-block whitespace-nowrap text-blue-400 font-bold text-[10px] uppercase tracking-wider bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">🔄 Güncelleme</span>}
                                                             </td>
                                                             <td className="px-6 py-4">
                                                                 <p className="text-stone-300 font-medium text-sm">{log.description}</p>
@@ -286,84 +286,138 @@ export default function IslemGecmisi() {
                             {selectedLog.details && (
                                 <div className="bg-stone-800/50 p-4 rounded-lg border border-stone-800">
                                     <p className="text-stone-500 text-xs mb-3 font-bold uppercase tracking-wider">Veri Değişiklikleri</p>
-                                    <div className="max-h-64 overflow-y-auto pr-2">
+                                    <div className="max-h-64 overflow-y-auto pr-2 space-y-3">
                                         {typeof selectedLog.details === 'string' ? (
                                             <p className="text-sm text-stone-300 bg-stone-950 p-3 rounded-lg border border-stone-800">{selectedLog.details}</p>
-                                        ) : selectedLog.details.detay && typeof selectedLog.details.detay === 'string' ? (
-                                            <div className="space-y-3">
-                                                {selectedLog.details.detay.split('|').map((item: string, itemIdx: number) => {
-                                                    let title = '';
-                                                    let changeText = item.trim();
-                                    
-                                                    if (changeText.includes('(')) {
-                                                        const parts = changeText.split('(');
-                                                        title = parts[0].trim();
-                                                        changeText = parts[1].replace(')', '').trim();
-                                                    }
-                                    
-                                                    const changes = changeText.split(',');
-                                    
-                                                    return (
-                                                        <div key={itemIdx} className="bg-stone-950 p-3 rounded-lg border border-stone-800">
-                                                            {title && <p className="text-amber-500 font-bold mb-2 text-sm">{title}</p>}
-                                                            <ul className="space-y-1.5">
-                                                                {changes.map((ch: string, idx: number) => {
-                                                                    const cleanCh = ch.trim();
-                                                                    if (!cleanCh) return null;
-                                    
-                                                                    if (cleanCh.includes('->')) {
-                                                                        const [labelSide, newValue] = cleanCh.split('->');
-                                                                        return (
-                                                                            <li key={idx} className="flex items-center gap-2 text-sm">
-                                                                                <div className="flex items-center gap-3 bg-stone-900/50 px-3 py-1.5 rounded-md border border-stone-800/60">
-                                                                                    <span className="text-stone-200">{labelSide.trim()}</span>
-                                                                                    <span className="text-stone-600 text-xs">➔</span>
-                                                                                    <span className="font-bold text-amber-400">{newValue.trim()}</span>
-                                                                                </div>
-                                                                            </li>
-                                                                        )
-                                                                    }
-                                    
-                                                                    return (
-                                                                        <li key={idx} className="flex items-center gap-2 text-sm text-stone-300">
-                                                                            <span className="text-amber-500 text-xs">❖</span> {cleanCh}
-                                                                        </li>
-                                                                    )
-                                                                })}
-                                                            </ul>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
                                         ) : (
-                                            <div className="space-y-2">
-                                                {Object.entries(selectedLog.details).filter(([k]) => k !== '_meta').map(([key, value]) => {
-                                                    if (typeof value === 'object' && value !== null) {
-                                                        return (
-                                                            <div key={key} className="flex flex-col gap-2 bg-stone-950 px-4 py-3 rounded-lg border border-stone-800">
-                                                                <span className="text-stone-500 text-xs font-bold uppercase">{key}</span>
-                                                                <div className="bg-stone-900/50 p-3 rounded border border-stone-800/50 flex flex-col gap-1.5">
-                                                                    {Object.entries(value).map(([subK, subV]) => (
-                                                                        <div key={subK} className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                                                            <span className="text-stone-500 text-xs min-w-[120px]">{subK}:</span>
-                                                                            <span className="text-stone-300 text-sm font-mono break-all">{String(subV)}</span>
-                                                                        </div>
-                                                                    ))}
+                                            <>
+                                                {/* Detay stringi varsa özel renderla */}
+                                                {selectedLog.details.detay && typeof selectedLog.details.detay === 'string' && (
+                                                    <div className="space-y-3 mb-3">
+                                                        {selectedLog.details.detay.split('|').map((item: string, itemIdx: number) => {
+                                                            let title = '';
+                                                            let changeText = item.trim();
+                                            
+                                                            if (changeText.includes('(')) {
+                                                                const parts = changeText.split('(');
+                                                                title = parts[0].trim();
+                                                                changeText = parts[1].replace(')', '').trim();
+                                                            }
+
+                                                            const formatTitle = (t: string) => {
+                                                                const dict: Record<string, string> = {
+                                                                    business_logo: 'İşletme Logosu',
+                                                                    business_name: 'İşletme Adı',
+                                                                }
+                                                                return dict[t] || t
+                                                            }
+                                                            const formattedTitle = formatTitle(title);
+                                                            const getLabel = (prefix: string) => {
+                                                                if (formattedTitle.toLowerCase().includes('logo')) return `${prefix} Logo`;
+                                                                if (formattedTitle.toLowerCase().includes('belge') || formattedTitle.toLowerCase().includes('fiş')) return `${prefix} Belge`;
+                                                                return `${prefix} Değer`;
+                                                            }
+                                                            
+                                                            const renderDiffVal = (val: string, colorClass: string) => {
+                                                                if (!val || val === 'undefined') return <span className="text-stone-600 italic">Boş</span>;
+                                                                if (val.startsWith('http') && (val.includes('.png') || val.includes('.jpg') || val.includes('.jpeg') || val.includes('supabase.co'))) {
+                                                                    return <img src={val} alt="preview" className="h-16 w-auto rounded object-contain bg-stone-900 p-1 border border-stone-700 shadow-sm" />
+                                                                }
+                                                                return <span className={`${colorClass} break-all text-center`}>{val}</span>
+                                                            }
+                                            
+                                                            const changes = changeText.split(',');
+                                            
+                                                            return (
+                                                                <div key={itemIdx} className="bg-stone-950 p-3 rounded-lg border border-stone-800 w-full overflow-hidden">
+                                                                    {title && <p className="text-amber-500 font-bold mb-3 text-sm text-center border-b border-stone-800/60 pb-2">{formattedTitle}</p>}
+                                                                    <ul className="space-y-2 w-full">
+                                                                        {changes.map((ch: string, idx: number) => {
+                                                                            const cleanCh = ch.trim();
+                                                                            if (!cleanCh) return null;
+                                            
+                                                                            if (cleanCh.includes('->')) {
+                                                                                const [labelSide, newValue] = cleanCh.split('->');
+                                                                                return (
+                                                                                    <li key={idx} className="flex items-center justify-between gap-4 bg-stone-900/50 p-4 rounded-lg border border-stone-800/60 w-full text-center">
+                                                                                        <div className="flex-1 min-w-0 flex flex-col items-center justify-center">
+                                                                                            <p className="text-[10px] text-stone-500 uppercase tracking-wider mb-2 font-medium">{getLabel('Eski')}</p>
+                                                                                            {renderDiffVal(labelSide.trim(), "text-stone-300")}
+                                                                                        </div>
+                                                                                        <div className="flex-shrink-0 flex items-center justify-center bg-stone-800 w-8 h-8 rounded-full border border-stone-700 shadow-inner relative z-10">
+                                                                                            <span className="text-stone-400 text-sm">➔</span>
+                                                                                        </div>
+                                                                                        <div className="flex-1 min-w-0 flex flex-col items-center justify-center">
+                                                                                            <p className="text-[10px] text-amber-500/70 uppercase tracking-wider mb-2 font-medium">{getLabel('Yeni')}</p>
+                                                                                            {renderDiffVal(newValue.trim(), "font-bold text-amber-400")}
+                                                                                        </div>
+                                                                                    </li>
+                                                                                )
+                                                                            }
+                                            
+                                                                            return (
+                                                                                <li key={idx} className="flex items-center gap-2 text-sm text-stone-300">
+                                                                                    <span className="text-amber-500 text-xs">❖</span> {cleanCh}
+                                                                                </li>
+                                                                            )
+                                                                        })}
+                                                                    </ul>
                                                                 </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
+
+                                                {/* Diğer keyleri renderla */}
+                                                {Object.entries(selectedLog.details)
+                                                    .filter(([k]) => k !== '_meta' && k !== 'detay')
+                                                    .map(([key, value]) => {
+                                                        const formatKey = (k: string) => {
+                                                            const dict: Record<string, string> = {
+                                                                amount: 'Tutar', note: 'Açıklama / Not', business_logo: 'İşletme Logosu',
+                                                                business_name: 'İşletme Adı', totalItems: 'Toplam Kalem', totalAmount: 'Toplam Tutar',
+                                                                batchId: 'İşlem Grubu (ID)', batch_id: 'İşlem Grubu (ID)', recipeId: 'Kayıt ID',
+                                                                productId: 'Kayıt ID', materialId: 'Kayıt ID', expenseId: 'Kayıt ID',
+                                                                paymentMethod: 'Ödeme Yöntemi', documentUrl: 'Belge/Fiş', transaction: 'İşlem Detayı'
+                                                            }
+                                                            return dict[k] || k
+                                                        }
+                                                        
+                                                        const renderValue = (v: any) => {
+                                                            if (typeof v === 'string' && v.startsWith('http') && (v.includes('.png') || v.includes('.jpg') || v.includes('.jpeg') || v.includes('supabase.co'))) {
+                                                                return (
+                                                                    <div className="mt-1">
+                                                                        <img src={v} alt="preview" className="max-h-24 w-auto rounded object-contain border border-stone-700 bg-stone-900 p-1" />
+                                                                    </div>
+                                                                )
+                                                            }
+                                                            return <span className="text-stone-200 text-sm break-all font-medium">{String(v)}</span>
+                                                        }
+
+                                                        if (typeof value === 'object' && value !== null) {
+                                                            return (
+                                                                <div key={key} className="flex flex-col gap-2 bg-stone-950 px-4 py-3 rounded-lg border border-stone-800">
+                                                                    <span className="text-stone-500 text-xs font-bold uppercase">{formatKey(key)}</span>
+                                                                    <div className="bg-stone-900/50 p-3 rounded border border-stone-800/50 flex flex-col gap-1.5">
+                                                                        {Object.entries(value).map(([subK, subV]) => (
+                                                                            <div key={subK} className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                                                                <span className="text-stone-500 text-xs min-w-[120px]">{formatKey(subK)}:</span>
+                                                                                {renderValue(subV)}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        }
+                                                        
+                                                        return (
+                                                            <div key={key} className="flex flex-col sm:flex-row sm:items-center justify-start gap-4 bg-stone-950 px-4 py-3 rounded-lg border border-stone-800">
+                                                                <span className="text-stone-500 text-xs font-bold uppercase min-w-[120px]">{formatKey(key)}</span>
+                                                                {renderValue(value)}
                                                             </div>
                                                         )
-                                                    }
-                                                    
-                                                    return (
-                                                        <div key={key} className="flex flex-col sm:flex-row sm:items-center justify-start gap-4 bg-stone-950 px-4 py-3 rounded-lg border border-stone-800">
-                                                            <span className="text-stone-500 text-xs font-bold uppercase min-w-[100px]">{key}</span>
-                                                            <span className="text-stone-200 text-sm break-all font-medium">
-                                                                {String(value)}
-                                                            </span>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
+                                                    })}
+                                            </>
                                         )}
                                     </div>
                                 </div>

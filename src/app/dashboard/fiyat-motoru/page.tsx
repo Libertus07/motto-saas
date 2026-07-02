@@ -107,13 +107,13 @@ export default function FiyatMotoru() {
     
     // Hammaddeleri çek
     const { data: mats } = await supabase.from('materials').select('*')
-    // Yarı mamulleri ve maliyetlerini çek
+    // Üretim reçetelerini ve maliyetlerini çek
     const { data: s_recipes } = await supabase.from('sub_recipes').select('*')
     const { data: s_recipe_ings } = await supabase.from('sub_recipe_ingredients').select('*')
     // Ürün içeriklerini çek
     const { data: prod_ings } = await supabase.from('product_ingredients').select('*')
     
-    // Yarı mamul maliyetlerini hesapla
+    // Üretim reçetesi maliyetlerini hesapla
     const processedSubRecipes = (s_recipes || []).map(r => {
       const myIngs = (s_recipe_ings || []).filter(i => i.sub_recipe_id === r.id)
       let totalCost = 0

@@ -51,7 +51,7 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
     { name: 'Ana Ekran', icon: '🏠', path: '/dashboard' },
     { name: 'Ürünler', icon: '🍔', path: '/dashboard/urunler' },
     { name: 'Hammaddeler', icon: '🧪', path: '/dashboard/hammaddeler' },
-    { name: 'Yarı Mamuller', icon: '🥣', path: '/dashboard/yari-mamuller' },
+    { name: 'Üretim Reçeteleri', icon: '🥣', path: '/dashboard/yari-mamuller' },
     { name: 'Fiyat Motoru', icon: '⚙️', path: '/dashboard/fiyat-motoru' },
     { name: 'Stok Takibi', icon: '📦', path: '/dashboard/stok' },
     { name: 'Finans', icon: '💳', path: '/dashboard/finans' },
