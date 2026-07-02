@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { logActivity } from '@/lib/logger'
 
 type Expense = {
   id: string
@@ -75,14 +76,26 @@ export default function Giderler() {
       expense_date: form.expense_date
     }
 
+    let details = ''
+
     if (editingId) {
+      const oldExp = expenses.find(e => e.id === editingId)
+      const changes = []
+      if (oldExp?.amount !== payload.amount) changes.push(`Tutar: ${oldExp?.amount} -> ${payload.amount} ₺`)
+      if (oldExp?.category !== payload.category) changes.push(`Kategori: ${oldExp?.category} -> ${payload.category}`)
+      if (oldExp?.period !== payload.period) changes.push(`Periyot: ${oldExp?.period} -> ${payload.period}`)
+      if (oldExp?.expense_date !== payload.expense_date) changes.push(`Tarih: ${oldExp?.expense_date} -> ${payload.expense_date}`)
+      details = changes.length > 0 ? changes.join(', ') : 'Gider ismi güncellendi'
+
       await supabase.from('expenses').update(payload).eq('id', editingId)
     } else {
+      details = `Tutar: ${payload.amount} ₺, Kategori: ${payload.category}, Periyot: ${payload.period}, Tarih: ${payload.expense_date}`
       await supabase.from('expenses').insert(payload)
     }
 
     resetForm()
     fetchExpenses()
+    logActivity('Giderler', editingId ? 'GUNCELLEME' : 'EKLEME', `${form.name} isimli ${form.amount} TL tutarında gider ${editingId ? 'güncellendi' : 'eklendi'}.`, { detay: details })
   }
 
   const handleEdit = (expense: Expense) => {
@@ -101,6 +114,7 @@ export default function Giderler() {
     if (!confirm('Bu gideri silmek istediğinize emin misiniz?')) return
     await supabase.from('expenses').delete().eq('id', id)
     fetchExpenses()
+    logActivity('Giderler', 'SILME', `Bir gider kaydı sistemden silindi.`, { expenseId: id })
   }
 
   // Aylık toplam hesapla
@@ -120,13 +134,11 @@ export default function Giderler() {
   })).filter(c => c.total > 0)
 
   return (
-    <div className="min-h-screen bg-stone-950 text-white">
+    <div className="min-h-full bg-stone-950 text-white">
 
       {/* Header */}
       <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push('/dashboard')} className="text-stone-400 hover:text-white">← Geri</button>
-          <span className="text-stone-600">|</span>
           <span className="text-2xl">💰</span>
           <h1 className="font-bold text-amber-400">Giderler</h1>
         </div>
