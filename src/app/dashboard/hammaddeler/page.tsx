@@ -345,7 +345,7 @@ export default function Hammaddeler() {
   return (
     <div className="min-h-full bg-stone-950 text-white">
       {/* Header */}
-      <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex items-center justify-between">
+      <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <span className="text-2xl">🧪</span>
           <div>
@@ -685,7 +685,7 @@ export default function Hammaddeler() {
                                           <h3 className="font-bold text-amber-400">✏️ {mat.name} Düzenle</h3>
                                           <button onClick={resetForm} className="text-stone-500 hover:text-white text-lg">✕</button>
                                         </div>
-                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                                           <div>
                                             <label className="text-stone-400 text-xs mb-1 block">Hammadde Adı</label>
                                             <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-400" />

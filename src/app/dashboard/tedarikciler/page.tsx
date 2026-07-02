@@ -244,7 +244,7 @@ export default function Tedarikciler() {
 
     return (
         <div className="min-h-full bg-stone-950 text-white">
-            <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex items-center justify-between">
+            <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <span className="text-2xl">🏢</span>
                     <h1 className="font-bold text-amber-400">Tedarikçiler ve Cari Takip</h1>
@@ -257,10 +257,10 @@ export default function Tedarikciler() {
                 </button>
             </header>
 
-            <main className="p-6 max-w-7xl mx-auto flex gap-6">
+            <main className="p-6 max-w-7xl mx-auto flex flex-col md:flex-row gap-6">
                 
                 {/* Sol Panel: Tedarikçi Listesi */}
-                <div className="flex-1 bg-stone-900 rounded-xl border border-stone-800 overflow-hidden flex flex-col h-[calc(100vh-120px)]">
+                <div className="flex-1 bg-stone-900 rounded-xl border border-stone-800 overflow-hidden flex flex-col min-h-[400px] h-auto md:h-[calc(100vh-120px)]">
                     <div className="p-4 border-b border-stone-800 flex justify-between items-center bg-stone-800/30">
                         <h2 className="font-bold text-stone-300">Tedarikçi Listesi</h2>
                         <span className="text-sm text-stone-400">Toplam Borç: ₺{suppliers.reduce((t, s) => t + parseFloat((s.total_debt || 0).toString()), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
@@ -300,7 +300,7 @@ export default function Tedarikciler() {
 
                 {/* Sağ Panel: Hesap Hareketleri */}
                 {selectedSupplier ? (
-                    <div className="flex-[1.5] bg-stone-900 rounded-xl border border-stone-800 overflow-hidden flex flex-col h-[calc(100vh-120px)]">
+                    <div className="flex-[1.5] bg-stone-900 rounded-xl border border-stone-800 overflow-hidden flex flex-col min-h-[500px] h-auto md:h-[calc(100vh-120px)] mt-4 md:mt-0">
                         <div className="p-6 border-b border-stone-800 bg-stone-800/30 flex justify-between items-start">
                             <div>
                                 <h2 className="text-2xl font-bold text-amber-400 mb-1">{selectedSupplier.name}</h2>
@@ -499,8 +499,8 @@ export default function Tedarikciler() {
 
             {/* Ödeme Modalı */}
             {showPaymentModal && selectedSupplier && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-                    <div className="bg-stone-900 border border-stone-700 rounded-2xl p-8 max-w-md w-full">
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-stone-900 border border-stone-700 rounded-2xl p-8 max-w-md w-full mx-auto">
                         <h3 className="text-2xl font-bold mb-2">Ödeme Gir</h3>
                         <p className="text-stone-400 mb-6">{selectedSupplier.name} firmasına yapılan ödemeyi kaydedin.</p>
 

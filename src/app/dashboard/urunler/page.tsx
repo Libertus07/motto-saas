@@ -278,12 +278,12 @@ export default function Urunler() {
       </div>
 
       <div className="mb-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 gap-3">
           <h3 className="font-bold text-amber-400">Ürün Reçetesi</h3>
-          <div className="flex gap-2">
-            <button onClick={handleAiRecipeBuild} disabled={isBuildingAiRecipe} className="text-stone-900 font-bold bg-amber-400 hover:bg-amber-500 px-3 py-1 rounded-lg text-sm disabled:opacity-50">{isBuildingAiRecipe ? '⏳ Hesaplanıyor...' : '✨ Yapay Zeka Hesaplasın'}</button>
-            <button onClick={() => addRecipeItem('material')} className="text-stone-300 text-sm bg-stone-800 hover:bg-stone-700 px-3 py-1 rounded-lg">+ Hammadde</button>
-            <button onClick={() => addRecipeItem('sub_recipe')} className="text-amber-400 text-sm border border-amber-400 hover:bg-amber-950 px-3 py-1 rounded-lg">+ Yarı Mamul</button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={handleAiRecipeBuild} disabled={isBuildingAiRecipe} className="text-stone-900 font-bold bg-amber-400 hover:bg-amber-500 px-3 py-2 md:py-1 rounded-lg text-sm disabled:opacity-50 flex-1 md:flex-none text-center">{isBuildingAiRecipe ? '⏳ Hesaplanıyor...' : '✨ Yapay Zeka Hesaplasın'}</button>
+            <button onClick={() => addRecipeItem('material')} className="text-stone-300 text-sm bg-stone-800 hover:bg-stone-700 px-3 py-2 md:py-1 rounded-lg flex-1 md:flex-none text-center">+ Hammadde</button>
+            <button onClick={() => addRecipeItem('sub_recipe')} className="text-amber-400 text-sm border border-amber-400 hover:bg-amber-950 px-3 py-2 md:py-1 rounded-lg flex-1 md:flex-none text-center">+ Yarı Mamul</button>
           </div>
         </div>
         {recipeItems.length === 0 ? (
@@ -291,8 +291,8 @@ export default function Urunler() {
         ) : (
           <div className="space-y-2">
             {recipeItems.map((item, index) => (
-              <div key={index} className="grid grid-cols-12 gap-2 items-center bg-stone-800/50 p-2 rounded-lg border border-stone-800">
-                <div className="col-span-2"><span className={`text-xs px-2 py-1 rounded-md ${item.type === 'sub_recipe' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>{item.type === 'sub_recipe' ? 'Yarı Mamul' : 'Hammadde'}</span></div>
+              <div key={index} className="flex flex-col md:grid md:grid-cols-12 gap-2 md:items-center bg-stone-800/50 p-3 md:p-2 rounded-lg border border-stone-800 mb-2">
+                <div className="col-span-2 mb-1 md:mb-0"><span className={`text-xs px-2 py-1 rounded-md ${item.type === 'sub_recipe' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>{item.type === 'sub_recipe' ? 'Yarı Mamul' : 'Hammadde'}</span></div>
                 <div className="col-span-5">
                   {item.type === 'material' ? (
                     <select value={item.item_id} onChange={e => updateRecipeItem(index, 'item_id', e.target.value)} className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-400">

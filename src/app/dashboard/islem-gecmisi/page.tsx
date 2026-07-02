@@ -243,7 +243,7 @@ export default function IslemGecmisi() {
                         </div>
                         
                         <div className="space-y-4">
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                 <div className="bg-stone-800/50 p-3 rounded-lg border border-stone-800">
                                     <p className="text-stone-500 text-xs mb-1">Tarih / Saat</p>
                                     <p className="text-stone-200 text-sm font-medium">

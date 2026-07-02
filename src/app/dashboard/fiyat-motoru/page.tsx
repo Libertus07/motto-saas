@@ -266,7 +266,7 @@ export default function FiyatMotoru() {
     <div className="min-h-full bg-stone-950 text-white">
 
       {/* Header */}
-      <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex items-center justify-between">
+      <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <span className="text-2xl">🧠</span>
           <h1 className="font-bold text-amber-400">Fiyat Motoru</h1>
@@ -303,7 +303,7 @@ export default function FiyatMotoru() {
         </div>
 
         {/* Özet Kartlar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
             <p className="text-stone-400 text-xs mb-1">Günlük Ciro</p>
             <p className="text-xl font-bold text-amber-400">₺{totalDailyRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 0 })}</p>
@@ -327,7 +327,7 @@ export default function FiyatMotoru() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
           <button
             onClick={() => setActiveTab('sales')}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === 'sales' ? 'bg-amber-500 text-stone-950' : 'bg-stone-800 text-stone-400 hover:text-white'}`}
