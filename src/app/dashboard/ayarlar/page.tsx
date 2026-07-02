@@ -466,6 +466,7 @@ function ProfilTab() {
 }
 
 function GenelTab({ s, set, onSave, saving }: { s: Settings; set: (k: keyof Settings, v: any) => void; onSave: () => void; saving: boolean }) {
+  const { showAlert } = useNotification()
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const supabase = createClient()
 
