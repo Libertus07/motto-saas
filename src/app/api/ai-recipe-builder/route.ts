@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: Request) {
     try {
@@ -19,6 +20,13 @@ export async function POST(req: Request) {
 
         const materialsContext = materials?.map((m: any) => `- ${m.id} | ${m.name} | ${m.unit} | ₺${m.price_per_unit}`).join('\n') || 'Yok';
         const subRecipesContext = subRecipes?.map((s: any) => `- ${s.id} | ${s.name} | Porsiyon Maliyeti: ₺${(s.total_cost / (s.yield_quantity || 1)).toFixed(2)}`).join('\n') || 'Yok';
+
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        if (!supabaseUrl || !supabaseKey) {
+            return NextResponse.json({ error: 'Supabase URL or Key missing' }, { status: 500 });
+        }
+        const supabase = createClient(supabaseUrl, supabaseKey);
 
         const { data: settings } = await supabase.from('settings').select('*');
         const takeawayRatioSetting = settings?.find(s => s.key === 'takeaway_ratio')?.value || '60';
