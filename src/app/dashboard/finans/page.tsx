@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 
 type Account = {
@@ -25,6 +25,10 @@ export default function FinansPage() {
     const [selectedAccount, setSelectedAccount] = useState<Account | null>(null)
     const [movements, setMovements] = useState<AccountMovement[]>([])
     const [loading, setLoading] = useState(true)
+    
+    // UI states
+    const [expandedDates, setExpandedDates] = useState<string[]>(['Bugün'])
+    const [selectedMovement, setSelectedMovement] = useState<AccountMovement | null>(null)
     
     // Modal state for manual entry
     const [isModalOpen, setIsModalOpen] = useState(false)
@@ -71,6 +75,34 @@ export default function FinansPage() {
         } else {
             setMovements(data || [])
         }
+    }
+
+    const groupedMovements = useMemo(() => {
+        const groups: Record<string, AccountMovement[]> = {}
+        const today = new Date()
+        const yesterday = new Date(today)
+        yesterday.setDate(yesterday.getDate() - 1)
+
+        movements.forEach(move => {
+            const date = new Date(move.created_at)
+            let dateKey = date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+            
+            if (date.toDateString() === today.toDateString()) {
+                dateKey = 'Bugün'
+            } else if (date.toDateString() === yesterday.toDateString()) {
+                dateKey = 'Dün'
+            }
+
+            if (!groups[dateKey]) {
+                groups[dateKey] = []
+            }
+            groups[dateKey].push(move)
+        })
+        return groups
+    }, [movements])
+
+    const toggleDate = (dateKey: string) => {
+        setExpandedDates(prev => prev.includes(dateKey) ? prev.filter(d => d !== dateKey) : [...prev, dateKey])
     }
 
     const handleManualEntry = async (e: React.FormEvent) => {
@@ -176,55 +208,74 @@ export default function FinansPage() {
                             </button>
                         </div>
                         
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-stone-950/50 text-stone-400 border-b border-stone-800">
-                                    <tr>
-                                        <th className="px-6 py-4 font-medium">Tarih</th>
-                                        <th className="px-6 py-4 font-medium">İşlem / Açıklama</th>
-                                        <th className="px-6 py-4 font-medium">Kaynak</th>
-                                        <th className="px-6 py-4 font-medium text-right">Tutar</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-stone-800">
-                                    {movements.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className="px-6 py-12 text-center text-stone-500">
-                                                Henüz bir hesap hareketi bulunmuyor.
-                                            </td>
-                                        </tr>
-                                    ) : movements.map(move => {
-                                        const isGiris = move.movement_type === 'giris'
-                                        return (
-                                            <tr key={move.id} className="hover:bg-stone-800/30 transition-colors">
-                                                <td className="px-6 py-4 text-stone-400 whitespace-nowrap">
-                                                    {new Date(move.created_at).toLocaleString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                                </td>
-                                                <td className="px-6 py-4 font-medium text-stone-200">
-                                                    {move.description}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-2 py-1 rounded-md text-xs font-bold border ${
-                                                        move.source_type === 'z_report' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                                        move.source_type === 'supplier_payment' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
-                                                        move.source_type === 'expense' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                                        'bg-stone-800 text-stone-400 border-stone-700'
-                                                    }`}>
-                                                        {move.source_type === 'z_report' ? 'Z-Raporu' :
-                                                         move.source_type === 'supplier_payment' ? 'Tedarikçi Ödemesi' :
-                                                         move.source_type === 'expense' ? 'Masraf/Gider' : 'Manuel İşlem'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-right whitespace-nowrap">
-                                                    <span className={`font-bold px-3 py-1 rounded-lg ${isGiris ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                                                        {isGiris ? '+' : '-'} ₺{move.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
+                        <div className="space-y-4 p-4 pt-0">
+                            {movements.length === 0 ? (
+                                <div className="p-8 text-center text-stone-500 bg-stone-950/50 rounded-xl border border-stone-800">
+                                    Henüz bir hesap hareketi bulunmuyor.
+                                </div>
+                            ) : (
+                                Object.entries(groupedMovements).map(([dateKey, groupMoves]) => {
+                                    const isExpanded = expandedDates.includes(dateKey)
+                                    return (
+                                        <div key={dateKey} className="bg-stone-950/50 rounded-xl border border-stone-800 overflow-hidden">
+                                            <button 
+                                                onClick={() => toggleDate(dateKey)}
+                                                className="w-full flex items-center justify-between px-6 py-4 hover:bg-stone-800/30 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-lg">{dateKey === 'Bugün' ? '📅' : dateKey === 'Dün' ? '⏱️' : '🗓️'}</span>
+                                                    <h3 className="font-bold text-stone-200">{dateKey}</h3>
+                                                    <span className="bg-stone-900 text-xs px-2 py-1 rounded-full text-stone-500 border border-stone-800">{groupMoves.length} işlem</span>
+                                                </div>
+                                                <span className="text-stone-500 text-sm font-bold bg-stone-900 w-8 h-8 flex items-center justify-center rounded-lg border border-stone-800">{isExpanded ? '▲' : '▼'}</span>
+                                            </button>
+                                            
+                                            {isExpanded && (
+                                                <div className="overflow-x-auto border-t border-stone-800/50">
+                                                    <table className="w-full text-left text-sm">
+                                                        <thead className="bg-stone-900/30 text-stone-500 text-xs uppercase tracking-wider">
+                                                            <tr>
+                                                                <th className="px-6 py-3 font-medium">Saat</th>
+                                                                <th className="px-6 py-3 font-medium">İşlem Özeti</th>
+                                                                <th className="px-6 py-3 font-medium text-right">Tutar</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-stone-800/30">
+                                                            {groupMoves.map(move => {
+                                                                const isGiris = move.movement_type === 'giris'
+                                                                return (
+                                                                    <tr 
+                                                                        key={move.id} 
+                                                                        onClick={() => setSelectedMovement(move)}
+                                                                        className="hover:bg-stone-800/30 transition-colors cursor-pointer group"
+                                                                    >
+                                                                        <td className="px-6 py-4 text-stone-400 whitespace-nowrap group-hover:text-amber-400/70 transition-colors">
+                                                                            {new Date(move.created_at).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                                                        </td>
+                                                                        <td className="px-6 py-4">
+                                                                            <p className="font-medium text-stone-300 group-hover:text-amber-400 transition-colors">{move.description}</p>
+                                                                            <p className="text-xs text-stone-500 mt-1">
+                                                                                {move.source_type === 'z_report' ? 'Z-Raporu' :
+                                                                                 move.source_type === 'supplier_payment' ? 'Tedarikçi Ödemesi' :
+                                                                                 move.source_type === 'expense' ? 'Masraf/Gider' : 'Manuel İşlem'}
+                                                                            </p>
+                                                                        </td>
+                                                                        <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                                            <span className={`font-bold px-3 py-1.5 rounded-lg ${isGiris ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                                                                                {isGiris ? '+' : '-'} ₺{move.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                                            </span>
+                                                                        </td>
+                                                                    </tr>
+                                                                )
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })
+                            )}
                         </div>
                     </div>
                 )}
@@ -301,6 +352,76 @@ export default function FinansPage() {
                                 {saving ? 'Kaydediliyor...' : 'İşlemi Kaydet'}
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+            {/* E-Dekont Modalı */}
+            {selectedMovement && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm" onClick={() => setSelectedMovement(null)}>
+                    <div className="bg-stone-900 border border-stone-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative" onClick={e => e.stopPropagation()}>
+                        <button 
+                            onClick={() => setSelectedMovement(null)}
+                            className="absolute top-4 right-4 text-stone-500 hover:text-white text-2xl leading-none"
+                        >
+                            &times;
+                        </button>
+                        
+                        <div className="text-center mb-8 mt-2">
+                            <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center text-3xl mb-4 shadow-lg ${selectedMovement.movement_type === 'giris' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+                                {selectedMovement.movement_type === 'giris' ? '⬇️' : '⬆️'}
+                            </div>
+                            <h2 className="text-2xl font-bold text-white mb-1">
+                                {selectedMovement.movement_type === 'giris' ? '+' : '-'} ₺{selectedMovement.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                            </h2>
+                            <p className="text-stone-400 text-sm font-medium">İşlem Tutarı</p>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <div className="bg-stone-950/50 p-4 rounded-xl border border-stone-800/80 space-y-3">
+                                <div className="flex justify-between items-center pb-3 border-b border-stone-800/50">
+                                    <span className="text-stone-500 text-xs font-bold uppercase tracking-wider">İşlem Tarihi</span>
+                                    <span className="text-stone-200 text-sm font-medium">
+                                        {new Date(selectedMovement.created_at).toLocaleString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center pb-3 border-b border-stone-800/50">
+                                    <span className="text-stone-500 text-xs font-bold uppercase tracking-wider">İşlem Türü</span>
+                                    <span className={`text-sm font-bold ${selectedMovement.movement_type === 'giris' ? 'text-green-400' : 'text-red-400'}`}>
+                                        {selectedMovement.movement_type === 'giris' ? 'Para Girişi' : 'Para Çıkışı'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center pb-3 border-b border-stone-800/50">
+                                    <span className="text-stone-500 text-xs font-bold uppercase tracking-wider">Kaynak</span>
+                                    <span className="text-stone-200 text-sm font-medium">
+                                        {selectedMovement.source_type === 'z_report' ? 'Z-Raporu' :
+                                         selectedMovement.source_type === 'supplier_payment' ? 'Tedarikçi Ödemesi' :
+                                         selectedMovement.source_type === 'expense' ? 'Masraf/Gider' : 'Manuel İşlem'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-stone-500 text-xs font-bold uppercase tracking-wider">Hesap</span>
+                                    <span className="text-amber-400 text-sm font-bold">
+                                        {selectedAccount?.name}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="bg-stone-950/50 p-4 rounded-xl border border-stone-800/80">
+                                <span className="text-stone-500 text-xs font-bold uppercase tracking-wider block mb-2">Açıklama</span>
+                                <p className="text-stone-200 text-sm leading-relaxed">
+                                    {selectedMovement.description}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-8">
+                            <button 
+                                onClick={() => setSelectedMovement(null)}
+                                className="w-full bg-stone-800 hover:bg-stone-700 text-white py-3 rounded-xl text-sm font-bold transition-colors"
+                            >
+                                Kapat
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

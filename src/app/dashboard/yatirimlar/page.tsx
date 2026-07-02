@@ -26,8 +26,11 @@ type Investment = {
 type Transaction = {
     id: string
     investment_id: string
-    transaction_type: 'buy' | 'sell' | 'rent'
+    transaction_type: 'buy' | 'sell' | 'rent' | 'value_update'
     total_amount: number
+    quantity_changed?: number
+    notes?: string
+    created_at?: string
 }
 
 type Rates = {
@@ -47,6 +50,9 @@ export default function YatirimlarPage() {
     const [groupBy, setGroupBy] = useState<'type' | 'month'>('type')
     const [sortBy, setSortBy] = useState<'date' | 'value'>('date')
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
+    
+    // UI States
+    const [expandedInvestment, setExpandedInvestment] = useState<string | null>(null)
 
     // Buy Modal States
     const [isBuyModalOpen, setIsBuyModalOpen] = useState(false)
@@ -120,7 +126,7 @@ export default function YatirimlarPage() {
         const { data: invData } = await supabase.from('investments').select('*').order('created_at')
         setInvestments(invData || [])
 
-        const { data: txData } = await supabase.from('investment_transactions').select('id, investment_id, transaction_type, total_amount')
+        const { data: txData } = await supabase.from('investment_transactions').select('*').order('created_at', { ascending: false })
         setTransactions(txData || [])
 
         const { data: accData } = await supabase.from('accounts').select('*').order('created_at')
@@ -488,6 +494,114 @@ export default function YatirimlarPage() {
         groupedInvestments[groupKey].push(inv)
     })
 
+    const renderInvestmentList = (investmentList: any[]) => {
+        return investmentList.map(inv => {
+            const isExpanded = expandedInvestment === inv.id;
+            const invTransactions = transactions.filter(t => t.investment_id === inv.id);
+
+            return (
+            <div key={inv.id} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden transition-all duration-200">
+                <div 
+                    onClick={() => setExpandedInvestment(isExpanded ? null : inv.id)}
+                    className="w-full px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-stone-800/30 transition-colors cursor-pointer gap-4"
+                >
+                    <div className="flex-1 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                            {inv.asset_type === 'gold' ? '🥇' : inv.asset_type === 'usd' ? '💵' : inv.asset_type === 'eur' ? '💶' : '🏠'}
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-stone-200 text-lg">{inv.name}</h4>
+                            <p className="text-xs text-stone-500 mt-0.5">
+                                {!inv.isRE && <span className="font-medium text-stone-400 mr-2">{inv.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 4 })} {inv.asset_type === 'gold' ? 'Gram' : inv.asset_type === 'usd' ? 'USD' : 'EUR'}</span>}
+                                {inv.purchase_date && <span>📅 {new Date(inv.purchase_date).toLocaleDateString('tr-TR')}</span>}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-6 justify-between sm:justify-end w-full sm:w-auto pl-16 sm:pl-0">
+                        <div className="text-left sm:text-right">
+                            <p className="text-stone-400 text-xs font-bold mb-0.5">Güncel Değer</p>
+                            <p className="text-lg font-bold text-white">₺{inv.currentValue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                            <p className={`text-xs font-bold mt-0.5 ${inv.isProfit ? 'text-green-400' : 'text-red-400'}`}>
+                                {inv.isProfit ? 'Kâr: +' : 'Zarar: '}₺{inv.profit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                            </p>
+                        </div>
+                        
+                        <div className={`text-stone-500 p-2 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+                            ▼
+                        </div>
+                    </div>
+                </div>
+
+                {isExpanded && (
+                    <div className="border-t border-stone-800 bg-stone-900/50">
+                        
+                        {/* Aksiyon Butonları Alanı */}
+                        <div className="px-5 py-3 border-b border-stone-800 flex flex-wrap gap-2 items-center bg-stone-950/30">
+                            {inv.isRE && (
+                                <>
+                                    <button onClick={() => { setSelectedInvestment(inv); setIsRentModalOpen(true); }} className="bg-green-600/20 hover:bg-green-600/40 text-green-400 border border-green-600/30 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2"><span>💰</span> Kira Tahsil Et</button>
+                                    <button onClick={() => { setSelectedInvestment(inv); setValueForm({ current_value: inv.current_manual_value?.toString() || '' }); setIsValueModalOpen(true); }} className="bg-stone-800 hover:bg-stone-700 text-white border border-stone-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2"><span>📈</span> Değeri Güncelle</button>
+                                </>
+                            )}
+                            {inv.notes && <button onClick={() => { setNotePreviewText(inv.notes!); setIsNoteModalOpen(true); }} className="bg-stone-800 hover:bg-stone-700 text-stone-300 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2"><span>📝</span> Notlar</button>}
+                            {inv.document_url && <button onClick={() => { setDocPreviewUrl(inv.document_url!); setIsDocModalOpen(true); }} className="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-600/30 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2"><span>📎</span> Belge</button>}
+                            <button onClick={() => openEditModal(inv)} className="bg-stone-800 hover:bg-amber-500/20 text-stone-400 hover:text-amber-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2"><span>✏️</span> Düzenle</button>
+                            <button onClick={() => handleDeleteInvestment(inv.id)} className="bg-stone-800 hover:bg-red-500/20 text-stone-400 hover:text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2"><span>🗑️</span> Sil</button>
+                        </div>
+
+                        {/* Tablo Alanı */}
+                        <div className="overflow-x-auto w-full">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-stone-800/30 text-stone-400 border-b border-stone-800">
+                                    <tr>
+                                        <th className="px-5 py-2.5 font-medium">İşlem Tarihi</th>
+                                        <th className="px-5 py-2.5 font-medium">İşlem Türü</th>
+                                        <th className="px-5 py-2.5 font-medium">Açıklama / Not</th>
+                                        <th className="px-5 py-2.5 font-medium text-right">Tutar / Değer</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-stone-800/50">
+                                    {invTransactions.length === 0 ? (
+                                        <tr><td colSpan={4} className="px-5 py-4 text-center text-stone-500">Bu yatırıma ait hiçbir hareket bulunamadı.</td></tr>
+                                    ) : (
+                                        invTransactions.map(tx => (
+                                            <tr key={tx.id} className="hover:bg-stone-800/20 transition-colors">
+                                                <td className="px-5 py-3 text-stone-400 whitespace-nowrap">
+                                                    {tx.created_at ? new Date(tx.created_at).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                </td>
+                                                <td className="px-5 py-3">
+                                                    <span className={`px-2 py-1 rounded-md text-xs font-bold border ${
+                                                        tx.transaction_type === 'buy' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                                        tx.transaction_type === 'rent' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                                        tx.transaction_type === 'value_update' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                                        'bg-stone-800 text-stone-400 border-stone-700'
+                                                    }`}>
+                                                        {tx.transaction_type === 'buy' ? 'İlk Alım' :
+                                                         tx.transaction_type === 'rent' ? 'Kira Geliri' :
+                                                         tx.transaction_type === 'value_update' ? 'Değer Güncellemesi' :
+                                                         tx.transaction_type === 'sell' ? 'Satış' : 'İşlem'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-5 py-3 text-stone-300">
+                                                    {tx.notes || '-'}
+                                                </td>
+                                                <td className="px-5 py-3 text-right font-bold text-white whitespace-nowrap">
+                                                    {tx.transaction_type === 'value_update' ? '' : (tx.transaction_type === 'buy' ? '-' : '+')}₺{tx.total_amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+            )
+        })
+    }
+
     return (
         <div className="min-h-full bg-stone-950 text-white pb-20">
             <header className="mb-8 p-6 pb-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -630,105 +744,35 @@ export default function YatirimlarPage() {
                                     </summary>
                                     
                                     <div className="p-3 pt-0 border-t border-stone-800/50 bg-stone-950/30">
-                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
-                                            {items.map(inv => (
-                                                <div key={inv.id} className="bg-stone-900 border border-stone-800 rounded-xl p-4 flex flex-col justify-between hover:border-stone-700 transition-colors">
-                                                    
-                                                    <div className="flex flex-col sm:flex-row justify-between gap-6 mb-4">
-                                                        <div className="flex items-start gap-4">
-                                                            <div className="w-16 h-16 rounded-2xl bg-stone-950 border border-stone-800 flex items-center justify-center text-3xl shadow-inner shrink-0 mt-1">
-                                                                {inv.asset_type === 'gold' ? '🥇' : inv.asset_type === 'usd' ? '💵' : inv.asset_type === 'eur' ? '💶' : '🏠'}
+                                        {groupName === 'Gayrimenkul Mülkleri' || groupBy === 'month' ? (
+                                            <div className="flex flex-col gap-2 mt-3">
+                                                {renderInvestmentList(items)}
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col gap-3 mt-3">
+                                                {Object.entries(
+                                                    items.reduce((acc, curr) => {
+                                                        const dateStr = curr.purchase_date ? new Date(curr.purchase_date).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) : 'Tarih Belirtilmeyenler'
+                                                        if (!acc[dateStr]) acc[dateStr] = []
+                                                        acc[dateStr].push(curr)
+                                                        return acc
+                                                    }, {} as Record<string, typeof items>)
+                                                ).map(([monthName, monthItems]) => (
+                                                    <details key={monthName} className="group/month bg-stone-900 border border-stone-800/50 rounded-lg overflow-hidden" open>
+                                                        <summary className="flex items-center justify-between p-2 px-4 cursor-pointer hover:bg-stone-800/30 list-none select-none border-b border-stone-800/30">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-stone-600 transition-transform duration-300 group-open/month:rotate-90 text-xs">▶</span>
+                                                                <h5 className="font-bold text-stone-300 text-sm">{monthName}</h5>
+                                                                <span className="text-xs text-stone-500">({monthItems.length} kayıt)</span>
                                                             </div>
-                                                            <div>
-                                                                <h4 className="text-xl font-bold pr-4">
-                                                                    {inv.name}
-                                                                </h4>
-                                                                
-                                                                <div className="flex gap-2 text-xs text-amber-500/60 font-medium mt-1 mb-2">
-                                                                    {inv.purchase_date && <span>📅 {new Date(inv.purchase_date).toLocaleDateString('tr-TR')}</span>}
-                                                                </div>
-
-                                                                {!inv.isRE && (
-                                                                    <p className="text-stone-400 font-medium">
-                                                                        {inv.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 4 })} 
-                                                                        {inv.asset_type === 'gold' ? ' Gram' : inv.asset_type === 'usd' ? ' USD' : ' EUR'}
-                                                                    </p>
-                                                                )}
-                                                                <div className="text-xs text-stone-500 mt-1 flex flex-col gap-1">
-                                                                    <span>{inv.isRE ? 'Toplam Maliyet' : 'Ort. Maliyet'}: ₺{inv.isRE ? inv.costValue.toLocaleString('tr-TR') : Number(inv.average_cost).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
-                                                                    {!inv.isRE && <span className="text-amber-500/70">Canlı Kur: ₺{inv.currentRate.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>}
-                                                                </div>
-                                                            </div>
+                                                        </summary>
+                                                        <div className="p-2 pt-2 flex flex-col gap-2 bg-stone-950/20">
+                                                            {renderInvestmentList(monthItems)}
                                                         </div>
-                                                        
-                                                        <div className="text-left sm:text-right border-t sm:border-t-0 sm:border-l border-stone-800 pt-4 sm:pt-0 sm:pl-6">
-                                                            <p className="text-stone-400 text-sm mb-1 font-bold">Güncel Değer</p>
-                                                            <h4 className="text-2xl font-bold text-white">₺{inv.currentValue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</h4>
-                                                            <p className={`text-sm font-bold mt-1 ${inv.isProfit ? 'text-green-400' : 'text-red-400'}`}>
-                                                                {inv.isProfit ? 'Kâr: +' : 'Zarar: '}₺{inv.profit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* İşlemler Menüsü */}
-                                                    <div className="mt-2 pt-4 border-t border-stone-800 flex flex-wrap gap-2 items-center">
-                                                        {inv.isRE && (
-                                                            <>
-                                                                <button 
-                                                                    onClick={() => { setSelectedInvestment(inv); setIsRentModalOpen(true); }}
-                                                                    className="bg-green-600/20 hover:bg-green-600/40 text-green-400 border border-green-600/30 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
-                                                                >
-                                                                    <span>💰</span> Kira Tahsil Et
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => { setSelectedInvestment(inv); setValueForm({ current_value: inv.current_manual_value?.toString() || '' }); setIsValueModalOpen(true); }}
-                                                                    className="bg-stone-800 hover:bg-stone-700 text-white border border-stone-700 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
-                                                                >
-                                                                    <span>📈</span> Değeri Güncelle
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                        
-                                                        {inv.notes && (
-                                                            <button 
-                                                                onClick={() => { setNotePreviewText(inv.notes!); setIsNoteModalOpen(true); }}
-                                                                className="bg-stone-800 hover:bg-stone-700 text-stone-300 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
-                                                            >
-                                                                <span>📝</span> Notlar
-                                                            </button>
-                                                        )}
-
-                                                        {inv.document_url && (
-                                                            <button 
-                                                                onClick={() => { setDocPreviewUrl(inv.document_url!); setIsDocModalOpen(true); }}
-                                                                className="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-600/30 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
-                                                            >
-                                                                <span>📎</span> Belge
-                                                            </button>
-                                                        )}
-
-                                                        <button 
-                                                            onClick={() => openEditModal(inv)}
-                                                            className="bg-stone-800 hover:bg-amber-500/20 text-stone-400 hover:text-amber-400 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
-                                                        >
-                                                            <span>✏️</span> Düzenle
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleDeleteInvestment(inv.id)}
-                                                            className="bg-stone-800 hover:bg-red-500/20 text-stone-400 hover:text-red-400 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
-                                                        >
-                                                            <span>🗑️</span> Sil
-                                                        </button>
-
-                                                        {inv.isRE && inv.invRentIncome > 0 && (
-                                                            <span className="ml-auto text-xs font-medium text-stone-500 flex items-center w-full sm:w-auto mt-2 sm:mt-0">
-                                                                Alınan Toplam Kira: <span className="text-green-400 ml-1">₺{inv.invRentIncome.toLocaleString('tr-TR')}</span>
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                                    </details>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </details>
                             )
