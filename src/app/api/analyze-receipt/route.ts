@@ -69,17 +69,17 @@ export async function POST(req: Request) {
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
-        const prompt = `Lütfen bu belgeyi (fiş, fatura, e-fatura XML veya fiyat listesi JSON) analiz et ve içerisindeki ürün kalemlerini çıkar.
+        const prompt = `Lütfen bu belgeyi (fiş, fatura, e-fatura XML veya fiyat listesi JSON) analiz et ve içerisindeki ürün kalemlerini DİKKATLİCE çıkar.
+
 Aşağıdaki mevcut hammaddelerimle eşleşenleri "BİREBİR AYNI İSİMLE", eşleşmeyenleri ise belgedeki ismiyle çıkar:
 Mevcut hammaddeler: ${existingIngredients.join(', ')}
 
-ÖNEMLİ KURAL 1: Ürün isimlerinin sonundaki veya içindeki gereksiz noktalama işaretlerini (özellikle nokta, virgül) ve fazla boşlukları temizle. (Örn: "ALGIDA CILEK 5L.." yerine "ALGIDA CILEK 5L" yaz).
-
-ÖNEMLİ KURAL 2: Birimleri ve miktarları sistem için standartlaştırmalısın!
-Eğer ürün adında "5L", "5 Litre", "2.5 Kg", "10 Kilogram" gibi büyük paket birimleri geçiyorsa ve fişte miktar "1 Adet" (veya koli) yazıyorsa;
-Bunu matematiksel olarak en küçük ortak birime çevir. 
-Örneğin: 5 Litre -> quantity: 5000, unit: "Ml". Veya 2.5 Kg -> quantity: 2500, unit: "Gram".
-Sıvıları her zaman "Ml", katıları "Gram" cinsinden getirmeye özen göster (tane/adet ile satılanlar hariç).
+ÖNEMLİ KURAL 1 (TİTİZLİK VE EKSİKSİZLİK): Belgedeki ürün kalemlerini satır satır son derece titiz bir şekilde analiz et. HİÇBİR gerçek ürünü atlama (eksik ürün bırakma) ve belgede YER ALMAYAN hiçbir ürünü uydurma (fazla ürün ekleme).
+ÖNEMLİ KURAL 2 (İSTENMEYEN KALEMLER): KDV, Ara Toplam, Genel Toplam, İndirim, Yuvarlama, Nakit, Kredi Kartı, Para Üstü, Tutar, Matrah gibi toplam ve ödeme satırlarını KESİNLİKLE ürün (items) olarak EKLEME. Yalnızca fiziksel mal/hizmet kalemlerini ekle.
+ÖNEMLİ KURAL 3 (İSİM TEMİZLİĞİ): Ürün isimlerinin sonundaki veya içindeki gereksiz noktalama işaretlerini (özellikle nokta, virgül, yıldız), KDV oranlarını (örn: %1, %10) ve fazla boşlukları temizle. (Örn: "ALGIDA CILEK 5L.. %1" yerine "ALGIDA CILEK 5L" yaz).
+ÖNEMLİ KURAL 4 (BİRİM VE MİKTAR DÖNÜŞÜMÜ): Birimleri ve miktarları sistem için standartlaştırmalısın! Eğer ürün adında "5L", "5 Litre", "2.5 Kg", "10 Kilogram" gibi büyük paket birimleri geçiyorsa ve fişte miktar "1 Adet" (veya koli) yazıyorsa; bunu matematiksel olarak en küçük ortak birime çevir. 
+Örneğin: 5 Litre -> quantity: 5000, unit: "Ml". Veya 2.5 Kg -> quantity: 2500, unit: "Gram". Sıvıları her zaman "Ml", katıları "Gram" cinsinden getirmeye özen göster (tane/adet ile satılanlar hariç).
+ÖNEMLİ KURAL 5 (MATEMATİKSEL TUTARLILIK): Çıkardığın her bir ürün için (quantity * unitPrice) değerinin totalPrice'a eşit (veya yuvarlama farkı kadar çok çok yakın) olduğundan emin ol. Fiyatları doğru oku.
 
 Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (\`\`\`json vb) veya düz metin ekleme:
 {
