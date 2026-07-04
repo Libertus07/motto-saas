@@ -80,6 +80,7 @@ Mevcut hammaddeler: ${existingIngredients.join(', ')}
 ÖNEMLİ KURAL 4 (BİRİM VE MİKTAR DÖNÜŞÜMÜ): Birimleri ve miktarları sistem için standartlaştırmalısın! Eğer ürün adında "5L", "5 Litre", "2.5 Kg", "10 Kilogram" gibi büyük paket birimleri geçiyorsa ve fişte miktar "1 Adet" (veya koli) yazıyorsa; bunu matematiksel olarak en küçük ortak birime çevir. 
 Örneğin: 5 Litre -> quantity: 5000, unit: "Ml". Veya 2.5 Kg -> quantity: 2500, unit: "Gram". Sıvıları her zaman "Ml", katıları "Gram" cinsinden getirmeye özen göster (tane/adet ile satılanlar hariç).
 ÖNEMLİ KURAL 5 (MATEMATİKSEL TUTARLILIK): Çıkardığın her bir ürün için (quantity * unitPrice) değerinin totalPrice'a eşit (veya yuvarlama farkı kadar çok çok yakın) olduğundan emin ol. Fiyatları doğru oku.
+ÖNEMLİ KURAL 6 (BEDELSİZ, PROMOSYON VE İADE ÜRÜNLER): Fiyatı veya tutarı 0.00 olan (bedelsiz/promosyon) veya eksi (-) değerli olan (iade) kalemleri atlama. Bunları da mutlaka ürün listesine dahil et. Eksi değerliyse fiyatı veya miktarı eksi (-) olarak aynen koru. Fiyatı 0 ise 0 olarak bırak.
 
 Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (\`\`\`json vb) veya düz metin ekleme:
 {
