@@ -417,7 +417,6 @@ export default function FisYukle() {
                                 <input
                                     type="file"
                                     accept="image/*,application/pdf,text/xml,.xml,application/json,.json,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                                    capture="environment"
                                     onChange={handleImageUpload}
                                     className="hidden"
                                 />
