@@ -81,6 +81,7 @@ Mevcut hammaddeler: ${existingIngredients.join(', ')}
 Örneğin: 5 Litre -> quantity: 5000, unit: "Ml". Veya 2.5 Kg -> quantity: 2500, unit: "Gram". Sıvıları her zaman "Ml", katıları "Gram" cinsinden getirmeye özen göster (tane/adet ile satılanlar hariç).
 ÖNEMLİ KURAL 5 (MATEMATİKSEL TUTARLILIK): Çıkardığın her bir ürün için (quantity * unitPrice) değerinin totalPrice'a eşit (veya yuvarlama farkı kadar çok çok yakın) olduğundan emin ol. Fiyatları doğru oku.
 ÖNEMLİ KURAL 6 (BEDELSİZ, PROMOSYON VE İADE ÜRÜNLER): Fiyatı veya tutarı 0.00 olan (bedelsiz/promosyon) veya eksi (-) değerli olan (iade) kalemleri atlama. Bunları da mutlaka ürün listesine dahil et. Eksi değerliyse fiyatı veya miktarı eksi (-) olarak aynen koru. Fiyatı 0 ise 0 olarak bırak.
+ÖNEMLİ KURAL 7 (SONUNA KADAR OKUMA / ASLA KISALTMA YAPMA): JSON dizisini oluştururken ASLA tembellik (laziness) veya kısaltma yapma. Belgede örneğin 30 kalem varsa, 30 kalemin hepsini TEK TEK yaz. Yarıda kesme, atlama yapma. Tüm faturayı başından sonuna kadar %100 eksiksiz aktar.
 
 Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (\`\`\`json vb) veya düz metin ekleme:
 {

@@ -72,6 +72,7 @@ export async function POST(req: Request) {
 ÖNEMLİ KURAL 2 (İSTENMEYEN KALEMLER): KDV, KDV Toplam, Ara Toplam, Genel Toplam, İndirim, Yuvarlama, Nakit, Kredi Kartı, Para Üstü gibi toplam ve ödeme satırlarını KESİNLİKLE satılan ürün (items) olarak EKLEME. Yalnızca gerçek fiziksel ürünleri/menü kalemlerini ekle.
 ÖNEMLİ KURAL 3 (TAHSİLAT ANALİZİ): Fişin üzerindeki ödeme tiplerini (Nakit, Kredi Kartı vb.) analiz et ve tahsilat dağılımını ayıkla. Eğer ayrı ayrı belirtilmemişse tamamını 'cash' (Nakit) sayma, belgeden okuyabildiğin kadarını yerleştir.
 ÖNEMLİ KURAL 4 (GİDER ANALİZİ): Eğer fiş veya raporda kasadan yapılan günlük masraflar/giderler (örneğin Kurye yemeği, Temizlik, Manav, Bahşiş vb.) varsa bunları ayıkla ve giderlere (expenses) ekle. Ürünlere ekleme.
+ÖNEMLİ KURAL 5 (SONUNA KADAR OKUMA / ASLA KISALTMA YAPMA): JSON dizisini oluştururken ASLA tembellik (laziness) veya kısaltma yapma. Belgede örneğin 30 kalem varsa, 30 kalemin hepsini TEK TEK yaz. Yarıda kesme, atlama yapma. Tüm faturayı/raporu başından sonuna kadar %100 eksiksiz aktar.
 
 Aşağıdaki mevcut sistem ürünlerimle eşleşenleri "BİREBİR AYNI İSİMLE", eşleşmeyenleri ise fişteki ismiyle çıkar:
 Mevcut Ürünler: ${existingProducts.join(', ')}
