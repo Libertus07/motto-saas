@@ -97,10 +97,10 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (\`\`
     {
       "name": "ürün adı",
       "category": "Tahmini ürün kategorisi (örn: Süt Ürünleri, Sebze/Meyve, Temizlik, İçecek vb.)",
-      "quantity": miktar_sayı_olarak,
-      "unit": "birim (kg/litre/adet/paket vb)",
-      "totalPrice": toplam_fiyat_sayı_olarak,
-      "unitPrice": birim_fiyat_sayı_olarak
+      "quantity": miktar_sadece_rakam_olarak,
+      "unit": "Faturada Miktarın yanında yazan birim. KESİNLİKLE uydurma veya tahmin etme! Satırda 'ADET' yazıyorsa 'Adet', 'KG' yazıyorsa 'Kg' yaz.",
+      "totalPrice": toplam_tutar_sadece_rakam_olarak,
+      "unitPrice": birim_fiyat_sadece_rakam_olarak
     }
   ]
 }`;
