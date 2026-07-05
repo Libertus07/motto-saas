@@ -554,7 +554,7 @@ export default function Hammaddeler() {
                 />
               </div>
             </div>
-            <div className="flex gap-3 mt-4">
+            <div className="flex gap-3 mt-4 items-center">
               <button
                 onClick={handleSubmit}
                 className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-2 rounded-lg transition-colors"
@@ -567,6 +567,25 @@ export default function Hammaddeler() {
               >
                 İptal
               </button>
+
+              {(form.unit.toLowerCase() === 'kg' || form.unit.toLowerCase() === 'kilogram' || form.unit.toLowerCase() === 'litre' || form.unit.toLowerCase() === 'l') && (
+                <button 
+                  onClick={() => {
+                    const currentQty = parseFloat(form.stock_quantity) || 0
+                    const currentPrice = parseFloat(form.price_per_unit) || 0
+                    const u = form.unit.toLowerCase()
+                    setForm({
+                      ...form,
+                      unit: (u === 'kg' || u === 'kilogram') ? 'Gram' : 'Ml',
+                      stock_quantity: (currentQty * 1000).toString(),
+                      price_per_unit: (currentPrice / 1000).toFixed(4)
+                    })
+                  }}
+                  className="ml-auto bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
+                >
+                  ⚖️ {(form.unit.toLowerCase() === 'kg' || form.unit.toLowerCase() === 'kilogram') ? 'Gram' : 'Ml'}'a Dönüştür
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -794,9 +813,28 @@ export default function Hammaddeler() {
                                             <input type="number" value={form.stock_quantity} onChange={e => setForm({ ...form, stock_quantity: e.target.value })} className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-400" placeholder="0" />
                                           </div>
                                         </div>
-                                        <div className="flex gap-3 mt-4">
+                                        <div className="flex gap-3 mt-4 items-center">
                                           <button onClick={handleSubmit} className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-5 py-2 rounded-lg text-sm">Güncelle</button>
                                           <button onClick={resetForm} className="bg-stone-700 hover:bg-stone-600 text-white px-5 py-2 rounded-lg text-sm">İptal</button>
+                                          
+                                          {(form.unit.toLowerCase() === 'kg' || form.unit.toLowerCase() === 'kilogram' || form.unit.toLowerCase() === 'litre' || form.unit.toLowerCase() === 'l') && (
+                                            <button 
+                                              onClick={() => {
+                                                const currentQty = parseFloat(form.stock_quantity) || 0
+                                                const currentPrice = parseFloat(form.price_per_unit) || 0
+                                                const u = form.unit.toLowerCase()
+                                                setForm({
+                                                  ...form,
+                                                  unit: (u === 'kg' || u === 'kilogram') ? 'Gram' : 'Ml',
+                                                  stock_quantity: (currentQty * 1000).toString(),
+                                                  price_per_unit: (currentPrice / 1000).toFixed(4)
+                                                })
+                                              }}
+                                              className="ml-auto bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
+                                            >
+                                              ⚖️ {(form.unit.toLowerCase() === 'kg' || form.unit.toLowerCase() === 'kilogram') ? 'Gram' : 'Ml'}'a Dönüştür
+                                            </button>
+                                          )}
                                         </div>
                                       </div>
                                     </td>
