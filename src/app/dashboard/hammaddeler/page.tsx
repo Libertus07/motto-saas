@@ -327,6 +327,28 @@ export default function Hammaddeler() {
     setLoadingHistory(false)
   }
 
+  const handleDeleteAll = async () => {
+    const confirmed = await showConfirm('DİKKAT: Sistemdeki TÜM hammaddeleri silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm stok verileriniz sıfırlanır!', 'TÜMÜNÜ SİL 🚨')
+    if (!confirmed) return
+
+    setLoading(true)
+    const { error } = await supabase
+      .from('materials')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000')
+
+    if (error) {
+      await showAlert('Silme hatası: ' + error.message, 'error')
+      setLoading(false)
+      return
+    }
+
+    await fetchMaterials()
+    logActivity('Hammadde', 'SILME', `Tüm hammaddeler sistemden toptan silindi.`)
+    await showAlert('Tüm hammaddeler başarıyla silindi!', 'success')
+    setLoading(false)
+  }
+
   const units = ['Kg', 'Gram', 'Litre', 'Ml', 'Adet', 'Paket']
 
   // Arama filtresi
@@ -389,7 +411,13 @@ export default function Hammaddeler() {
             </>
           ) : (
             <>
-
+              <button
+                onClick={handleDeleteAll}
+                disabled={materials.length === 0}
+                className="bg-red-950 hover:bg-red-900 disabled:opacity-50 text-red-400 font-medium px-4 py-2 rounded-lg text-sm transition-colors border border-red-900/50 flex items-center gap-2"
+              >
+                🗑️ Tümünü Sil
+              </button>
               <button
                 onClick={enterBulkEdit}
                 className="bg-stone-700 hover:bg-stone-600 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors border border-stone-600 flex items-center gap-2"
