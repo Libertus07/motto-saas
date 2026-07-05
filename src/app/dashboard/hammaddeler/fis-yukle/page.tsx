@@ -242,13 +242,14 @@ export default function FisYukle() {
         const selectedItems = parsedItems.filter(i => i.selected)
         const batchId = crypto.randomUUID()
 
+        let globalSupplierId: string | null = null;
+
         // 1. Tedarikçi Kayıt ve Borç (Cari) İşlemleri
         if (parsedSupplier) {
-            let supplierId = null;
             const { data: existingSuppliers } = await supabase.from('suppliers').select('*').eq('name', parsedSupplier.name).limit(1)
             
             if (existingSuppliers && existingSuppliers.length > 0) {
-                supplierId = existingSuppliers[0].id
+                globalSupplierId = existingSuppliers[0].id
                 
                 // Mevcut tedarikçinin bilgileri (telefon, adres vb.) eksikse ve faturada varsa onları tamamla!
                 const updates: any = {};
@@ -257,7 +258,7 @@ export default function FisYukle() {
                 if (!existingSuppliers[0].address && parsedSupplier.address) updates.address = parsedSupplier.address;
                 
                 if (Object.keys(updates).length > 0) {
-                    await supabase.from('suppliers').update(updates).eq('id', supplierId);
+                    await supabase.from('suppliers').update(updates).eq('id', globalSupplierId);
                 }
             } else {
                 const { data: newSup } = await supabase.from('suppliers').insert({
@@ -266,10 +267,10 @@ export default function FisYukle() {
                     iban: parsedSupplier.iban || null,
                     address: parsedSupplier.address || null
                 }).select().single()
-                if (newSup) supplierId = newSup.id
+                if (newSup) globalSupplierId = newSup.id
             }
 
-            if (supplierId) {
+            if (globalSupplierId) {
                 const totalInvoice = parsedSupplier.totalAmount
                 const paid = parsedSupplier.paidAmount
                 
@@ -400,11 +401,7 @@ export default function FisYukle() {
 
             // Stok hareketi (Giriş) olarak kaydet
             if (actualMaterialId) {
-                let currentSupplierId = null;
-                if (parsedSupplier) {
-                    const { data: currentSup } = await supabase.from('suppliers').select('id').eq('name', parsedSupplier.name).limit(1);
-                    if (currentSup && currentSup.length > 0) currentSupplierId = currentSup[0].id;
-                }
+                const currentSupplierId = globalSupplierId;
 
                 const { error: smError } = await supabase.from('stock_movements').insert({
                     batch_id: batchId,

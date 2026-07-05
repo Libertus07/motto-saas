@@ -149,7 +149,8 @@ export default function Hammaddeler() {
     const toUpdate = [...changedIds]
     const bulkDetails: string[] = []
 
-    for (const id of toUpdate) {
+    // Optimizasyon: Tüm güncellemeleri paralel (eşzamanlı) çalıştır
+    await Promise.all(toUpdate.map(async (id) => {
       const row = editRows[id]
       const oldMat = materials.find(m => m.id === id)
       const newPrice = parseFloat(row.price_per_unit)
@@ -157,7 +158,7 @@ export default function Hammaddeler() {
       const newStock = parseFloat(row.stock_quantity) || 0
       const oldStock = oldMat?.stock_quantity || 0
 
-      if (isNaN(newPrice) || !row.name) continue
+      if (isNaN(newPrice) || !row.name) return
 
       const changes = []
       if (oldPrice !== newPrice) changes.push(`Fiyat: ${oldPrice}->${newPrice}`)
@@ -185,7 +186,7 @@ export default function Hammaddeler() {
           source: 'manual'
         })
       }
-    }
+    }))
 
     setBulkEditMode(false)
     setChangedIds(new Set())
@@ -204,9 +205,8 @@ export default function Hammaddeler() {
     
     const deletedNames = Array.from(selectedForDeletion).map(id => materials.find(m => m.id === id)?.name).filter(Boolean)
 
-    for (const id of Array.from(selectedForDeletion)) {
-      await supabase.from('materials').delete().eq('id', id)
-    }
+    // Optimizasyon: Tek tek silmek yerine hepsini tek sorguda sil (Çok daha hızlı)
+    await supabase.from('materials').delete().in('id', Array.from(selectedForDeletion))
 
     setBulkEditMode(false)
     setChangedIds(new Set())
