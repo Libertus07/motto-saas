@@ -439,6 +439,18 @@ export default function Hammaddeler() {
                 ) : 'Hiçbir değişiklik yapılmadı'}
               </span>
               <button
+                onClick={() => {
+                  if (selectedForDeletion.size === filteredMaterials.length && filteredMaterials.length > 0) {
+                    setSelectedForDeletion(new Set())
+                  } else {
+                    setSelectedForDeletion(new Set(filteredMaterials.map(m => m.id)))
+                  }
+                }}
+                className="bg-stone-800 hover:bg-stone-700 text-stone-300 font-medium px-4 py-2 rounded-lg text-sm transition-colors border border-stone-700 flex items-center gap-2"
+              >
+                {selectedForDeletion.size === filteredMaterials.length && filteredMaterials.length > 0 ? '☐ Temizle' : '☑️ Tümünü Seç'}
+              </button>
+              <button
                 onClick={handleBulkDelete}
                 disabled={selectedForDeletion.size === 0}
                 className="bg-red-950 hover:bg-red-900 disabled:opacity-50 text-red-400 font-medium px-4 py-2 rounded-lg text-sm transition-colors border border-red-900/50 flex items-center gap-2"
