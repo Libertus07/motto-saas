@@ -240,6 +240,7 @@ export default function Hammaddeler() {
 
   const handleSubmit = async () => {
     if (!form.name || !form.price_per_unit) return
+    const { data: { user } } = await supabase.auth.getUser()
 
     const payload = {
       name: form.name,
@@ -247,6 +248,7 @@ export default function Hammaddeler() {
       unit: form.unit,
       price_per_unit: parseFloat(form.price_per_unit),
       stock_quantity: parseFloat(form.stock_quantity) || 0,
+      user_id: user?.id
     }
 
     let details = ''

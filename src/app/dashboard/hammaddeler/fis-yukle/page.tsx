@@ -377,7 +377,8 @@ export default function FisYukle() {
                         category: item.category || 'Diğer',
                         unit: item.unit || 'Adet',
                         price_per_unit: safeUnitPrice,
-                        stock_quantity: safeQuantity
+                        stock_quantity: safeQuantity,
+                        user_id: user?.id
                     };
                     
                     const { data, error: insertError } = await supabase.from('materials').insert(insertPayload).select()
