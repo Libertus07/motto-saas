@@ -372,25 +372,27 @@ export default function FisYukle() {
                     }
                 } else {
                     // Gerçekten yepyeni hammadde ekle
-                    const { data, error: insertError } = await supabase.from('materials').insert({
-                        name: item.name,
-                        category: item.category || null,
-                        unit: item.unit,
+                    const insertPayload = {
+                        name: item.name || 'İsimsiz Ürün',
+                        category: item.category || 'Diğer',
+                        unit: item.unit || 'Adet',
                         price_per_unit: safeUnitPrice,
                         stock_quantity: safeQuantity
-                    }).select().single()
+                    };
+                    
+                    const { data, error: insertError } = await supabase.from('materials').insert(insertPayload).select()
 
-                    if (data) {
-                        actualMaterialId = data.id;
+                    if (data && data.length > 0) {
+                        actualMaterialId = data[0].id;
                         // İlk fiyatını geçmişe kaydet
                         await supabase.from('material_price_history').insert({
-                            material_id: data.id,
+                            material_id: actualMaterialId,
                             old_price: 0,
                             new_price: safeUnitPrice,
                             source: 'receipt_upload'
                         })
                     } else if (insertError) {
-                        console.error("Hammadde eklenirken hata:", insertError);
+                        console.error("Hammadde eklenirken hata:", insertError.message || JSON.stringify(insertError), "Payload:", insertPayload);
                     }
                 }
             }
