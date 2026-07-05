@@ -424,7 +424,8 @@ export default function FisYukle() {
             }
         }
 
-        logActivity('Stok', 'EKLEME', `Yapay zeka ile fiş okunarak ${selectedItems.length} kalem ürün/stok sisteme eklendi.`, { batchId })
+        const addedItemsStr = selectedItems.map(item => `${item.name} (${item.quantity} ${item.unit})`).join(', ')
+        logActivity('Stok', 'EKLEME', `Yapay zeka ile fiş okunarak ${selectedItems.length} kalem ürün/stok sisteme eklendi.`, { batchId, eklenen_urunler: addedItemsStr })
         setStep('done')
         setLoading(false)
     }

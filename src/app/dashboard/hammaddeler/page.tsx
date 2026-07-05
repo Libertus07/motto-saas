@@ -202,6 +202,8 @@ export default function Hammaddeler() {
 
     setBulkSaving(true)
     
+    const deletedNames = Array.from(selectedForDeletion).map(id => materials.find(m => m.id === id)?.name).filter(Boolean)
+
     for (const id of Array.from(selectedForDeletion)) {
       await supabase.from('materials').delete().eq('id', id)
     }
@@ -211,7 +213,7 @@ export default function Hammaddeler() {
     setSelectedForDeletion(new Set())
     setBulkSaving(false)
     fetchMaterials()
-    logActivity('Hammadde', 'SILME', `${selectedForDeletion.size} adet hammadde toplu olarak silindi.`)
+    logActivity('Hammadde', 'SILME', `${selectedForDeletion.size} adet hammadde toplu olarak silindi.`, { silinen_urunler: deletedNames.join(', ') })
     showAlert(`${selectedForDeletion.size} adet hammadde başarıyla silindi.`, 'success')
   }
 
@@ -379,6 +381,8 @@ export default function Hammaddeler() {
     if (!confirmed) return
 
     setLoading(true)
+    const allNames = materials.map(m => m.name)
+
     const { error } = await supabase
       .from('materials')
       .delete()
@@ -391,7 +395,7 @@ export default function Hammaddeler() {
     }
 
     await fetchMaterials()
-    logActivity('Hammadde', 'SILME', `Tüm hammaddeler sistemden toptan silindi.`)
+    logActivity('Hammadde', 'SILME', `Tüm hammaddeler sistemden toptan silindi.`, { silinen_urunler: allNames.join(', ') })
     await showAlert('Tüm hammaddeler başarıyla silindi!', 'success')
     setLoading(false)
   }
