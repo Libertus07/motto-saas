@@ -56,6 +56,7 @@ export default function Hammaddeler() {
   const [editRows, setEditRows] = useState<Record<string, EditRow>>({})
   const [bulkSaving, setBulkSaving] = useState(false)
   const [changedIds, setChangedIds] = useState<Set<string>>(new Set())
+  const [selectedForDeletion, setSelectedForDeletion] = useState<Set<string>>(new Set())
 
   // Otomatik Kategorize
   const [autoCatLoading, setAutoCatLoading] = useState(false)
@@ -104,23 +105,46 @@ export default function Hammaddeler() {
         unit: m.unit,
         price_per_unit: m.price_per_unit.toString(),
         stock_quantity: (m.stock_quantity || 0).toString(),
-        category: m.category || 'Diğer',
+        category: m.category || 'Diğer'
       }
     })
     setEditRows(rows)
     setChangedIds(new Set())
+    setSelectedForDeletion(new Set())
     setBulkEditMode(true)
     setShowForm(false)
   }
 
+  const cancelBulkEdit = () => {
+    setBulkEditMode(false)
+    setChangedIds(new Set())
+    setSelectedForDeletion(new Set())
+  }
+
   // Tek bir satırın alanını güncelle ve değiştiği olarak işaretle
   const updateEditRow = (id: string, field: keyof EditRow, value: string) => {
-    setEditRows(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
-    setChangedIds(prev => new Set([...prev, id]))
+    setEditRows(prev => ({
+      ...prev,
+      [id]: { ...prev[id], [field]: value }
+    }))
+    const newChanged = new Set(changedIds)
+    newChanged.add(id)
+    setChangedIds(newChanged)
+  }
+
+  const toggleDeletion = (id: string) => {
+    const newSet = new Set(selectedForDeletion)
+    if (newSet.has(id)) {
+      newSet.delete(id)
+    } else {
+      newSet.add(id)
+    }
+    setSelectedForDeletion(newSet)
   }
 
   // Tüm değişenleri kaydet
   const handleBulkSave = async () => {
+    if (changedIds.size === 0) return
     setBulkSaving(true)
     const toUpdate = [...changedIds]
     const bulkDetails: string[] = []
@@ -132,6 +156,8 @@ export default function Hammaddeler() {
       const oldPrice = oldMat?.price_per_unit || 0
       const newStock = parseFloat(row.stock_quantity) || 0
       const oldStock = oldMat?.stock_quantity || 0
+
+      if (isNaN(newPrice) || !row.name) continue
 
       const changes = []
       if (oldPrice !== newPrice) changes.push(`Fiyat: ${oldPrice}->${newPrice}`)
@@ -163,52 +189,30 @@ export default function Hammaddeler() {
 
     setBulkEditMode(false)
     setChangedIds(new Set())
+    setSelectedForDeletion(new Set())
     setBulkSaving(false)
     fetchMaterials()
     logActivity('Hammadde', 'GUNCELLEME', `${changedIds.size} adet hammaddenin bilgileri (fiyat/stok/kategori) topluca güncellendi.`, bulkDetails.length > 0 ? { detay: bulkDetails.join(' | ') } : undefined)
   }
 
-  const convertUnits = () => {
-    const updatedRows = { ...editRows }
-    let changed = false
-    const newChangedIds = new Set(changedIds)
+  const handleBulkDelete = async () => {
+    if (selectedForDeletion.size === 0) return
+    const confirmed = await showConfirm(`Seçili ${selectedForDeletion.size} adet hammaddeyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz!`, 'Seçilileri Sil 🗑️')
+    if (!confirmed) return
 
-    Object.keys(updatedRows).forEach(id => {
-      const row = updatedRows[id]
-      const u = row.unit.toLowerCase()
-
-      if (u === 'kg' || u === 'kilogram') {
-        const currentQty = parseFloat(row.stock_quantity) || 0
-        const currentPrice = parseFloat(row.price_per_unit) || 0
-        updatedRows[id] = {
-          ...row,
-          unit: 'Gram',
-          stock_quantity: (currentQty * 1000).toString(),
-          price_per_unit: (currentPrice / 1000).toFixed(4)
-        }
-        newChangedIds.add(id)
-        changed = true
-      } else if (u === 'litre' || u === 'l') {
-        const currentQty = parseFloat(row.stock_quantity) || 0
-        const currentPrice = parseFloat(row.price_per_unit) || 0
-        updatedRows[id] = {
-          ...row,
-          unit: 'Ml',
-          stock_quantity: (currentQty * 1000).toString(),
-          price_per_unit: (currentPrice / 1000).toFixed(4)
-        }
-        newChangedIds.add(id)
-        changed = true
-      }
-    })
-
-    if (changed) {
-      setEditRows(updatedRows)
-      setChangedIds(newChangedIds)
-      showAlert('Dönüşüm yapıldı! Lütfen değerleri kontrol edip Kaydet butonuna basın.', 'success')
-    } else {
-      showAlert('Dönüştürülecek Kg veya Litre birimi bulunamadı.', 'info')
+    setBulkSaving(true)
+    
+    for (const id of Array.from(selectedForDeletion)) {
+      await supabase.from('materials').delete().eq('id', id)
     }
+
+    setBulkEditMode(false)
+    setChangedIds(new Set())
+    setSelectedForDeletion(new Set())
+    setBulkSaving(false)
+    fetchMaterials()
+    logActivity('Hammadde', 'SILME', `${selectedForDeletion.size} adet hammadde toplu olarak silindi.`)
+    showAlert(`${selectedForDeletion.size} adet hammadde başarıyla silindi.`, 'success')
   }
 
   // Otomatik Kategorize — AI'dan öneri al
@@ -435,20 +439,20 @@ export default function Hammaddeler() {
                 ) : 'Hiçbir değişiklik yapılmadı'}
               </span>
               <button
-                onClick={convertUnits}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
-                title="Kg'ı Gram'a, Litre'yi Ml'ye çevirir"
+                onClick={handleBulkDelete}
+                disabled={selectedForDeletion.size === 0}
+                className="bg-red-950 hover:bg-red-900 disabled:opacity-50 text-red-400 font-medium px-4 py-2 rounded-lg text-sm transition-colors border border-red-900/50 flex items-center gap-2"
               >
-                ⚖️ Birimleri Dönüştür
+                🗑️ Seçilileri Sil ({selectedForDeletion.size})
               </button>
               <button
-                onClick={() => { setBulkEditMode(false); setChangedIds(new Set()) }}
+                onClick={cancelBulkEdit}
                 className="bg-stone-800 hover:bg-stone-700 text-stone-300 font-medium px-4 py-2 rounded-lg text-sm transition-colors border border-stone-700"
               >
                 İptal
               </button>
               <button
-                onClick={handleBulkSave}
+                onClick={saveBulkEdit}
                 disabled={bulkSaving || changedIds.size === 0}
                 className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-950 font-bold px-5 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
               >
@@ -666,6 +670,9 @@ export default function Hammaddeler() {
 <table className="w-full">
                         <thead>
                           <tr className="bg-stone-950/40 border-b border-stone-800">
+                            {bulkEditMode && (
+                              <th className="text-center px-4 py-2.5 text-stone-500 text-xs font-medium w-10">Sil</th>
+                            )}
                             <th className="text-left px-5 py-2.5 text-stone-500 text-xs font-medium">Hammadde</th>
                             <th className="text-left px-4 py-2.5 text-stone-500 text-xs font-medium">Birim</th>
                             <th className="text-right px-4 py-2.5 text-stone-500 text-xs font-medium">Birim Fiyat</th>
@@ -684,15 +691,25 @@ export default function Hammaddeler() {
 
                             if (bulkEditMode && row) {
                               const isChanged = changedIds.has(mat.id)
-                              const inputCls = "w-full bg-stone-800 border border-stone-700 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-amber-400"
+                              const isSelected = selectedForDeletion.has(mat.id)
+                              const inputCls = "w-full bg-stone-800 border border-stone-700 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-amber-400 disabled:opacity-50"
                               return (
-                                <tr key={mat.id} className={`border-b border-stone-800/50 last:border-0 transition-colors ${isChanged ? 'bg-amber-950/20' : ''}`}>
+                                <tr key={mat.id} className={`border-b border-stone-800/50 last:border-0 transition-colors ${isSelected ? 'bg-red-950/20' : isChanged ? 'bg-amber-950/20' : ''}`}>
+                                  <td className="px-4 py-2 text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => toggleDeletion(mat.id)}
+                                      className="w-4 h-4 rounded bg-stone-800 border-stone-700 text-red-500 focus:ring-red-500 focus:ring-offset-stone-900 cursor-pointer"
+                                    />
+                                  </td>
                                   <td className="px-2 py-2">
                                     <input
                                       value={row.name}
                                       onChange={e => updateEditRow(mat.id, 'name', e.target.value)}
                                       className={inputCls}
                                       placeholder="Ad"
+                                      disabled={isSelected}
                                     />
                                   </td>
                                   <td className="px-2 py-2">
@@ -700,6 +717,7 @@ export default function Hammaddeler() {
                                       value={row.unit}
                                       onChange={e => updateEditRow(mat.id, 'unit', e.target.value)}
                                       className={inputCls}
+                                      disabled={isSelected}
                                     >
                                       {['Kg','Gram','Litre','Ml','Adet','Paket'].map(u => <option key={u} value={u}>{u}</option>)}
                                     </select>
@@ -711,6 +729,7 @@ export default function Hammaddeler() {
                                       onChange={e => updateEditRow(mat.id, 'price_per_unit', e.target.value)}
                                       className={inputCls + ' text-right'}
                                       placeholder="0.00"
+                                      disabled={isSelected}
                                     />
                                   </td>
                                   <td className="px-2 py-2">
@@ -720,13 +739,18 @@ export default function Hammaddeler() {
                                       onChange={e => updateEditRow(mat.id, 'stock_quantity', e.target.value)}
                                       className={inputCls + ' text-right'}
                                       placeholder="0"
+                                      disabled={isSelected}
                                     />
                                   </td>
-                                  <td className="px-4 py-2 text-right text-amber-400 font-bold text-sm">
+                                  <td className={`px-4 py-2 text-right font-bold text-sm ${isSelected ? 'text-stone-500' : 'text-amber-400'}`}>
                                     ₺{(parseFloat(row.stock_quantity || '0') * parseFloat(row.price_per_unit || '0')).toFixed(2)}
                                   </td>
                                   <td className="px-4 py-2 text-center">
-                                    {isChanged && <span className="text-amber-400 text-xs font-medium">● değişti</span>}
+                                    {isSelected ? (
+                                      <span className="text-red-400 text-xs font-bold">🗑️ Silinecek</span>
+                                    ) : isChanged ? (
+                                      <span className="text-amber-400 text-xs font-medium">● değişti</span>
+                                    ) : null}
                                   </td>
                                 </tr>
                               )
