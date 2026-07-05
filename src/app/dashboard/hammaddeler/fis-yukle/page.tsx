@@ -144,7 +144,7 @@ export default function FisYukle() {
                 const normItemName = normalizeName(item.name);
                 const matched = existingMaterials?.find(mat => {
                     const normMatName = normalizeName(mat.name);
-                    return normMatName.includes(normItemName) || normItemName.includes(normMatName);
+                    return normMatName === normItemName;
                 })
                 return {
                     ...item,
@@ -341,24 +341,49 @@ export default function FisYukle() {
                     })
                 }
             } else {
-                // Yeni hammadde ekle
-                const { data } = await supabase.from('materials').insert({
-                    name: item.name,
-                    category: item.category || null,
-                    unit: item.unit,
-                    price_per_unit: item.unitPrice,
-                    stock_quantity: item.quantity
-                }).select().single()
+                // Önce bu isimde bir hammadde veritabanında (veya bu döngüde) oluşmuş mu diye tekrar kontrol et
+                const { data: checkData } = await supabase.from('materials').select('id, stock_quantity, price_per_unit').eq('name', item.name).single()
+                
+                if (checkData) {
+                    actualMaterialId = checkData.id;
+                    const updatePayload: any = {
+                        price_per_unit: item.unitPrice,
+                        stock_quantity: (checkData.stock_quantity || 0) + item.quantity
+                    }
+                    if (item.category && item.category.trim() !== '') updatePayload.category = item.category.trim();
+                    
+                    await supabase.from('materials').update(updatePayload).eq('id', checkData.id)
+                    
+                    if (checkData.price_per_unit !== item.unitPrice) {
+                        await supabase.from('material_price_history').insert({
+                            material_id: checkData.id,
+                            old_price: checkData.price_per_unit,
+                            new_price: item.unitPrice,
+                            source: 'receipt_upload'
+                        })
+                    }
+                } else {
+                    // Gerçekten yepyeni hammadde ekle
+                    const { data, error: insertError } = await supabase.from('materials').insert({
+                        name: item.name,
+                        category: item.category || null,
+                        unit: item.unit,
+                        price_per_unit: item.unitPrice,
+                        stock_quantity: item.quantity
+                    }).select().single()
 
-                if (data) {
-                    actualMaterialId = data.id;
-                    // İlk fiyatını geçmişe kaydet
-                    await supabase.from('material_price_history').insert({
-                        material_id: data.id,
-                        old_price: 0,
-                        new_price: item.unitPrice,
-                        source: 'receipt_upload'
-                    })
+                    if (data) {
+                        actualMaterialId = data.id;
+                        // İlk fiyatını geçmişe kaydet
+                        await supabase.from('material_price_history').insert({
+                            material_id: data.id,
+                            old_price: 0,
+                            new_price: item.unitPrice,
+                            source: 'receipt_upload'
+                        })
+                    } else if (insertError) {
+                        console.error("Hammadde eklenirken hata:", insertError);
+                    }
                 }
             }
 
