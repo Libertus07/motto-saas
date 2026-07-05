@@ -426,7 +426,7 @@ export default function TedarikciGecmisi() {
                                                                                         {item.materials?.name || 'Bilinmeyen'}
                                                                                     </td>
                                                                                     <td className="px-5 py-2.5 text-center text-stone-400">
-                                                                                        ₺{item.unit_price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                                                        ₺{item.unit_price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                                                                                     </td>
                                                                                     <td className="px-5 py-2.5 text-center">
                                                                                         <span className="inline-block bg-stone-800 text-green-400 px-2 py-0.5 rounded text-xs font-bold min-w-[2rem]">
