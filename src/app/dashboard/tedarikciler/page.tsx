@@ -107,7 +107,7 @@ export default function Tedarikciler() {
                 .order('created_at', { ascending: false }),
             supabase
                 .from('stock_movements')
-                .select('id, created_at, quantity, unit_price, batch_id, document_url, materials(name, unit)')
+                .select('id, created_at, quantity, unit_price, batch_id, materials(name, unit)')
                 .eq('supplier_id', supplier.id)
                 .order('created_at', { ascending: false })
         ])
@@ -127,12 +127,9 @@ export default function Tedarikciler() {
                     date: dateStr,
                     totalAmount: 0,
                     totalItems: 0,
-                    documentUrl: item.document_url,
+                    documentUrl: null, // Document loaded on demand
                     items: []
                 }
-            }
-            if (item.document_url) {
-                groups[key].documentUrl = item.document_url
             }
             groups[key].items.push(item)
             groups[key].totalAmount += (item.quantity || 0) * (item.unit_price || 0)
@@ -141,6 +138,28 @@ export default function Tedarikciler() {
         
         const sortedGroups = Object.values(groups).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         setGroupedReceipts(sortedGroups)
+    }
+
+    const viewDocument = async (batchId: string | null) => {
+        if (!batchId) {
+            alert('Bu işlem için ekli belge bulunamadı.')
+            return
+        }
+        setLoading(true) // Loading gösterelim ki tıklandığı anlaşılsın
+        const { data } = await supabase
+            .from('stock_movements')
+            .select('document_url')
+            .eq('batch_id', batchId)
+            .not('document_url', 'is', null)
+            .limit(1)
+            .single()
+            
+        setLoading(false)
+        if (data?.document_url) {
+            setPreviewUrl(data.document_url)
+        } else {
+            alert('Veritabanında bu kayıt için herhangi bir fatura/fiş görseli bulunamadı.')
+        }
     }
 
     const handlePayment = async () => {
@@ -459,9 +478,9 @@ export default function Tedarikciler() {
                                                             <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Fiş Toplamı</p>
                                                             <p className="font-bold text-red-400">₺{group.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
                                                         </div>
-                                                        {group.documentUrl && (
+                                                        {group.batchId && (
                                                             <button 
-                                                                onClick={(e) => { e.stopPropagation(); setPreviewUrl(group.documentUrl!); }}
+                                                                onClick={(e) => { e.stopPropagation(); viewDocument(group.batchId); }}
                                                                 className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg text-sm flex items-center justify-center transition-colors border border-stone-700 active:scale-95 ml-2"
                                                                 title="Belgeyi Gör"
                                                             >
