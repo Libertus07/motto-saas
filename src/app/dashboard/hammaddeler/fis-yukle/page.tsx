@@ -305,20 +305,28 @@ export default function FisYukle() {
             }
         }
 
+        // Helper function to ensure safe numbers for DB
+        const parseNum = (val: any) => {
+            if (typeof val === 'number') return val;
+            if (!val) return 0;
+            return parseFloat(val.toString().replace(/,/g, '.')) || 0;
+        }
+
         // 2. Hammadde ve Fiyat Güncelleme İşlemleri
         for (const item of selectedItems) {
             let actualMaterialId = item.matchedMaterialId;
+            const safeUnitPrice = parseNum(item.unitPrice);
+            const safeQuantity = parseNum(item.quantity);
 
             if (item.matchedMaterialId) {
                 const existing = materials.find(m => m.id === item.matchedMaterialId)
                 const currentStock = existing?.stock_quantity || 0
                 const oldPrice = existing?.price_per_unit || 0
-                const newPrice = item.unitPrice
 
                 // Mevcut hammaddeyi güncelle
                 const updatePayload: any = {
-                    price_per_unit: newPrice,
-                    stock_quantity: currentStock + item.quantity
+                    price_per_unit: safeUnitPrice,
+                    stock_quantity: currentStock + safeQuantity
                 }
                 
                 // Eğer yeni kategorisi varsa veya boş olanı dolduruyorsak güncelleyelim
@@ -332,11 +340,11 @@ export default function FisYukle() {
                     .eq('id', item.matchedMaterialId)
 
                 // Fiyat değiştiyse geçmişe kaydet
-                if (oldPrice !== newPrice) {
+                if (oldPrice !== safeUnitPrice) {
                     await supabase.from('material_price_history').insert({
                         material_id: item.matchedMaterialId,
                         old_price: oldPrice,
-                        new_price: newPrice,
+                        new_price: safeUnitPrice,
                         source: 'receipt_upload'
                     })
                 }
@@ -347,18 +355,18 @@ export default function FisYukle() {
                 if (checkData) {
                     actualMaterialId = checkData.id;
                     const updatePayload: any = {
-                        price_per_unit: item.unitPrice,
-                        stock_quantity: (checkData.stock_quantity || 0) + item.quantity
+                        price_per_unit: safeUnitPrice,
+                        stock_quantity: (checkData.stock_quantity || 0) + safeQuantity
                     }
                     if (item.category && item.category.trim() !== '') updatePayload.category = item.category.trim();
                     
                     await supabase.from('materials').update(updatePayload).eq('id', checkData.id)
                     
-                    if (checkData.price_per_unit !== item.unitPrice) {
+                    if (checkData.price_per_unit !== safeUnitPrice) {
                         await supabase.from('material_price_history').insert({
                             material_id: checkData.id,
                             old_price: checkData.price_per_unit,
-                            new_price: item.unitPrice,
+                            new_price: safeUnitPrice,
                             source: 'receipt_upload'
                         })
                     }
@@ -368,8 +376,8 @@ export default function FisYukle() {
                         name: item.name,
                         category: item.category || null,
                         unit: item.unit,
-                        price_per_unit: item.unitPrice,
-                        stock_quantity: item.quantity
+                        price_per_unit: safeUnitPrice,
+                        stock_quantity: safeQuantity
                     }).select().single()
 
                     if (data) {
@@ -378,7 +386,7 @@ export default function FisYukle() {
                         await supabase.from('material_price_history').insert({
                             material_id: data.id,
                             old_price: 0,
-                            new_price: item.unitPrice,
+                            new_price: safeUnitPrice,
                             source: 'receipt_upload'
                         })
                     } else if (insertError) {
@@ -400,8 +408,8 @@ export default function FisYukle() {
                     material_id: actualMaterialId,
                     supplier_id: currentSupplierId,
                     movement_type: 'giris',
-                    quantity: item.quantity,
-                    unit_price: item.unitPrice,
+                    quantity: safeQuantity,
+                    unit_price: safeUnitPrice,
                     note: `Yapay Zeka Fiş Yükleme${parsedSupplier ? ` (${parsedSupplier.name})` : ''}`,
                     document_url: image || null,
                     user_id: user?.id
