@@ -168,6 +168,49 @@ export default function Hammaddeler() {
     logActivity('Hammadde', 'GUNCELLEME', `${changedIds.size} adet hammaddenin bilgileri (fiyat/stok/kategori) topluca güncellendi.`, bulkDetails.length > 0 ? { detay: bulkDetails.join(' | ') } : undefined)
   }
 
+  const convertUnits = () => {
+    const updatedRows = { ...editRows }
+    let changed = false
+    const newChangedIds = new Set(changedIds)
+
+    Object.keys(updatedRows).forEach(id => {
+      const row = updatedRows[id]
+      const u = row.unit.toLowerCase()
+
+      if (u === 'kg' || u === 'kilogram') {
+        const currentQty = parseFloat(row.stock_quantity) || 0
+        const currentPrice = parseFloat(row.price_per_unit) || 0
+        updatedRows[id] = {
+          ...row,
+          unit: 'Gram',
+          stock_quantity: (currentQty * 1000).toString(),
+          price_per_unit: (currentPrice / 1000).toFixed(4)
+        }
+        newChangedIds.add(id)
+        changed = true
+      } else if (u === 'litre' || u === 'l') {
+        const currentQty = parseFloat(row.stock_quantity) || 0
+        const currentPrice = parseFloat(row.price_per_unit) || 0
+        updatedRows[id] = {
+          ...row,
+          unit: 'Ml',
+          stock_quantity: (currentQty * 1000).toString(),
+          price_per_unit: (currentPrice / 1000).toFixed(4)
+        }
+        newChangedIds.add(id)
+        changed = true
+      }
+    })
+
+    if (changed) {
+      setEditRows(updatedRows)
+      setChangedIds(newChangedIds)
+      showAlert('Dönüşüm yapıldı! Lütfen değerleri kontrol edip Kaydet butonuna basın.', 'success')
+    } else {
+      showAlert('Dönüştürülecek Kg veya Litre birimi bulunamadı.', 'info')
+    }
+  }
+
   // Otomatik Kategorize — AI'dan öneri al
   const handleAutoCategorize = async () => {
     setAutoCatLoading(true)
@@ -391,6 +434,13 @@ export default function Hammaddeler() {
                   <span className="text-amber-400 font-medium">{changedIds.size} satır düzenlendi</span>
                 ) : 'Hiçbir değişiklik yapılmadı'}
               </span>
+              <button
+                onClick={convertUnits}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
+                title="Kg'ı Gram'a, Litre'yi Ml'ye çevirir"
+              >
+                ⚖️ Birimleri Dönüştür
+              </button>
               <button
                 onClick={() => { setBulkEditMode(false); setChangedIds(new Set()) }}
                 className="bg-stone-800 hover:bg-stone-700 text-stone-300 font-medium px-4 py-2 rounded-lg text-sm transition-colors border border-stone-700"
