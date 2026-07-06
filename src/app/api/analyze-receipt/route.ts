@@ -99,6 +99,7 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (\`\`
       "category": "Tahmini ürün kategorisi (örn: Süt Ürünleri, Sebze/Meyve, Temizlik, İçecek vb.)",
       "quantity": miktar_sadece_rakam_olarak,
       "unit": "Faturada Miktarın yanında yazan birim. KESİNLİKLE uydurma veya tahmin etme! Satırda 'ADET' yazıyorsa 'Adet', 'KG' yazıyorsa 'Kg', 'KUTU' veya 'KOLİ' yazıyorsa mutlaka 'Kutu' veya 'Koli' yaz. Eğer birim yoksa 'Adet' yaz, asla kafana göre 'Gram' yazma.",
+      "boxMultiplier": "Eğer ürün Kutu, Koli veya Paket ise ve fişte içinde kaç adet olduğu yazıyorsa (örn: '1 Koli 24 Adet', '1x24'), bu sayıyı sadece rakam olarak buraya yaz. Eğer yazmıyorsa veya emin değilsen null bırak.",
       "totalPrice": toplam_tutar_sadece_rakam_olarak,
       "unitPrice": birim_fiyat_sadece_rakam_olarak
     }

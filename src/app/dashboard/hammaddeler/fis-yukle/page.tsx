@@ -16,6 +16,7 @@ type ParsedItem = {
     selected: boolean
     matchedMaterialId?: string
     isNew: boolean
+    boxMultiplier?: number
 }
 
 type Material = {
@@ -751,7 +752,7 @@ export default function FisYukle() {
                                                 <input 
                                                     id={`koli-carpan-fis-${index}`} 
                                                     type="number" 
-                                                    defaultValue="12" 
+                                                    defaultValue={item.boxMultiplier || 12} 
                                                     className="w-14 bg-stone-950 border border-stone-700 rounded px-1 py-1 text-white text-xs text-center focus:outline-none focus:border-indigo-500" 
                                                 />
                                                 <button 
