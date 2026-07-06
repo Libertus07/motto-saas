@@ -127,7 +127,7 @@ export default function Tedarikciler() {
                     date: dateStr,
                     totalAmount: 0,
                     totalItems: 0,
-                    documentUrl: null, // Document loaded on demand
+                    documentUrl: undefined, // Document loaded on demand
                     items: []
                 }
             }
