@@ -727,6 +727,24 @@ export default function FisYukle() {
                                         </div>
                                         
                                         <div className="mt-3 flex flex-wrap items-center gap-2">
+                                            {(item.unit.toLowerCase() === 'kg' || item.unit.toLowerCase() === 'kilogram' || item.unit.toLowerCase() === 'litre' || item.unit.toLowerCase() === 'l') && (
+                                              <button 
+                                                type="button"
+                                                onClick={() => {
+                                                  const currentQty = typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity) || 0;
+                                                  const currentPrice = typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0;
+                                                  const u = item.unit.toLowerCase();
+                                                  const updated = [...parsedItems];
+                                                  updated[index].unit = (u === 'kg' || u === 'kilogram') ? 'Gram' : 'Ml';
+                                                  updated[index].quantity = currentQty * 1000;
+                                                  updated[index].unitPrice = parseFloat((currentPrice / 1000).toFixed(4));
+                                                  setParsedItems(updated);
+                                                }}
+                                                className="bg-indigo-600/20 border border-indigo-500/50 hover:bg-indigo-600 hover:text-white text-indigo-400 font-medium px-4 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-2"
+                                              >
+                                                ⚖️ {(item.unit.toLowerCase() === 'kg' || item.unit.toLowerCase() === 'kilogram') ? 'Gram' : 'Ml'}'a Dönüştür
+                                              </button>
+                                            )}
                                             {(item.unit.toLowerCase() === 'kutu' || item.unit.toLowerCase() === 'koli' || item.unit.toLowerCase() === 'paket' || item.unit.toLowerCase() === 'adet') && (
                                               <div className="flex items-center gap-2 bg-stone-800/80 border border-stone-700 px-3 py-1.5 rounded-lg">
                                                 <span className="text-xs text-stone-400 font-medium">İçindeki Adet:</span>
