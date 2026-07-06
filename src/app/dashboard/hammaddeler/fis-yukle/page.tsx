@@ -277,7 +277,7 @@ export default function FisYukle() {
                 // Fatura borcunu ekle
                 await supabase.from('supplier_transactions').insert({
                     batch_id: batchId,
-                    supplier_id: supplierId,
+                    supplier_id: globalSupplierId,
                     transaction_date: parsedSupplier.date,
                     amount: totalInvoice,
                     transaction_type: 'invoice',
@@ -288,7 +288,7 @@ export default function FisYukle() {
                 if (paid > 0) {
                     await supabase.from('supplier_transactions').insert({
                         batch_id: batchId,
-                        supplier_id: supplierId,
+                        supplier_id: globalSupplierId,
                         transaction_date: parsedSupplier.date,
                         amount: paid,
                         transaction_type: 'payment',
@@ -299,9 +299,9 @@ export default function FisYukle() {
                 // Toplam bakiyeyi (total_debt) güncelle
                 const netDebtIncrease = totalInvoice - paid
                 if (netDebtIncrease !== 0) {
-                    const { data: currentSup } = await supabase.from('suppliers').select('total_debt').eq('id', supplierId).single()
+                    const { data: currentSup } = await supabase.from('suppliers').select('total_debt').eq('id', globalSupplierId).single()
                     const newTotal = parseFloat(currentSup?.total_debt || 0) + netDebtIncrease
-                    await supabase.from('suppliers').update({ total_debt: newTotal }).eq('id', supplierId)
+                    await supabase.from('suppliers').update({ total_debt: newTotal }).eq('id', globalSupplierId)
                 }
             }
         }
