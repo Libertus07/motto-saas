@@ -853,28 +853,61 @@ export default function Hammaddeler() {
                                             <input type="number" value={form.stock_quantity} onChange={e => setForm({ ...form, stock_quantity: e.target.value })} className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-400" placeholder="0" />
                                           </div>
                                         </div>
-                                        <div className="flex gap-3 mt-4 items-center">
+                                        <div className="flex flex-wrap gap-3 mt-4 items-center">
                                           <button onClick={handleSubmit} className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-5 py-2 rounded-lg text-sm">Güncelle</button>
                                           <button onClick={resetForm} className="bg-stone-700 hover:bg-stone-600 text-white px-5 py-2 rounded-lg text-sm">İptal</button>
                                           
-                                          {(form.unit.toLowerCase() === 'kg' || form.unit.toLowerCase() === 'kilogram' || form.unit.toLowerCase() === 'litre' || form.unit.toLowerCase() === 'l') && (
-                                            <button 
-                                              onClick={() => {
-                                                const currentQty = parseFloat(form.stock_quantity) || 0
-                                                const currentPrice = parseFloat(form.price_per_unit) || 0
-                                                const u = form.unit.toLowerCase()
-                                                setForm({
-                                                  ...form,
-                                                  unit: (u === 'kg' || u === 'kilogram') ? 'Gram' : 'Ml',
-                                                  stock_quantity: (currentQty * 1000).toString(),
-                                                  price_per_unit: (currentPrice / 1000).toFixed(4)
-                                                })
-                                              }}
-                                              className="ml-auto bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
-                                            >
-                                              ⚖️ {(form.unit.toLowerCase() === 'kg' || form.unit.toLowerCase() === 'kilogram') ? 'Gram' : 'Ml'}'a Dönüştür
-                                            </button>
-                                          )}
+                                          <div className="flex items-center gap-2 ml-auto">
+                                            {(form.unit.toLowerCase() === 'kg' || form.unit.toLowerCase() === 'kilogram' || form.unit.toLowerCase() === 'litre' || form.unit.toLowerCase() === 'l') && (
+                                              <button 
+                                                onClick={() => {
+                                                  const currentQty = parseFloat(form.stock_quantity) || 0
+                                                  const currentPrice = parseFloat(form.price_per_unit) || 0
+                                                  const u = form.unit.toLowerCase()
+                                                  setForm({
+                                                    ...form,
+                                                    unit: (u === 'kg' || u === 'kilogram') ? 'Gram' : 'Ml',
+                                                    stock_quantity: (currentQty * 1000).toString(),
+                                                    price_per_unit: (currentPrice / 1000).toFixed(4)
+                                                  })
+                                                }}
+                                                className="bg-indigo-600/20 border border-indigo-500/50 hover:bg-indigo-600 hover:text-white text-indigo-400 font-medium px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
+                                              >
+                                                ⚖️ {(form.unit.toLowerCase() === 'kg' || form.unit.toLowerCase() === 'kilogram') ? 'Gram' : 'Ml'}'a Dönüştür
+                                              </button>
+                                            )}
+                                            
+                                            {(form.unit.toLowerCase() === 'kutu' || form.unit.toLowerCase() === 'koli' || form.unit.toLowerCase() === 'paket' || form.unit.toLowerCase() === 'adet') && (
+                                              <div className="flex items-center gap-2 bg-stone-800/80 border border-stone-700 px-3 py-1.5 rounded-lg">
+                                                <span className="text-xs text-stone-400 font-medium">İçindeki Adet:</span>
+                                                <input 
+                                                    id={`koli-carpan-${mat.id}`} 
+                                                    type="number" 
+                                                    defaultValue="12" 
+                                                    className="w-14 bg-stone-950 border border-stone-700 rounded px-1 py-1 text-white text-xs text-center focus:outline-none focus:border-indigo-500" 
+                                                />
+                                                <button 
+                                                  onClick={() => {
+                                                    const input = document.getElementById(`koli-carpan-${mat.id}`) as HTMLInputElement;
+                                                    const mult = parseInt(input?.value || '1');
+                                                    if (mult > 1) {
+                                                        const currentQty = parseFloat(form.stock_quantity) || 0
+                                                        const currentPrice = parseFloat(form.price_per_unit) || 0
+                                                        setForm({
+                                                          ...form,
+                                                          unit: 'Adet',
+                                                          stock_quantity: (currentQty * mult).toString(),
+                                                          price_per_unit: (currentPrice / mult).toFixed(4)
+                                                        })
+                                                    }
+                                                  }}
+                                                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1 rounded text-xs transition-colors"
+                                                >
+                                                  Adete Çevir
+                                                </button>
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     </td>
