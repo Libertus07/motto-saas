@@ -98,7 +98,7 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (\`\`
       "name": "ürün adı",
       "category": "Tahmini ürün kategorisi (örn: Süt Ürünleri, Sebze/Meyve, Temizlik, İçecek vb.)",
       "quantity": miktar_sadece_rakam_olarak,
-      "unit": "Faturada Miktarın yanında yazan birim. KESİNLİKLE uydurma veya tahmin etme! Satırda 'ADET' yazıyorsa 'Adet', 'KG' yazıyorsa 'Kg' yaz.",
+      "unit": "Faturada Miktarın yanında yazan birim. KESİNLİKLE uydurma veya tahmin etme! Satırda 'ADET' yazıyorsa 'Adet', 'KG' yazıyorsa 'Kg', 'KUTU' veya 'KOLİ' yazıyorsa mutlaka 'Kutu' veya 'Koli' yaz. Eğer birim yoksa 'Adet' yaz, asla kafana göre 'Gram' yazma.",
       "totalPrice": toplam_tutar_sadece_rakam_olarak,
       "unitPrice": birim_fiyat_sadece_rakam_olarak
     }

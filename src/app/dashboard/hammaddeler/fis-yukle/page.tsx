@@ -161,7 +161,7 @@ export default function FisYukle() {
                 address: data.supplier_address || '',
                 date: data.invoice_date || new Date().toISOString().split('T')[0],
                 totalAmount: data.total_amount || 0,
-                paidAmount: data.total_amount || 0, // Varsayılan olarak peşin (tamamı ödenmiş) kabul ediyoruz
+                paidAmount: 0, // Varsayılan olarak cariye (borca) yazılacak
                 statedDebt: data.supplier_stated_debt ?? null
             })
 
