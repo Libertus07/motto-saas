@@ -710,7 +710,7 @@ export default function FisYukle() {
                                                     onChange={e => updateItem(index, 'unit', e.target.value)}
                                                     className="w-full bg-stone-800 border border-stone-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400"
                                                 >
-                                                    {['Gram', 'Kg', 'Ml', 'Litre', 'Adet', 'Paket'].map(u =>
+                                                    {['Gram', 'Kg', 'Ml', 'Litre', 'Adet', 'Paket', 'Kutu', 'Koli'].map(u =>
                                                         <option key={u} value={u}>{u}</option>
                                                     )}
                                                 </select>
@@ -724,6 +724,40 @@ export default function FisYukle() {
                                                     className="w-full bg-stone-800 border border-stone-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400"
                                                 />
                                             </div>
+                                        </div>
+                                        
+                                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                                            {(item.unit.toLowerCase() === 'kutu' || item.unit.toLowerCase() === 'koli' || item.unit.toLowerCase() === 'paket' || item.unit.toLowerCase() === 'adet') && (
+                                              <div className="flex items-center gap-2 bg-stone-800/80 border border-stone-700 px-3 py-1.5 rounded-lg">
+                                                <span className="text-xs text-stone-400 font-medium">İçindeki Adet:</span>
+                                                <input 
+                                                    id={`koli-carpan-fis-${index}`} 
+                                                    type="number" 
+                                                    defaultValue="12" 
+                                                    className="w-14 bg-stone-950 border border-stone-700 rounded px-1 py-1 text-white text-xs text-center focus:outline-none focus:border-indigo-500" 
+                                                />
+                                                <button 
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const input = document.getElementById(`koli-carpan-fis-${index}`) as HTMLInputElement;
+                                                    const mult = parseInt(input?.value || '1');
+                                                    if (mult > 1) {
+                                                        const currentQty = typeof item.quantity === 'number' ? item.quantity : parseFloat(item.quantity) || 0;
+                                                        const currentPrice = typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0;
+                                                        const updated = [...parsedItems];
+                                                        updated[index].unit = 'Adet';
+                                                        updated[index].quantity = currentQty * mult;
+                                                        updated[index].unitPrice = parseFloat((currentPrice / mult).toFixed(4));
+                                                        // Total price remains the same (quantity * unitPrice)
+                                                        setParsedItems(updated);
+                                                    }
+                                                  }}
+                                                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1 rounded text-xs transition-colors"
+                                                >
+                                                  Adete Çevir
+                                                </button>
+                                              </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
