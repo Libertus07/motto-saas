@@ -82,7 +82,6 @@ export default function TedarikciGecmisi() {
                 created_at,
                 batch_id,
                 note,
-                document_url,
                 materials (
                     name,
                     unit
@@ -116,7 +115,7 @@ export default function TedarikciGecmisi() {
                     totalAmount: 0,
                     totalItems: 0,
                     batchId: item.batch_id,
-                    documentUrl: item.document_url || null,
+                    documentUrl: undefined, // Document loaded on demand
                     items: []
                 }
             }
@@ -128,6 +127,28 @@ export default function TedarikciGecmisi() {
         const sortedGroups = Object.values(groups).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         setAllReceipts(sortedGroups)
         setLoading(false)
+    }
+
+    const viewDocument = async (batchId: string | null) => {
+        if (!batchId) {
+            alert('Bu işlem için ekli belge bulunamadı.')
+            return
+        }
+        setLoading(true)
+        const { data } = await supabase
+            .from('stock_movements')
+            .select('document_url')
+            .eq('batch_id', batchId)
+            .not('document_url', 'is', null)
+            .limit(1)
+            .single()
+            
+        setLoading(false)
+        if (data?.document_url) {
+            setPreviewUrl(data.document_url)
+        } else {
+            alert('Veritabanında bu kayıt için herhangi bir fatura/fiş görseli bulunamadı.')
+        }
     }
 
     // Ay Listesi (Filtre için)
@@ -377,9 +398,9 @@ export default function TedarikciGecmisi() {
                                                                 </div>
                                                                 
                                                                 <div className="flex items-center gap-1">
-                                                                    {receipt.documentUrl && (
+                                                                    {receipt.batchId && (
                                                                         <button
-                                                                            onClick={(e) => { e.stopPropagation(); setPreviewUrl(receipt.documentUrl!); }}
+                                                                            onClick={(e) => { e.stopPropagation(); viewDocument(receipt.batchId); }}
                                                                             className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg flex items-center justify-center transition-colors border border-stone-700 active:scale-95"
                                                                             title="Fiş Belgesini Gör"
                                                                         >
