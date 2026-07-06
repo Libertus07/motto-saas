@@ -246,7 +246,7 @@ export default function FisYukle() {
 
         // 1. Tedarikçi Kayıt ve Borç (Cari) İşlemleri
         if (parsedSupplier) {
-            const { data: existingSuppliers } = await supabase.from('suppliers').select('*').eq('name', parsedSupplier.name).limit(1)
+            const { data: existingSuppliers } = await supabase.from('suppliers').select('*').ilike('name', parsedSupplier.name).limit(1)
             
             if (existingSuppliers && existingSuppliers.length > 0) {
                 globalSupplierId = existingSuppliers[0].id
@@ -261,12 +261,18 @@ export default function FisYukle() {
                     await supabase.from('suppliers').update(updates).eq('id', globalSupplierId);
                 }
             } else {
-                const { data: newSup } = await supabase.from('suppliers').insert({
+                const { data: newSup, error: insertError } = await supabase.from('suppliers').insert({
                     name: parsedSupplier.name,
                     phone: parsedSupplier.phone || null,
                     iban: parsedSupplier.iban || null,
-                    address: parsedSupplier.address || null
+                    address: parsedSupplier.address || null,
+                    user_id: user?.id
                 }).select().single()
+                
+                if (insertError) {
+                    console.error("Yeni tedarikçi eklenirken hata oluştu:", insertError)
+                }
+                
                 if (newSup) globalSupplierId = newSup.id
             }
 
