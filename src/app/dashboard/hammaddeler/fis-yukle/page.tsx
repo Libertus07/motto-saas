@@ -282,25 +282,29 @@ export default function FisYukle() {
                 const paid = parsedSupplier.paidAmount
                 
                 // Fatura borcunu ekle
-                await supabase.from('supplier_transactions').insert({
+                const { error: txErr1 } = await supabase.from('supplier_transactions').insert({
                     batch_id: batchId,
                     supplier_id: globalSupplierId,
                     transaction_date: parsedSupplier.date,
                     amount: totalInvoice,
                     transaction_type: 'invoice',
-                    note: 'Sistemden Fiş Yükleme (Otomatik Borç)'
+                    note: 'Sistemden Fiş Yükleme (Otomatik Borç)',
+                    user_id: user?.id
                 })
+                if (txErr1) console.error("Fatura borcu eklenemedi:", txErr1)
 
                 // Ödenen kısmı payment olarak ekle
                 if (paid > 0) {
-                    await supabase.from('supplier_transactions').insert({
+                    const { error: txErr2 } = await supabase.from('supplier_transactions').insert({
                         batch_id: batchId,
                         supplier_id: globalSupplierId,
                         transaction_date: parsedSupplier.date,
                         amount: paid,
                         transaction_type: 'payment',
-                        note: 'Fiş Yükleme Anında Ödeme'
+                        note: 'Fiş Yükleme Anında Ödeme',
+                        user_id: user?.id
                     })
+                    if (txErr2) console.error("Fatura ödemesi eklenemedi:", txErr2)
                 }
 
                 // Toplam bakiyeyi (total_debt) güncelle
