@@ -353,10 +353,17 @@ export default function ZRaporuYukle() {
                     // Materials tablosundaki güncel stokları al ve güncelle
                     const { data: currentMats } = await supabase.from('materials').select('id, stock_quantity').in('id', Object.keys(stockDeductions))
                     
-                    for (const mat of currentMats || []) {
-                        const deduction = stockDeductions[mat.id] || 0
-                        const newStock = Math.max(0, (mat.stock_quantity || 0) - deduction)
-                        await supabase.from('materials').update({ stock_quantity: newStock }).eq('id', mat.id)
+                    if (currentMats && currentMats.length > 0) {
+                        const updatePromises = currentMats.map(mat => {
+                            const deduction = stockDeductions[mat.id] || 0
+                            const newStock = Math.max(0, (mat.stock_quantity || 0) - deduction)
+                            return supabase.from('materials').update({ stock_quantity: newStock }).eq('id', mat.id)
+                        })
+                        
+                        // Maksimum 50'şerli paketler halinde güncelleyelim ki veritabanı kilitlenmesin
+                        for (let i = 0; i < updatePromises.length; i += 50) {
+                            await Promise.all(updatePromises.slice(i, i + 50))
+                        }
                     }
                 }
             }
