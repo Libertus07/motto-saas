@@ -228,7 +228,7 @@ export default function ZRaporuYukle() {
                 quantity: item.quantity,
                 unit_price: item.quantity > 0 ? Number((item.total_price / item.quantity).toFixed(2)) : 0,
                 total_price: item.total_price,
-                document_url: imageUrl || null
+                document_url: null // Devasa base64 metnini veritabanına kaydetmemek için iptal edildi
             }))
 
             const { error: salesError } = await supabase.from('sales').insert(salesInserts)
