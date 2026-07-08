@@ -68,7 +68,6 @@ export default function GecmisRaporlar() {
                 document_url
             `)
             .order('sale_date', { ascending: false })
-            .order('created_at', { ascending: false })
 
         if (error) {
             console.error('Satışlar çekilirken hata:', error)
