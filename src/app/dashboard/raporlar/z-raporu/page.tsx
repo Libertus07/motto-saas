@@ -350,22 +350,22 @@ export default function ZRaporuYukle() {
                 if (movementInserts.length > 0) {
                     await supabase.from('stock_movements').insert(movementInserts)
 
-                    // Materials tablosundaki güncel stokları al ve güncelle
-                    const { data: currentMats } = await supabase.from('materials').select('id, stock_quantity').in('id', Object.keys(stockDeductions))
+                    // Materials tablosundaki güncel stokları al ve bulk upsert ile tek seferde güncelle
+                    const { data: currentMats } = await supabase.from('materials').select('*').in('id', Object.keys(stockDeductions))
                     
                     if (currentMats && currentMats.length > 0) {
-                        // iOS Safari ağ hatasını (Load failed) önlemek için istekleri 5'erli paketler halinde gönderiyoruz.
-                        // Safari aynı anda 50 isteğe izin vermediği için bağlantıyı kesebiliyor.
-                        const chunkSize = 5;
-                        for (let i = 0; i < currentMats.length; i += chunkSize) {
-                            const chunk = currentMats.slice(i, i + chunkSize);
-                            const updatePromises = chunk.map(mat => {
-                                const deduction = stockDeductions[mat.id] || 0
-                                const newStock = Math.max(0, (mat.stock_quantity || 0) - deduction)
-                                return supabase.from('materials').update({ stock_quantity: newStock }).eq('id', mat.id)
-                            })
-                            await Promise.all(updatePromises)
-                        }
+                        const upsertData = currentMats.map(mat => {
+                            const deduction = stockDeductions[mat.id] || 0
+                            return {
+                                ...mat,
+                                stock_quantity: Math.max(0, (mat.stock_quantity || 0) - deduction)
+                            }
+                        })
+                        
+                        // Tek bir HTTP isteği ile tüm malzemeleri aynı anda günceller (Bulk Update)
+                        // Timeout veya bağlantı kopma sorunlarını tamamen çözer.
+                        const { error: upsertErr } = await supabase.from('materials').upsert(upsertData)
+                        if (upsertErr) throw upsertErr
                     }
                 }
             }
