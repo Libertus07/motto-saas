@@ -354,15 +354,17 @@ export default function ZRaporuYukle() {
                     const { data: currentMats } = await supabase.from('materials').select('id, stock_quantity').in('id', Object.keys(stockDeductions))
                     
                     if (currentMats && currentMats.length > 0) {
-                        const updatePromises = currentMats.map(mat => {
-                            const deduction = stockDeductions[mat.id] || 0
-                            const newStock = Math.max(0, (mat.stock_quantity || 0) - deduction)
-                            return supabase.from('materials').update({ stock_quantity: newStock }).eq('id', mat.id)
-                        })
-                        
-                        // Maksimum 50'şerli paketler halinde güncelleyelim ki veritabanı kilitlenmesin
-                        for (let i = 0; i < updatePromises.length; i += 50) {
-                            await Promise.all(updatePromises.slice(i, i + 50))
+                        // iOS Safari ağ hatasını (Load failed) önlemek için istekleri 5'erli paketler halinde gönderiyoruz.
+                        // Safari aynı anda 50 isteğe izin vermediği için bağlantıyı kesebiliyor.
+                        const chunkSize = 5;
+                        for (let i = 0; i < currentMats.length; i += chunkSize) {
+                            const chunk = currentMats.slice(i, i + chunkSize);
+                            const updatePromises = chunk.map(mat => {
+                                const deduction = stockDeductions[mat.id] || 0
+                                const newStock = Math.max(0, (mat.stock_quantity || 0) - deduction)
+                                return supabase.from('materials').update({ stock_quantity: newStock }).eq('id', mat.id)
+                            })
+                            await Promise.all(updatePromises)
                         }
                     }
                 }
