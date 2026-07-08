@@ -65,7 +65,7 @@ export async function POST(req: Request) {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
         const prompt = `Lütfen yüklenen belgeyi (Kuyumcu fişi, Döviz dekontu, Tapu Senedi, Araç Alım Satım evrağı vb.) incele ve bunun bir finansal yatırım işlemi olduğunu varsayarak verileri analiz et.
 
