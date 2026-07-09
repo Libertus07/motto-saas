@@ -8,6 +8,7 @@ export default function Dashboard() {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
+  const [showCriticalModal, setShowCriticalModal] = useState(false)
     const [stats, setStats] = useState({
     totalProducts: 0,
     totalIngredients: 0,
@@ -346,7 +347,9 @@ export default function Dashboard() {
                 <p className="text-3xl font-black text-white">{loading ? '...' : stats.totalIngredients}</p>
              </div>
 
-             <div className={`bg-stone-900 border ${stats.criticalStockCount > 0 ? 'border-red-900/50 hover:border-red-500/50' : 'border-stone-800 hover:border-stone-700'} transition-all duration-300 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group shadow-lg`}>
+             <div 
+                onClick={() => stats.criticalStockCount > 0 && setShowCriticalModal(true)}
+                className={`bg-stone-900 border ${stats.criticalStockCount > 0 ? 'border-red-900/50 hover:border-red-500/50 cursor-pointer' : 'border-stone-800'} transition-all duration-300 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group shadow-lg`}>
                 <div className="absolute -bottom-6 -right-6 text-6xl opacity-5 group-hover:scale-110 transition-transform">⚠️</div>
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${stats.criticalStockCount > 0 ? 'bg-red-500/10 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-pulse' : 'bg-stone-800 text-stone-500'}`}>🔔</div>
                 <p className="text-stone-400 text-[11px] uppercase tracking-wider mb-1 font-bold">Kritik Stok</p>
@@ -380,6 +383,59 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+
+        {/* Kritik Stok Modalı */}
+        {showCriticalModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-stone-900 border border-stone-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+              <div className="p-6 border-b border-stone-800 flex justify-between items-center bg-red-500/5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center text-xl animate-pulse">
+                    ⚠️
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-lg text-white">Kritik Stok Uyarıları</h2>
+                    <p className="text-stone-400 text-sm">Stoğu tükenmek üzere olan veya tükenen hammaddeler</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowCriticalModal(false)} className="text-stone-500 hover:text-white transition-colors">
+                  ✕
+                </button>
+              </div>
+              <div className="p-6 max-h-[60vh] overflow-y-auto space-y-3">
+                {stats.criticalItems.map((item: any) => (
+                  <div key={item.id} className="flex justify-between items-center p-4 rounded-xl bg-stone-800/50 border border-stone-800 hover:border-red-900/50 transition-colors">
+                    <div>
+                      <p className="font-bold text-white">{item.name}</p>
+                      <p className="text-stone-400 text-xs mt-1">
+                        Kritik Seviye: <span className="text-stone-300">{item.critical_stock_level} {item.unit}</span>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-stone-500 mb-1">Mevcut Stok</p>
+                      <p className={`font-bold text-lg ${item.stock_quantity <= 0 ? 'text-red-500' : 'text-amber-500'}`}>
+                        {item.stock_quantity} {item.unit}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {stats.criticalItems.length === 0 && (
+                  <div className="text-center p-6 text-stone-500">
+                    Şu an kritik seviyede stok bulunmuyor.
+                  </div>
+                )}
+              </div>
+              <div className="p-4 border-t border-stone-800 bg-stone-900/50 flex justify-end">
+                <button 
+                  onClick={() => router.push('/dashboard/hammaddeler')}
+                  className="px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white rounded-lg transition-colors text-sm font-medium"
+                >
+                  Hammaddelere Git
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )
