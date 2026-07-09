@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { logActivity } from '@/lib/logger'
 
 export default function KasaSayimPage() {
     const supabase = createClient()
@@ -263,7 +264,17 @@ export default function KasaSayimPage() {
                 }
             }
 
+            // İşlem geçmişine kaydet
+            await logActivity('Kasa', existingReconciliation ? 'GUNCELLEME' : 'EKLEME', `${date} tarihli kasa sayımı yapıldı ve kasa hareketleri (Açık/Fazla) düzeltildi.`, { 
+                nakit_sayim: countedCash, 
+                pos_sayim: countedCreditCard, 
+                nakit_beklenen: expectedNetCash,
+                pos_beklenen: expectedNetCredit,
+                fark: variance 
+            })
+
             setSuccess(true)
+            setTimeout(() => setSuccess(false), 3000)
             fetchExpectedTotals() // Yenile
         } catch (err: any) {
             setError(err.message || 'Kaydetme sırasında hata oluştu')
