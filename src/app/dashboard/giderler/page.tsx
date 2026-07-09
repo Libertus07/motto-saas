@@ -16,7 +16,7 @@ type Expense = {
 }
 
 export default function Giderler() {
-  const { showConfirm } = useNotification()
+  const { showConfirm, showAlert } = useNotification()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -84,7 +84,7 @@ export default function Giderler() {
 
     const finalCategory = form.category === 'custom' ? customCategory.trim().toLowerCase().replace(/\s+/g, '-') : form.category
     if (form.category === 'custom' && !finalCategory) {
-        await showConfirm('Lütfen geçerli bir kategori adı girin.', 'Uyarı', 'Tamam')
+        await showAlert('Lütfen geçerli bir kategori adı girin.', 'warning')
         return
     }
 
