@@ -817,17 +817,17 @@ export default function Hammaddeler() {
                                 <td className="px-4 py-3 text-right text-stone-300 text-sm">
                                   ₺{mat.price_per_unit.toFixed(2)}
                                 </td>
+                                <td className="px-4 py-3 text-right font-bold text-white">
+                                  {mat.stock_quantity || 0}
+                                </td>
                                 <td className="px-4 py-3 text-right">
-                                  <div className="flex flex-col items-end">
-                                    <span className="font-bold text-white">
-                                      {mat.stock_quantity || 0}
+                                  {mat.critical_stock_level != null && mat.critical_stock_level > 0 ? (
+                                    <span className={`font-bold text-sm ${isCritical ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)] animate-pulse' : 'text-amber-500'}`}>
+                                      {mat.critical_stock_level}
                                     </span>
-                                    {mat.critical_stock_level != null && mat.critical_stock_level > 0 && (
-                                      <span className={`text-[10px] ${isCritical ? 'text-red-400 font-bold animate-pulse' : 'text-stone-500'}`}>
-                                        Kritik: {mat.critical_stock_level}
-                                      </span>
-                                    )}
-                                  </div>
+                                  ) : (
+                                    <span className="text-stone-600">-</span>
+                                  )}
                                 </td>
                                 <td className="px-4 py-3 text-right font-bold text-amber-400">
                                   ₺{((mat.stock_quantity || 0) * mat.price_per_unit).toFixed(2)}
