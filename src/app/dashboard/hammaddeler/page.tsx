@@ -320,6 +320,8 @@ export default function Hammaddeler() {
       const changes = []
       if (oldPrice !== newPrice) changes.push(`Fiyat: ${oldPrice} -> ${newPrice} ₺`)
       if (oldStock !== newStock) changes.push(`Stok: ${oldStock} -> ${newStock}`)
+      if (oldMat?.critical_stock_level !== payload.critical_stock_level) changes.push(`Kritik Stok: ${oldMat?.critical_stock_level || 0} -> ${payload.critical_stock_level}`)
+      if (oldMat?.unit !== payload.unit) changes.push(`Birim: ${oldMat?.unit} -> ${payload.unit}`)
       if (oldMat?.category !== payload.category) changes.push(`Kategori: ${oldMat?.category || 'Diğer'} -> ${payload.category}`)
       
       details = changes.length > 0 ? changes.join(', ') : 'İsim veya birim güncellendi'
@@ -365,11 +367,12 @@ export default function Hammaddeler() {
   }
 
   const handleDelete = async (id: string) => {
-    const confirmed = await showConfirm('Bu hammaddeyi silmek istediğinize emin misiniz?', 'Hammaddeyi Sil 🗑️')
+    const matToDelete = materials.find(m => m.id === id)
+    const confirmed = await showConfirm(`"${matToDelete?.name}" isimli hammaddeyi silmek istediğinize emin misiniz?`, 'Hammaddeyi Sil 🗑️')
     if (!confirmed) return
     await supabase.from('materials').delete().eq('id', id)
     fetchMaterials()
-    logActivity('Hammadde', 'SILME', `Bir hammadde sistemden silindi.`, { materialId: id })
+    logActivity('Hammadde', 'SILME', `${matToDelete?.name || 'Bir hammadde'} sistemden silindi.`, { materialId: id })
   }
 
   const handleViewHistory = async (mat: Material) => {

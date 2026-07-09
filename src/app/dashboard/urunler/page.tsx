@@ -218,10 +218,11 @@ export default function Urunler() {
   }
 
   const handleDelete = async (id: string) => {
-    const confirmed = await showConfirm('Bu ürünü silmek istediğinize emin misiniz?', 'Ürünü Sil 🗑️')
+    const productToDelete = products.find(p => p.id === id)
+    const confirmed = await showConfirm(`"${productToDelete?.name}" ürününü silmek istediğinize emin misiniz?`, 'Ürünü Sil 🗑️')
     if (!confirmed) return
     await supabase.from('products').delete().eq('id', id); fetchData()
-    logActivity('Ürünler', 'SILME', `Ürün sistemden silindi.`, { productId: id })
+    logActivity('Ürünler', 'SILME', `${productToDelete?.name || 'Bir ürün'} sistemden silindi.`, { productId: id })
   }
 
   const handleAiRecipeBuild = async () => {

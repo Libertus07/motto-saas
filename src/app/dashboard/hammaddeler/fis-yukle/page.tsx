@@ -244,6 +244,7 @@ export default function FisYukle() {
         const batchId = crypto.randomUUID()
 
         let globalSupplierId: string | null = null;
+        const auditDetails: string[] = []
 
         // 1. Tedarikçi Kayıt ve Borç (Cari) İşlemleri
         if (parsedSupplier) {
@@ -307,12 +308,13 @@ export default function FisYukle() {
                     if (txErr2) console.error("Fatura ödemesi eklenemedi:", txErr2)
                 }
 
-                // Toplam bakiyeyi (total_debt) güncelle
                 const netDebtIncrease = totalInvoice - paid
                 if (netDebtIncrease !== 0) {
                     const { data: currentSup } = await supabase.from('suppliers').select('total_debt').eq('id', globalSupplierId).single()
-                    const newTotal = parseFloat(currentSup?.total_debt || 0) + netDebtIncrease
+                    const oldTotal = parseFloat(currentSup?.total_debt || 0)
+                    const newTotal = oldTotal + netDebtIncrease
                     await supabase.from('suppliers').update({ total_debt: newTotal }).eq('id', globalSupplierId)
+                    logActivity('Tedarikçi', 'GUNCELLEME', `${parsedSupplier.name} cari hesabı güncellendi (Yapay Zeka Fiş Yükleme).`, { detay: `Bakiye: ₺${oldTotal.toFixed(2)} -> ₺${newTotal.toFixed(2)}` })
                 }
             }
         }
@@ -340,6 +342,9 @@ export default function FisYukle() {
                     price_per_unit: safeUnitPrice,
                     stock_quantity: currentStock + safeQuantity
                 }
+                
+                if (oldPrice !== safeUnitPrice) auditDetails.push(`${existing?.name}: Fiyat ${oldPrice}->${safeUnitPrice}₺`)
+                auditDetails.push(`${existing?.name}: Stok ${currentStock}->${currentStock + safeQuantity}`)
                 
                 // Eğer yeni kategorisi varsa veya boş olanı dolduruyorsak güncelleyelim
                 if (item.category && item.category.trim() !== '') {
@@ -370,6 +375,9 @@ export default function FisYukle() {
                         price_per_unit: safeUnitPrice,
                         stock_quantity: (checkData.stock_quantity || 0) + safeQuantity
                     }
+                    if (checkData.price_per_unit !== safeUnitPrice) auditDetails.push(`${item.name}: Fiyat ${checkData.price_per_unit}->${safeUnitPrice}₺`)
+                    auditDetails.push(`${item.name}: Stok ${(checkData.stock_quantity || 0)}->${(checkData.stock_quantity || 0) + safeQuantity}`)
+
                     if (item.category && item.category.trim() !== '') updatePayload.category = item.category.trim();
                     
                     await supabase.from('materials').update(updatePayload).eq('id', checkData.id)
@@ -392,6 +400,7 @@ export default function FisYukle() {
                         stock_quantity: safeQuantity,
                         user_id: user?.id
                     };
+                    auditDetails.push(`YENİ ${insertPayload.name}: Fiyat ${safeUnitPrice}₺, Stok ${safeQuantity}`)
                     
                     const { data, error: insertError } = await supabase.from('materials').insert(insertPayload).select()
 
@@ -433,7 +442,7 @@ export default function FisYukle() {
         }
 
         const addedItemsStr = selectedItems.map(item => `${item.name} (${item.quantity} ${item.unit})`).join(', ')
-        logActivity('Stok', 'EKLEME', `Yapay zeka ile fiş okunarak ${selectedItems.length} kalem ürün/stok sisteme eklendi.`, { batchId, eklenen_urunler: addedItemsStr })
+        logActivity('Stok', 'EKLEME', `Yapay zeka ile fiş okunarak ${selectedItems.length} kalem ürün/stok sisteme eklendi.`, { batchId, detay: auditDetails.join(' | ') })
         setStep('done')
         setLoading(false)
     }

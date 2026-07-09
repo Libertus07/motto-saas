@@ -448,11 +448,15 @@ export default function ZRaporuYukle() {
                     const { data: currentMats } = await supabase.from('materials').select('*').in('id', Object.keys(stockDeductions))
                     
                     if (currentMats && currentMats.length > 0) {
+                        const auditDetails: string[] = []
                         const upsertData = currentMats.map(mat => {
                             const deduction = stockDeductions[mat.id] || 0
+                            const oldStock = mat.stock_quantity || 0
+                            const newStock = Math.max(0, oldStock - deduction)
+                            if (deduction > 0) auditDetails.push(`${mat.name} Stok: ${oldStock} -> ${newStock} (-${deduction})`)
                             return {
                                 ...mat,
-                                stock_quantity: Math.max(0, (mat.stock_quantity || 0) - deduction)
+                                stock_quantity: newStock
                             }
                         })
                         
@@ -464,7 +468,14 @@ export default function ZRaporuYukle() {
                 }
             }
 
-            logActivity('Z-Raporu', 'EKLEME', `${reportDate} tarihli Z-Raporu sisteme eklendi ve ${matchedSales.length} ürün/hammadde stoğu düşüldü.`, { batchId })
+            const logDetails = Object.keys(stockDeductions).length > 0 ? "Stoklar detaylarda düşüldü." : "Stok düşümü yapılmadı."
+            // Note: Since auditDetails is scoped inside the if block, we can just pass the JSON of stockDeductions if it's simpler, 
+            // but let's actually just use the JSON representation of stockDeductions.
+            logActivity('Z-Raporu', 'EKLEME', `${reportDate} tarihli Z-Raporu sisteme eklendi ve toplam ${matchedSales.length} kalem satıldı.`, { 
+                batchId,
+                toplam_gelir: parsedData.total_revenue,
+                dusen_stoklar: stockDeductions
+            })
             await showAlert('Z Raporu başarıyla işlendi ve stoklar düşüldü!', 'success')
             router.push('/dashboard/raporlar')
         } catch (err: any) {

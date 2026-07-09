@@ -428,8 +428,15 @@ export default function YatirimlarPage() {
                 updated_at: new Date().toISOString()
             }).eq('id', selectedInvestment.id)
 
+            const changes = []
+            if (selectedInvestment.name !== editForm.name) changes.push(`İsim: ${selectedInvestment.name} -> ${editForm.name}`)
+            if (selectedInvestment.quantity !== qty) changes.push(`Miktar: ${selectedInvestment.quantity} -> ${qty}`)
+            if (selectedInvestment.average_cost !== cost) changes.push(`Maliyet: ₺${selectedInvestment.average_cost} -> ₺${cost}`)
+            
+            const details = changes.length > 0 ? changes.join(' | ') : 'Sadece diğer bilgiler güncellendi'
+
             await logActivity('Yatırımlar', 'GUNCELLEME', `Yatırım Düzenleme: ${editForm.name}`, {
-                detay: `Miktar (${qty}) | Maliyet (₺${cost})`
+                detay: details
             })
 
             await showAlert('Yatırım başarıyla güncellendi!', 'success')
@@ -489,9 +496,14 @@ export default function YatirimlarPage() {
             const { error: delError } = await supabase.from('investments').delete().eq('id', id)
             if (delError) throw delError
             
+            let totalRefunded = 0
+            if (movements && movements.length > 0) {
+                totalRefunded = movements.reduce((acc, mov) => acc + Number(mov.amount), 0)
+            }
+
             if (invToDelete) {
                 await logActivity('Yatırımlar', 'SILME', `Yatırım Silindi (Bakiye İade Edildi): ${invToDelete.name}`, {
-                    detay: `Silinen Varlık Tipi (${invToDelete.asset_type}) | Miktar (${invToDelete.quantity})`
+                    detay: `Silinen Varlık Tipi (${invToDelete.asset_type}) | Miktar (${invToDelete.quantity}) | Kasaya İade Edilen Toplam Tutar: ₺${totalRefunded.toFixed(2)}`
                 })
             }
 
