@@ -401,13 +401,12 @@ export default function ZRaporuYukle() {
             // 2. Stoktan Düşüm (Sadece eşleşen ürünler için BOM hesapla)
             const matchedSales = parsedData.items.filter(i => i.matchedProductId)
             
+            let stockDeductions: Record<string, number> = {}
             if (matchedSales.length > 0) {
                 // Tüm ürün reçetelerini çek
                 const { data: prodIngs } = await supabase.from('product_ingredients')
                     .select('*, sub_recipes(*, sub_recipe_ingredients(*))')
                     .in('product_id', matchedSales.map(s => s.matchedProductId))
-
-                const stockDeductions: Record<string, number> = {}
 
                 matchedSales.forEach(sale => {
                     const recipe = prodIngs?.filter(pi => pi.product_id === sale.matchedProductId) || []
