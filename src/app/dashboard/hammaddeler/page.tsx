@@ -31,6 +31,7 @@ type EditRow = {
   unit: string
   price_per_unit: string
   stock_quantity: string
+  critical_stock_level: string
   category: string
 }
 
@@ -70,6 +71,7 @@ export default function Hammaddeler() {
     unit: 'Kg',
     price_per_unit: '',
     stock_quantity: '0',
+    critical_stock_level: '0'
   })
 
   const supabase = createClient()
@@ -105,6 +107,7 @@ export default function Hammaddeler() {
         unit: m.unit,
         price_per_unit: m.price_per_unit.toString(),
         stock_quantity: (m.stock_quantity || 0).toString(),
+        critical_stock_level: (m.critical_stock_level || 0).toString(),
         category: m.category || 'Diğer'
       }
     })
@@ -157,12 +160,15 @@ export default function Hammaddeler() {
       const oldPrice = oldMat?.price_per_unit || 0
       const newStock = parseFloat(row.stock_quantity) || 0
       const oldStock = oldMat?.stock_quantity || 0
+      const newCritical = parseFloat(row.critical_stock_level) || 0
+      const oldCritical = oldMat?.critical_stock_level || 0
 
       if (isNaN(newPrice) || !row.name) return
 
       const changes = []
       if (oldPrice !== newPrice) changes.push(`Fiyat: ${oldPrice}->${newPrice}`)
       if (oldStock !== newStock) changes.push(`Stok: ${oldStock}->${newStock}`)
+      if (oldCritical !== newCritical) changes.push(`Kritik Stok: ${oldCritical}->${newCritical}`)
       if (oldMat?.category !== row.category) changes.push(`Kategori: ${oldMat?.category || 'Diğer'}->${row.category}`)
 
       if (changes.length > 0) {
@@ -175,6 +181,7 @@ export default function Hammaddeler() {
         category: row.category,
         price_per_unit: newPrice,
         stock_quantity: newStock,
+        critical_stock_level: newCritical,
       }).eq('id', id)
 
       // Fiyat değiştiyse geçmişe kaydet
@@ -282,7 +289,7 @@ export default function Hammaddeler() {
   }
 
   const resetForm = () => {
-    setForm({ name: '', category: 'Diğer', unit: 'Kg', price_per_unit: '', stock_quantity: '0' })
+    setForm({ name: '', category: 'Diğer', unit: 'Kg', price_per_unit: '', stock_quantity: '0', critical_stock_level: '0' })
     setEditingId(null)
     setShowForm(false)
   }
@@ -297,6 +304,7 @@ export default function Hammaddeler() {
       unit: form.unit,
       price_per_unit: parseFloat(form.price_per_unit),
       stock_quantity: parseFloat(form.stock_quantity) || 0,
+      critical_stock_level: parseFloat(form.critical_stock_level) || 0,
       user_id: user?.id
     }
 
@@ -350,6 +358,7 @@ export default function Hammaddeler() {
       unit: mat.unit,
       price_per_unit: mat.price_per_unit.toString(),
       stock_quantity: (mat.stock_quantity || 0).toString(),
+      critical_stock_level: (mat.critical_stock_level || 0).toString()
     })
     setEditingId(mat.id)
     setShowForm(false) // Üst formu kapat, inline açılacak
@@ -523,7 +532,7 @@ export default function Hammaddeler() {
             <h2 className="font-bold text-lg mb-4">
               Yeni Hammadde Ekle
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
                 <label className="text-stone-400 text-sm mb-1 block">Hammadde Adı *</label>
                 <input
@@ -570,6 +579,16 @@ export default function Hammaddeler() {
                   value={form.stock_quantity}
                   onChange={e => setForm({ ...form, stock_quantity: e.target.value })}
                   className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="text-stone-400 text-sm mb-1 block">Kritik Stok Uyarı Seviyesi</label>
+                <input
+                  type="number"
+                  value={form.critical_stock_level}
+                  onChange={e => setForm({ ...form, critical_stock_level: e.target.value })}
+                  className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-amber-400 font-bold focus:outline-none focus:border-amber-400"
                   placeholder="0"
                 />
               </div>
@@ -693,6 +712,7 @@ export default function Hammaddeler() {
                             <th className="text-left px-4 py-2.5 text-stone-500 text-xs font-medium">Birim</th>
                             <th className="text-right px-4 py-2.5 text-stone-500 text-xs font-medium">Birim Fiyat</th>
                             <th className="text-right px-4 py-2.5 text-stone-500 text-xs font-medium">Stok</th>
+                            <th className="text-right px-4 py-2.5 text-stone-500 text-xs font-medium">Kritik Stok</th>
                             <th className="text-right px-4 py-2.5 text-stone-500 text-xs font-medium">Toplam</th>
                             <th className="text-right px-5 py-2.5 text-stone-500 text-xs font-medium">
                               {bulkEditMode ? 'Durum' : 'İşlem'}
@@ -758,7 +778,17 @@ export default function Hammaddeler() {
                                       disabled={isSelected}
                                     />
                                   </td>
-                                  <td className={`px-4 py-2 text-right font-bold text-sm ${isSelected ? 'text-stone-500' : 'text-amber-400'}`}>
+                                  <td className="px-2 py-2">
+                                    <input
+                                      type="number"
+                                      value={row.critical_stock_level}
+                                      onChange={e => updateEditRow(mat.id, 'critical_stock_level', e.target.value)}
+                                      className={inputCls + ' text-right text-amber-500'}
+                                      placeholder="0"
+                                      disabled={isSelected}
+                                    />
+                                  </td>
+                                  <td className="px-4 py-2 text-right font-medium text-amber-400 text-xs">
                                     ₺{(parseFloat(row.stock_quantity || '0') * parseFloat(row.price_per_unit || '0')).toFixed(2)}
                                   </td>
                                   <td className="px-4 py-2 text-center">
@@ -787,10 +817,19 @@ export default function Hammaddeler() {
                                 <td className="px-4 py-3 text-right text-stone-300 text-sm">
                                   ₺{mat.price_per_unit.toFixed(2)}
                                 </td>
-                                <td className={`px-4 py-3 text-right text-sm font-medium ${isCritical ? 'text-red-400' : 'text-stone-300'}`}>
-                                  {mat.stock_quantity || 0}
+                                <td className="px-4 py-3 text-right">
+                                  <div className="flex flex-col items-end">
+                                    <span className="font-bold text-white">
+                                      {mat.stock_quantity || 0}
+                                    </span>
+                                    {mat.critical_stock_level != null && mat.critical_stock_level > 0 && (
+                                      <span className={`text-[10px] ${isCritical ? 'text-red-400 font-bold animate-pulse' : 'text-stone-500'}`}>
+                                        Kritik: {mat.critical_stock_level}
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
-                                <td className="px-4 py-3 text-right text-amber-400 font-bold text-sm">
+                                <td className="px-4 py-3 text-right font-bold text-amber-400">
                                   ₺{((mat.stock_quantity || 0) * mat.price_per_unit).toFixed(2)}
                                 </td>
                                 <td className="px-5 py-3 text-right">
