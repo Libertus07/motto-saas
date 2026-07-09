@@ -72,6 +72,7 @@ export default function KasaSayimPage() {
             // 4. Günün Ödeme Yöntemi Dağılımını Getir (Z-Raporu hareketleri)
             let totalExpectedCash = 0;
             let totalExpectedCredit = 0;
+            let finalExpectedSales = totalSales; // Varsayılan olarak ürün toplamı
 
             if (validBatchIds.length > 0) {
                 const { data: movementsData, error: movError } = await supabase
@@ -90,15 +91,19 @@ export default function KasaSayimPage() {
                             totalExpectedCredit += Number(m.amount) || 0;
                         }
                     })
+
+                    // Eğer fişte gerçek tahsilat tutarları varsa, gerçek satışı tahsilatların toplamı kabul et
+                    // (Çünkü fişteki ürünlerin toplamı; KDV, yuvarlama, küsurat veya bahşiş sebebiyle tahsilattan farklı olabilir)
+                    if (totalExpectedCash > 0 || totalExpectedCredit > 0) {
+                        finalExpectedSales = totalExpectedCash + totalExpectedCredit;
+                    }
                 }
             }
 
             // Kasa Net Nakit Beklentisi (Giren Nakit - Giderler)
-            // Eğer movement data yoksa, tüm satışı nakit kabul et veya cash'i 0 göster.
-            // Biz eğer ayrım varsa onu kullanacağız, yoksa "Bilinmiyor" diyeceğiz ama basitçe sıfırda bırakacağız
-            setExpectedSales(totalSales)
+            setExpectedSales(finalExpectedSales)
             setExpectedExpenses(totalExpenses)
-            setExpectedTotal(totalSales - totalExpenses)
+            setExpectedTotal(finalExpectedSales - totalExpenses)
             setExpectedCashRaw(totalExpectedCash)
             setExpectedCreditRaw(totalExpectedCredit)
 
