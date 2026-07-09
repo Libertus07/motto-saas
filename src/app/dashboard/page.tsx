@@ -217,55 +217,114 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Özet Kartları */}
-        <h3 className="text-lg font-bold mb-4 text-stone-300 flex items-center gap-2"><span>📊</span> Operasyonel Metrikler</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        {/* Operasyonel Metrikler */}
+        <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold text-stone-300 flex items-center gap-2"><span>📊</span> Operasyonel Metrikler</h3>
+            <span className="text-xs bg-stone-800 text-stone-400 px-3 py-1 rounded-full border border-stone-700">Son 30 Gün</span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           
-          <div className={`col-span-1 md:col-span-4 bg-stone-900 border ${stats.netProfit >= 0 ? 'border-green-900/50' : 'border-red-900/50'} rounded-xl p-6 relative overflow-hidden`}>
-            <div className={`absolute top-0 right-0 w-32 h-32 blur-3xl opacity-20 ${stats.netProfit >= 0 ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <h3 className="text-stone-400 text-sm font-medium mb-4">Son 30 Günlük Net Kâr Performansı</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-10">
-              <div>
-                <div className="text-stone-500 text-xs mb-1">Brüt Ciro (Satışlar)</div>
-                <div className="text-xl font-bold text-white">₺{stats.grossRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</div>
-              </div>
-              <div>
-                <div className="text-stone-500 text-xs mb-1">- Satılan Malın Maliyeti</div>
-                <div className="text-xl font-bold text-red-300">₺{stats.totalCogs.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</div>
-              </div>
-              <div>
-                <div className="text-stone-500 text-xs mb-1">- Genel Giderler</div>
-                <div className="text-xl font-bold text-red-300">₺{stats.monthlyExpenses.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</div>
-              </div>
-              <div className="pl-4 border-l border-stone-800">
-                <div className="text-stone-500 text-xs mb-1">NET KÂR</div>
-                <div className={`text-3xl font-black ${stats.netProfit >= 0 ? 'text-green-400' : 'text-red-500'}`}>
-                  ₺{stats.netProfit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+          {/* P&L (Kâr/Zarar) Tablosu - 2 Sütun */}
+          <div className="lg:col-span-2 bg-stone-900/50 backdrop-blur-md border border-stone-800 rounded-2xl p-6 relative overflow-hidden group">
+             <div className={`absolute -top-24 -right-24 w-48 h-48 blur-[80px] opacity-30 transition-all duration-700 group-hover:opacity-50 ${stats.netProfit >= 0 ? 'bg-green-500' : 'bg-red-500'}`}></div>
+             
+             <h4 className="text-sm font-bold text-stone-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${stats.netProfit >= 0 ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                Net Kâr Analizi
+             </h4>
+             
+             <div className="space-y-3 relative z-10">
+                <div className="flex justify-between items-center p-3 rounded-xl bg-stone-800/30 hover:bg-stone-800/50 transition-colors">
+                   <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">📈</div>
+                      <div>
+                         <p className="text-stone-400 text-xs">Brüt Satışlar (Ciro)</p>
+                         <p className="font-bold text-white text-lg">₺{stats.grossRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                   </div>
                 </div>
-              </div>
-            </div>
+
+                <div className="w-px h-3 bg-stone-800 mx-auto"></div>
+
+                <div className="flex justify-between items-center p-3 rounded-xl bg-stone-800/30 hover:bg-stone-800/50 transition-colors">
+                   <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400">📦</div>
+                      <div>
+                         <p className="text-stone-400 text-xs">- Satılan Malın Maliyeti (SMM)</p>
+                         <p className="font-bold text-red-300 text-lg">₺{stats.totalCogs.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                   </div>
+                   <div className="text-right hidden sm:block">
+                      <span className="text-xs text-stone-500">Ciroya Oranı</span>
+                      <p className="text-sm text-stone-400 font-medium">%{stats.grossRevenue > 0 ? ((stats.totalCogs / stats.grossRevenue) * 100).toFixed(1) : '0.0'}</p>
+                   </div>
+                </div>
+
+                <div className="w-px h-3 bg-stone-800 mx-auto"></div>
+
+                <div className="flex justify-between items-center p-3 rounded-xl bg-stone-800/30 hover:bg-stone-800/50 transition-colors">
+                   <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-400">💸</div>
+                      <div>
+                         <p className="text-stone-400 text-xs">- Operasyonel Giderler</p>
+                         <p className="font-bold text-red-300 text-lg">₺{stats.monthlyExpenses.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                   </div>
+                   <div className="text-right hidden sm:block">
+                      <span className="text-xs text-stone-500">Ciroya Oranı</span>
+                      <p className="text-sm text-stone-400 font-medium">%{stats.grossRevenue > 0 ? ((stats.monthlyExpenses / stats.grossRevenue) * 100).toFixed(1) : '0.0'}</p>
+                   </div>
+                </div>
+                
+                <div className="pt-5 mt-2 border-t border-stone-800/80">
+                   <div className="flex justify-between items-end">
+                      <div>
+                        <p className="text-stone-500 text-[10px] uppercase tracking-wider mb-1">Dönem Sonu</p>
+                        <p className="text-stone-300 text-sm font-bold">NET KÂR / ZARAR</p>
+                      </div>
+                      <div className="text-right">
+                         <h2 className={`text-4xl font-black tracking-tight ${stats.netProfit >= 0 ? 'text-green-400 drop-shadow-[0_0_15px_rgba(74,222,128,0.2)]' : 'text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.2)]'}`}>
+                           {stats.netProfit >= 0 ? '+' : ''}₺{stats.netProfit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                         </h2>
+                         <p className={`text-xs mt-1 font-medium ${stats.netProfit >= 0 ? 'text-green-500/70' : 'text-red-500/70'}`}>
+                           Net Kâr Marjı: %{stats.grossRevenue > 0 ? ((stats.netProfit / stats.grossRevenue) * 100).toFixed(1) : '0.0'}
+                         </p>
+                      </div>
+                   </div>
+                </div>
+             </div>
           </div>
 
-          <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
-            <p className="text-stone-400 text-xs mb-1">Toplam Ürün</p>
-            <p className="text-2xl font-bold text-white">{loading ? '...' : stats.totalProducts}</p>
+          {/* Sağ Taraftaki KPI Grid */}
+          <div className="lg:col-span-1 grid grid-cols-2 gap-4">
+             <div className="bg-stone-900 border border-stone-800 hover:border-stone-700 transition-all duration-300 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group">
+                <div className="absolute -bottom-6 -right-6 text-6xl opacity-5 group-hover:scale-110 transition-transform">🍔</div>
+                <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3">📝</div>
+                <p className="text-stone-400 text-xs mb-1 font-medium">Kayıtlı Ürün</p>
+                <p className="text-2xl font-bold text-white">{loading ? '...' : stats.totalProducts}</p>
+             </div>
+             
+             <div className="bg-stone-900 border border-stone-800 hover:border-stone-700 transition-all duration-300 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group">
+                <div className="absolute -bottom-6 -right-6 text-6xl opacity-5 group-hover:scale-110 transition-transform">🧪</div>
+                <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center mb-3">⚖️</div>
+                <p className="text-stone-400 text-xs mb-1 font-medium">Hammadde</p>
+                <p className="text-2xl font-bold text-white">{loading ? '...' : stats.totalIngredients}</p>
+             </div>
+
+             <div className="bg-stone-900 border border-stone-800 hover:border-stone-700 transition-all duration-300 rounded-2xl p-6 flex flex-col justify-center col-span-2 relative overflow-hidden group">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-colors"></div>
+                <div className="flex items-center gap-3 mb-2 relative z-10">
+                   <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">💎</div>
+                   <p className="text-stone-400 text-xs font-bold uppercase tracking-wider">Güncel Stok Değeri</p>
+                </div>
+                <p className="text-4xl font-bold text-emerald-400 tracking-tight mt-1 relative z-10">
+                  {loading ? '...' : `₺${stats.totalStockValue.toLocaleString('tr-TR', { minimumFractionDigits: 0 })}`}
+                </p>
+                <p className="text-stone-500 text-[10px] mt-3 relative z-10">Sistemdeki tüm hammaddelerin anlık toplam sermaye karşılığı.</p>
+             </div>
           </div>
-          <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
-            <p className="text-stone-400 text-xs mb-1">Hammadde Çeşidi</p>
-            <p className="text-2xl font-bold text-white">{loading ? '...' : stats.totalIngredients}</p>
-          </div>
-          <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
-            <p className="text-stone-400 text-xs mb-1">Aylık Gider</p>
-            <p className="text-2xl font-bold text-amber-400">
-              {loading ? '...' : `₺${stats.monthlyExpenses.toLocaleString('tr-TR', { minimumFractionDigits: 0 })}`}
-            </p>
-          </div>
-          <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
-            <p className="text-stone-400 text-xs mb-1">Stok Değeri</p>
-            <p className="text-2xl font-bold text-green-400">
-              {loading ? '...' : `₺${stats.totalStockValue.toLocaleString('tr-TR', { minimumFractionDigits: 0 })}`}
-            </p>
-          </div>
+
         </div>
 
         {/* Modül Kartları */}
