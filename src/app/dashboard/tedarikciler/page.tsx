@@ -142,7 +142,7 @@ export default function Tedarikciler() {
 
     const viewDocument = async (batchId: string | null) => {
         if (!batchId) {
-            alert('Bu işlem için ekli belge bulunamadı.')
+            await showAlert('Bu işlem için ekli belge bulunamadı.', 'error')
             return
         }
         setLoading(true) // Loading gösterelim ki tıklandığı anlaşılsın
@@ -158,7 +158,7 @@ export default function Tedarikciler() {
         if (data?.document_url) {
             setPreviewUrl(data.document_url)
         } else {
-            alert('Veritabanında bu kayıt için herhangi bir fatura/fiş görseli bulunamadı.')
+            await showAlert('Veritabanında bu kayıt için herhangi bir fatura/fiş görseli bulunamadı.', 'error')
         }
     }
 

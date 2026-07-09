@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
+import { useNotification } from '@/components/NotificationProvider'
 
 type StockMovement = {
     id: string
@@ -50,6 +51,7 @@ type GroupedMonth = {
 }
 
 export default function TedarikciGecmisi() {
+    const { showAlert, showConfirm } = useNotification()
     const [allReceipts, setAllReceipts] = useState<GroupedReceipt[]>([])
     const [loading, setLoading] = useState(true)
     const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -131,7 +133,7 @@ export default function TedarikciGecmisi() {
 
     const viewDocument = async (batchId: string | null) => {
         if (!batchId) {
-            alert('Bu işlem için ekli belge bulunamadı.')
+            await showAlert('Bu işlem için ekli belge bulunamadı.', 'error')
             return
         }
         setLoading(true)
@@ -147,7 +149,7 @@ export default function TedarikciGecmisi() {
         if (data?.document_url) {
             setPreviewUrl(data.document_url)
         } else {
-            alert('Veritabanında bu kayıt için herhangi bir fatura/fiş görseli bulunamadı.')
+            await showAlert('Veritabanında bu kayıt için herhangi bir fatura/fiş görseli bulunamadı.', 'error')
         }
     }
 
@@ -230,33 +232,36 @@ export default function TedarikciGecmisi() {
         }
     }, [allReceipts, groupBy, selectedMonth, sortBy])
 
-    const handleDelete = async (receipt: GroupedReceipt) => {
-        if (!receipt.batchId) {
-            alert('Bu fiş eski bir versiyona ait (Batch ID eksik) olduğu için otomatik olarak geri alınamaz. Lütfen manuel olarak stok ve cari düzeltmesi yapın.')
+    const handleDelete = async (group: GroupedReceipt) => {
+        if (!group.id) {
+            await showAlert('Bu fiş eski bir versiyona ait (Batch ID eksik) olduğu için otomatik olarak geri alınamaz. Lütfen manuel olarak stok ve cari düzeltmesi yapın.', 'warning')
             return
         }
 
-        if (!confirm(`Emin misiniz?\n\nBu fiş silindiğinde:\n- Fişten gelen stoklar silinecek.\n- Tedarikçi borç/ödeme kayıtları geri alınacak.\n\nBu işlem geri alınamaz!`)) {
-            return
-        }
+        const confirmed = await showConfirm(
+            `Emin misiniz?\n\nBu fiş silindiğinde:\n- Fişten gelen stoklar silinecek.\n- Tedarikçi borç/ödeme kayıtları geri alınacak.\n\nBu işlem geri alınamaz!`,
+            'Fişi Sil 🗑️'
+        )
+        if (!confirmed) return
 
-        setDeletingId(receipt.id)
+        setDeletingId(group.id)
         try {
             const res = await fetch('/api/delete-receipt', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ batch_id: receipt.batchId })
+                body: JSON.stringify({ batch_id: group.batchId })
             })
             
             const data = await res.json()
             if (data.error) throw new Error(data.error)
             
-            await logActivity('Tedarikçi', 'SILME', `Tedarikçi geçmiş fişi silindi ve içerisindeki stok/cari hareketler geri alındı.`, { batchId: receipt.batchId, totalAmount: receipt.totalAmount })
-
-            alert('Fiş başarıyla silindi ve işlemler geri alındı.')
+            const formattedDate = new Date(group.date).toLocaleDateString('tr-TR');
+            await logActivity('Tedarikçi Geçmişi', 'SILME', `${formattedDate} tarihli ${group.supplierName} fişi silindi. Stoklar ve cari bakiyeler geri alındı.`, { batchId: group.id })
+            
+            await showAlert('Fiş başarıyla silindi ve işlemler geri alındı.', 'success')
             fetchReceipts()
         } catch (err: any) {
-            alert('Silme işlemi başarısız: ' + err.message)
+            await showAlert('Silme işlemi başarısız: ' + err.message, 'error')
         } finally {
             setDeletingId(null)
         }
