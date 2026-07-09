@@ -866,7 +866,7 @@ export default function Hammaddeler() {
                                           <h3 className="font-bold text-amber-400">✏️ {mat.name} Düzenle</h3>
                                           <button onClick={resetForm} className="text-stone-500 hover:text-white text-lg">✕</button>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
                                           <div>
                                             <label className="text-stone-400 text-xs mb-1 block">Hammadde Adı</label>
                                             <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-400" />
@@ -890,6 +890,10 @@ export default function Hammaddeler() {
                                           <div>
                                             <label className="text-stone-400 text-xs mb-1 block">Stok Miktarı</label>
                                             <input type="number" value={form.stock_quantity} onChange={e => setForm({ ...form, stock_quantity: e.target.value })} className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-400" placeholder="0" />
+                                          </div>
+                                          <div>
+                                            <label className="text-stone-400 text-xs mb-1 block">Kritik Stok</label>
+                                            <input type="number" value={form.critical_stock_level} onChange={e => setForm({ ...form, critical_stock_level: e.target.value })} className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-amber-400 font-bold text-sm focus:outline-none focus:border-amber-400" placeholder="0" />
                                           </div>
                                         </div>
                                         <div className="flex flex-wrap gap-3 mt-4 items-center">
