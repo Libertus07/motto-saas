@@ -42,7 +42,7 @@ export default function Dashboard() {
     ] = await Promise.all([
       supabase.from('products').select('id, sale_price, calculated_cost'),
       supabase.from('materials').select('id, name, stock_quantity, unit, critical_stock_level, price_per_unit'),
-      supabase.from('expenses').select('amount, period, expense_date'),
+      supabase.from('expenses').select('amount, period, expense_date, category'),
       supabase.from('sales').select('quantity, total_price, sale_date, product_id'),
       supabase.from('settings').select('*'),
       supabase.from('accounts').select('type, balance'),
