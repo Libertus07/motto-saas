@@ -34,7 +34,7 @@ export default function ZRaporuYukle() {
     const [fileType, setFileType] = useState<'image' | 'pdf' | 'xml' | 'json' | null>(null)
     const [loading, setLoading] = useState(false)
     const [analyzing, setAnalyzing] = useState(false)
-    const [parsedData, setParsedData] = useState<{ date: string, total_revenue: number, payment_methods?: { cash: number, credit_card: number, other: number }, items: ParsedSaleItem[], expenses: ParsedExpenseItem[] } | null>(null)
+    const [parsedData, setParsedData] = useState<{ date: string, total_revenue: number, payment_methods?: { cash: number, credit_card: number, other: number }, items: ParsedSaleItem[], expenses: ParsedExpenseItem[], discounts?: { total_amount: number, details?: string[] } } | null>(null)
     const [products, setProducts] = useState<Product[]>([])
     const [accounts, setAccounts] = useState<{id: string, name: string, type: string}[]>([])
 
