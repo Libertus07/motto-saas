@@ -17,6 +17,8 @@ export default function KasaSayimPage() {
     const [expectedSales, setExpectedSales] = useState(0)
     const [expectedExpenses, setExpectedExpenses] = useState(0)
     const [expectedTotal, setExpectedTotal] = useState(0)
+    const [expectedCashRaw, setExpectedCashRaw] = useState(0)
+    const [expectedCreditRaw, setExpectedCreditRaw] = useState(0)
 
     const [countedCash, setCountedCash] = useState<number | ''>('')
     const [countedCreditCard, setCountedCreditCard] = useState<number | ''>('')
@@ -66,9 +68,36 @@ export default function KasaSayimPage() {
             
             const totalExpenses = expensesData?.reduce((sum, e) => sum + (Number(e.amount) || 0), 0) || 0
 
+            // 4. Günün Ödeme Yöntemi Dağılımını Getir (Z-Raporu hareketleri)
+            const { data: movementsData, error: movError } = await supabase
+                .from('account_movements')
+                .select('amount, description, movement_type')
+                .eq('source_type', 'z_report')
+                .ilike('description', `${date}%`)
+
+            if (movError) throw movError
+
+            let totalExpectedCash = 0;
+            let totalExpectedCredit = 0;
+
+            if (movementsData && movementsData.length > 0) {
+                movementsData.forEach(m => {
+                    if (m.description?.includes('Nakit') && m.movement_type === 'giris') {
+                        totalExpectedCash += Number(m.amount) || 0;
+                    } else if (m.description?.includes('Kredi Kartı') && m.movement_type === 'giris') {
+                        totalExpectedCredit += Number(m.amount) || 0;
+                    }
+                })
+            }
+
+            // Kasa Net Nakit Beklentisi (Giren Nakit - Giderler)
+            // Eğer movement data yoksa, tüm satışı nakit kabul et veya cash'i 0 göster.
+            // Biz eğer ayrım varsa onu kullanacağız, yoksa "Bilinmiyor" diyeceğiz ama basitçe sıfırda bırakacağız
             setExpectedSales(totalSales)
             setExpectedExpenses(totalExpenses)
             setExpectedTotal(totalSales - totalExpenses)
+            setExpectedCashRaw(totalExpectedCash)
+            setExpectedCreditRaw(totalExpectedCredit)
 
         } catch (err: any) {
             setError(err.message || 'Veriler yüklenirken hata oluştu')
@@ -78,6 +107,14 @@ export default function KasaSayimPage() {
     }
 
     const countedTotal = (Number(countedCash) || 0) + (Number(countedCreditCard) || 0) + (Number(countedMealCard) || 0)
+    
+    // Nakit ve POS kırılımı varsa ayrı ayrı hesapla
+    const isMovementFound = expectedCashRaw > 0 || expectedCreditRaw > 0
+    const expectedNetCash = isMovementFound ? expectedCashRaw - expectedExpenses : 0
+    const expectedNetCredit = isMovementFound ? expectedCreditRaw : 0
+    
+    const cashVariance = isMovementFound ? (Number(countedCash) || 0) - expectedNetCash : 0
+    const creditVariance = isMovementFound ? (Number(countedCreditCard) || 0) - expectedNetCredit : 0
     const variance = countedTotal - expectedTotal
 
     const handleSave = async () => {
@@ -99,11 +136,11 @@ export default function KasaSayimPage() {
                 counted_cash: Number(countedCash) || 0,
                 counted_credit_card: Number(countedCreditCard) || 0,
                 counted_meal_card: Number(countedMealCard) || 0,
-                expected_cash: 0, // Ayrıntılı kırılamıyorsa 0
-                expected_credit_card: 0,
+                expected_cash: expectedNetCash,
+                expected_credit_card: expectedNetCredit,
                 expected_meal_card: 0,
-                cash_variance: variance, // Toplam farkı cash_variance içine yazıyoruz
-                credit_card_variance: 0,
+                cash_variance: isMovementFound ? cashVariance : variance, // Ayrımsa sadece nakit, değilse genel fark
+                credit_card_variance: isMovementFound ? creditVariance : 0,
                 meal_card_variance: 0,
                 status,
                 notes: `Toplam Satış: ${expectedSales} TL, Toplam Gider: ${expectedExpenses} TL`
@@ -263,6 +300,23 @@ export default function KasaSayimPage() {
                                 {variance > 0 ? '+' : ''}₺{variance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                             </div>
                             {getVarianceBadge()}
+
+                            {isMovementFound && (
+                                <div className="flex gap-4 mt-4 w-full px-4">
+                                    <div className="flex-1 bg-stone-950 p-4 rounded-xl border border-stone-800 text-center">
+                                        <div className="text-stone-400 text-sm mb-1">POS Farkı</div>
+                                        <div className={`font-bold text-lg ${creditVariance === 0 ? 'text-amber-500' : creditVariance > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                            {creditVariance > 0 ? '+' : ''}₺{creditVariance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 bg-stone-950 p-4 rounded-xl border border-stone-800 text-center">
+                                        <div className="text-stone-400 text-sm mb-1">Nakit Farkı</div>
+                                        <div className={`font-bold text-lg ${cashVariance === 0 ? 'text-amber-500' : cashVariance > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                            {cashVariance > 0 ? '+' : ''}₺{cashVariance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {error && (
