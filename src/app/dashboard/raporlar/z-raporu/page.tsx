@@ -318,7 +318,17 @@ export default function ZRaporuYukle() {
             const { error: salesError } = await supabase.from('sales').insert(salesInserts)
             if (salesError) throw salesError
 
-            // 1.5. Giderleri Expenses tablosuna kaydet
+            // 1.5. İndirim ve İkramları Gider (Eksi Bakiye) olarak ekle
+            if (parsedData.discounts && parsedData.discounts.total_amount > 0) {
+                if (!parsedData.expenses) parsedData.expenses = [];
+                parsedData.expenses.push({
+                    expense_name: 'Z-Raporu İndirim ve İkramlar',
+                    category: 'indirim-ikram',
+                    amount: parsedData.discounts.total_amount
+                });
+            }
+
+            // 1.6. Giderleri Expenses tablosuna kaydet
             if (parsedData.expenses && parsedData.expenses.length > 0) {
                 const expenseInserts = parsedData.expenses.map(exp => ({
                     batch_id: batchId,

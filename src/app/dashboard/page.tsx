@@ -16,6 +16,8 @@ export default function Dashboard() {
     lowMarginProducts: 0,
     totalStockValue: 0,
     grossRevenue: 0,
+    totalDiscounts: 0,
+    netRevenue: 0,
     totalCogs: 0,
     netProfit: 0,
     targetMargin: 35,
@@ -80,10 +82,11 @@ export default function Dashboard() {
       return t + (cost * Number(s.quantity));
     }, 0);
 
-    // Son 30 gün içinde gerçekleşen tüm giderleri topluyoruz (Mükerrer toplanmasını engelledik)
-    const monthlyExpenses = recentExpenses.reduce((t, e) => t + Number(e.amount), 0);
+    const totalDiscounts = recentExpenses.filter(e => e.category === 'indirim-ikram').reduce((t, e) => t + Number(e.amount), 0);
+    const monthlyExpenses = recentExpenses.filter(e => e.category !== 'indirim-ikram').reduce((t, e) => t + Number(e.amount), 0);
 
-    const netProfit = grossRevenue - totalCogs - monthlyExpenses;
+    const netRevenue = grossRevenue - totalDiscounts;
+    const netProfit = netRevenue - totalCogs - monthlyExpenses;
 
     const targetMarginSetting = (settings || []).find(s => s.key === 'target_margin')?.value
     const targetMargin = targetMarginSetting ? Number(targetMarginSetting) : 35
@@ -112,6 +115,8 @@ export default function Dashboard() {
       lowMarginProducts,
       totalStockValue,
       grossRevenue,
+      totalDiscounts,
+      netRevenue,
       totalCogs,
       netProfit,
       targetMargin,
@@ -240,8 +245,36 @@ export default function Dashboard() {
                    <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">📈</div>
                       <div>
-                         <p className="text-stone-400 text-xs">Brüt Satışlar (Ciro)</p>
+                         <p className="text-stone-400 text-xs">Brüt Satışlar (Liste Fiyatı)</p>
                          <p className="font-bold text-white text-lg">₺{stats.grossRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                   </div>
+                </div>
+
+                <div className="w-px h-3 bg-stone-800 mx-auto"></div>
+
+                <div className="flex justify-between items-center p-3 rounded-xl bg-stone-800/30 hover:bg-stone-800/50 transition-colors border-l-2 border-red-500/50">
+                   <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400">✂️</div>
+                      <div>
+                         <p className="text-stone-400 text-xs">- İndirim ve İkramlar</p>
+                         <p className="font-bold text-red-400 text-lg">₺{stats.totalDiscounts.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                   </div>
+                   <div className="text-right hidden sm:block">
+                      <span className="text-xs text-stone-500">İndirim Oranı</span>
+                      <p className="text-sm text-red-400/80 font-medium">%{stats.grossRevenue > 0 ? ((stats.totalDiscounts / stats.grossRevenue) * 100).toFixed(1) : '0.0'}</p>
+                   </div>
+                </div>
+
+                <div className="w-px h-3 bg-stone-800 mx-auto"></div>
+
+                <div className="flex justify-between items-center p-3 rounded-xl bg-stone-800/30 hover:bg-stone-800/50 transition-colors bg-blue-900/10">
+                   <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">💵</div>
+                      <div>
+                         <p className="text-emerald-400/80 text-xs font-bold">NET SATIŞ (KASAYA GİREN)</p>
+                         <p className="font-bold text-emerald-400 text-xl">₺{stats.netRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
                       </div>
                    </div>
                 </div>

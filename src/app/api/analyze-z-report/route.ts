@@ -74,6 +74,7 @@ export async function POST(req: Request) {
 ÖNEMLİ KURAL 4 (GİDER ANALİZİ): Eğer fiş veya raporda kasadan yapılan günlük masraflar/giderler (örneğin Kurye yemeği, Temizlik, Manav, Bahşiş vb.) varsa bunları ayıkla ve giderlere (expenses) ekle. Ürünlere ekleme.
 ÖNEMLİ KURAL 5 (SONUNA KADAR OKUMA / ASLA KISALTMA YAPMA): JSON dizisini oluştururken ASLA tembellik (laziness) veya kısaltma yapma. Belgede örneğin 30 kalem varsa, 30 kalemin hepsini TEK TEK yaz. Yarıda kesme, atlama yapma. Tüm faturayı/raporu başından sonuna kadar %100 eksiksiz aktar.
 ÖNEMLİ KURAL 6 (TARİH SEÇİMİ): Fişte 'İlk Tarih' (Başlangıç) ve 'Son Tarih' (Bitiş) olmak üzere iki farklı tarih varsa, HER ZAMAN 'İlk Tarihi' (Başlangıç Tarihini) baz al. Gece yarısını geçen vardiyalarda (örn: 8 Temmuz sabahı başlayıp 9 Temmuz gecesi 02:00'de alınan z-raporu) raporun ait olduğu asıl iş günü ilk tarihtir. Bu yüzden "date" alanına sadece İlk Tarihi yaz.
+ÖNEMLİ KURAL 7 (İNDİRİM VE İKRAMLAR): Fişin altında veya üstünde yer alan 'İndirim', 'İskonto', 'İkram' gibi satırları topla ve 'discounts' objesine ekle. Eğer indirim yoksa 0 yaz.
 
 Fişteki ürün isimlerini BİREBİR AYNI ŞEKİLDE (hiçbir harfini, noktalama işaretini veya boşluğunu değiştirmeden) çıkar.
 
@@ -85,6 +86,9 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (\`\`
     "cash": nakit_tahsilat_tutari_sayi_olarak_veya_0,
     "credit_card": kredi_karti_tahsilat_tutari_sayi_olarak_veya_0,
     "other": yemek_karti_veya_diger_sayi_olarak_veya_0
+  },
+  "discounts": {
+    "total_amount": toplam_indirim_iskonto_veya_ikram_tutari_sayi_olarak_veya_0
   },
   "items": [
     {
