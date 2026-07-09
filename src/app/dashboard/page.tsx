@@ -40,7 +40,7 @@ export default function Dashboard() {
       supabase.from('products').select('id, sale_price, calculated_cost'),
       supabase.from('materials').select('id, name, stock_quantity, unit, critical_stock_level, price_per_unit'),
       supabase.from('expenses').select('amount, period, expense_date'),
-      supabase.from('sales').select('quantity, total_price, sale_date, products(calculated_cost)'),
+      supabase.from('sales').select('quantity, total_price, sale_date, product_id'),
       supabase.from('settings').select('*'),
       supabase.from('accounts').select('type, balance'),
       supabase.from('investments').select('asset_type, quantity, average_cost')
@@ -75,7 +75,8 @@ export default function Dashboard() {
 
     const grossRevenue = recentSales.reduce((t, s) => t + Number(s.total_price), 0);
     const totalCogs = recentSales.reduce((t, s) => {
-      const cost = s.products ? Number((s.products as any).calculated_cost || 0) : 0;
+      const product = (products || []).find(p => p.id === s.product_id);
+      const cost = product ? Number(product.calculated_cost || 0) : 0;
       return t + (cost * Number(s.quantity));
     }, 0);
 
