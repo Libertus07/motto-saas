@@ -29,6 +29,7 @@ type ParsedExpenseItem = {
 export default function ZRaporuYukle() {
     const { showAlert } = useNotification()
     const [imageUrl, setImageUrl] = useState<string | null>(null)
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [fileText, setFileText] = useState<string | null>(null)
     const [fileType, setFileType] = useState<'image' | 'pdf' | 'xml' | 'json' | null>(null)
     const [loading, setLoading] = useState(false)
@@ -62,6 +63,8 @@ export default function ZRaporuYukle() {
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
+        
+        setSelectedFile(file)
 
         const fileExt = file.name.split('.').pop()?.toLowerCase()
         if (fileExt === 'xml' || fileExt === 'json') {
@@ -220,6 +223,19 @@ export default function ZRaporuYukle() {
             const batchId = crypto.randomUUID()
             const { data: { user } } = await supabase.auth.getUser()
 
+            let uploadedUrl = null;
+            if (selectedFile) {
+                const fileExt = selectedFile.name.split('.').pop();
+                const fileName = `z-report-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('receipts')
+                    .upload(fileName, selectedFile);
+                if (!uploadError && uploadData) {
+                    const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(fileName);
+                    uploadedUrl = urlData.publicUrl;
+                }
+            }
+
             // 1. Satışları Sales tablosuna kaydet
             const salesInserts = parsedData.items.map(item => ({
                 batch_id: batchId,
@@ -228,7 +244,7 @@ export default function ZRaporuYukle() {
                 quantity: item.quantity,
                 unit_price: item.quantity > 0 ? Number((item.total_price / item.quantity).toFixed(2)) : 0,
                 total_price: item.total_price,
-                document_url: null // Devasa base64 metnini veritabanına kaydetmemek için iptal edildi
+                document_url: uploadedUrl
             }))
 
             const { error: salesError } = await supabase.from('sales').insert(salesInserts)

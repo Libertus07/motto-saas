@@ -433,6 +433,19 @@ export default function GecmisRaporlar() {
                                     className="w-[80vw] h-[70vh] rounded-lg border-0"
                                     title="Belge Önizleme"
                                 />
+                            ) : previewUrl.endsWith('.xml') || previewUrl.endsWith('.json') || previewUrl.endsWith('.xls') || previewUrl.endsWith('.xlsx') ? (
+                                <div className="p-8 text-center bg-stone-800 rounded-lg">
+                                    <div className="text-4xl mb-4">📄</div>
+                                    <h3 className="text-xl font-bold mb-4 text-stone-200">Bu belge formatı ekranda önizlenemiyor</h3>
+                                    <a 
+                                        href={previewUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="bg-amber-500 hover:bg-amber-600 text-stone-900 font-bold py-2 px-6 rounded-lg inline-block transition-colors"
+                                    >
+                                        Dosyayı İndir / Görüntüle
+                                    </a>
+                                </div>
                             ) : (
                                 <img 
                                     src={previewUrl} 
