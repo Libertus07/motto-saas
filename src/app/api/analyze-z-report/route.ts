@@ -73,6 +73,7 @@ export async function POST(req: Request) {
 ÖNEMLİ KURAL 3 (TAHSİLAT ANALİZİ): Fişin üzerindeki ödeme tiplerini (Nakit, Kredi Kartı vb.) analiz et ve tahsilat dağılımını ayıkla. Eğer ayrı ayrı belirtilmemişse tamamını 'cash' (Nakit) sayma, belgeden okuyabildiğin kadarını yerleştir.
 ÖNEMLİ KURAL 4 (GİDER ANALİZİ): Eğer fiş veya raporda kasadan yapılan günlük masraflar/giderler (örneğin Kurye yemeği, Temizlik, Manav, Bahşiş vb.) varsa bunları ayıkla ve giderlere (expenses) ekle. Ürünlere ekleme.
 ÖNEMLİ KURAL 5 (SONUNA KADAR OKUMA / ASLA KISALTMA YAPMA): JSON dizisini oluştururken ASLA tembellik (laziness) veya kısaltma yapma. Belgede örneğin 30 kalem varsa, 30 kalemin hepsini TEK TEK yaz. Yarıda kesme, atlama yapma. Tüm faturayı/raporu başından sonuna kadar %100 eksiksiz aktar.
+ÖNEMLİ KURAL 6 (TARİH SEÇİMİ): Fişte 'İlk Tarih' (Başlangıç) ve 'Son Tarih' (Bitiş) olmak üzere iki farklı tarih varsa, HER ZAMAN 'İlk Tarihi' (Başlangıç Tarihini) baz al. Gece yarısını geçen vardiyalarda (örn: 8 Temmuz sabahı başlayıp 9 Temmuz gecesi 02:00'de alınan z-raporu) raporun ait olduğu asıl iş günü ilk tarihtir. Bu yüzden "date" alanına sadece İlk Tarihi yaz.
 
 Aşağıdaki mevcut sistem ürünlerimle eşleşenleri "BİREBİR AYNI İSİMLE", eşleşmeyenleri ise fişteki ismiyle çıkar:
 Mevcut Ürünler: ${existingProducts.join(', ')}
