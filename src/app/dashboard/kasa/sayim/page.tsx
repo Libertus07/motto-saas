@@ -51,12 +51,13 @@ export default function KasaSayimPage() {
             // 2. Günün Satışlarını Getir
             const { data: salesData, error: salesError } = await supabase
                 .from('sales')
-                .select('total_price')
+                .select('batch_id, total_price')
                 .eq('sale_date', date)
             
             if (salesError) throw salesError
             
             const totalSales = salesData?.reduce((sum, s) => sum + (Number(s.total_price) || 0), 0) || 0
+            const validBatchIds = Array.from(new Set(salesData?.map(s => s.batch_id).filter(Boolean)))
 
             // 3. Günün Giderlerini Getir
             const { data: expensesData, error: expError } = await supabase
@@ -69,25 +70,27 @@ export default function KasaSayimPage() {
             const totalExpenses = expensesData?.reduce((sum, e) => sum + (Number(e.amount) || 0), 0) || 0
 
             // 4. Günün Ödeme Yöntemi Dağılımını Getir (Z-Raporu hareketleri)
-            const { data: movementsData, error: movError } = await supabase
-                .from('account_movements')
-                .select('amount, description, movement_type')
-                .eq('source_type', 'z_report')
-                .ilike('description', `${date}%`)
-
-            if (movError) throw movError
-
             let totalExpectedCash = 0;
             let totalExpectedCredit = 0;
 
-            if (movementsData && movementsData.length > 0) {
-                movementsData.forEach(m => {
-                    if (m.description?.includes('Nakit') && m.movement_type === 'giris') {
-                        totalExpectedCash += Number(m.amount) || 0;
-                    } else if (m.description?.includes('Kredi Kartı') && m.movement_type === 'giris') {
-                        totalExpectedCredit += Number(m.amount) || 0;
-                    }
-                })
+            if (validBatchIds.length > 0) {
+                const { data: movementsData, error: movError } = await supabase
+                    .from('account_movements')
+                    .select('amount, description, movement_type, source_id')
+                    .eq('source_type', 'z_report')
+                    .in('source_id', validBatchIds)
+
+                if (movError) throw movError
+
+                if (movementsData && movementsData.length > 0) {
+                    movementsData.forEach(m => {
+                        if (m.description?.includes('Nakit') && m.movement_type === 'giris') {
+                            totalExpectedCash += Number(m.amount) || 0;
+                        } else if (m.description?.includes('Kredi Kartı') && m.movement_type === 'giris') {
+                            totalExpectedCredit += Number(m.amount) || 0;
+                        }
+                    })
+                }
             }
 
             // Kasa Net Nakit Beklentisi (Giren Nakit - Giderler)
