@@ -118,8 +118,7 @@ export default function ZRaporuYukle() {
                 body: JSON.stringify({
                     image: imageUrl,
                     fileText: fileText,
-                    fileType: fileType,
-                    existingProducts: products.map(p => p.name)
+                    fileType: fileType
                 })
             })
 
