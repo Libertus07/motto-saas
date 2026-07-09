@@ -47,21 +47,41 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
     router.push('/login')
   }
 
-  const menuItems = [
-    { name: 'Ana Ekran', icon: '🏠', path: '/dashboard' },
-    { name: 'Ürünler', icon: '🍔', path: '/dashboard/urunler' },
-    { name: 'Hammaddeler', icon: '🧪', path: '/dashboard/hammaddeler' },
-    { name: 'Üretim Reçeteleri', icon: '🥣', path: '/dashboard/yari-mamuller' },
-    { name: 'Fiyat Motoru', icon: '⚙️', path: '/dashboard/fiyat-motoru' },
-    { name: 'Stok Takibi', icon: '📦', path: '/dashboard/stok' },
-    { name: 'Finans', icon: '💳', path: '/dashboard/finans' },
-    { name: 'Yatırımlar', icon: '📈', path: '/dashboard/yatirimlar' },
-    { name: 'Giderler', icon: '💸', path: '/dashboard/giderler' },
-    { name: 'Tedarikçiler', icon: '🏢', path: '/dashboard/tedarikciler' },
-    { name: 'Raporlar', icon: '📊', path: '/dashboard/raporlar' },
-    { name: 'Kasa Sayımı', icon: '🏧', path: '/dashboard/kasa/sayim' },
-    { name: 'İşlem Geçmişi', icon: '🕵️‍♂️', path: '/dashboard/islem-gecmisi' },
-    { name: 'Ayarlar', icon: '⚙️', path: '/dashboard/ayarlar' },
+  const menuGroups = [
+    {
+      title: 'Genel',
+      items: [
+        { name: 'Ana Ekran', icon: '🏠', path: '/dashboard' },
+      ]
+    },
+    {
+      title: 'Katalog & Üretim',
+      items: [
+        { name: 'Ürünler', icon: '🍔', path: '/dashboard/urunler' },
+        { name: 'Hammaddeler', icon: '🧪', path: '/dashboard/hammaddeler' },
+        { name: 'Stok Takibi', icon: '📦', path: '/dashboard/stok' },
+        { name: 'Üretim Reçeteleri', icon: '🥣', path: '/dashboard/yari-mamuller' },
+        { name: 'Tedarikçiler', icon: '🏢', path: '/dashboard/tedarikciler' },
+      ]
+    },
+    {
+      title: 'Finans & Kasa',
+      items: [
+        { name: 'Finans ve Hesaplar', icon: '🏦', path: '/dashboard/finans' },
+        { name: 'Kasa Sayımı', icon: '🏧', path: '/dashboard/kasa/sayim' },
+        { name: 'Giderler', icon: '💸', path: '/dashboard/giderler' },
+        { name: 'Yatırımlar', icon: '📈', path: '/dashboard/yatirimlar' },
+        { name: 'Fiyat Motoru', icon: '⚙️', path: '/dashboard/fiyat-motoru' },
+      ]
+    },
+    {
+      title: 'Yönetim',
+      items: [
+        { name: 'Raporlar', icon: '📊', path: '/dashboard/raporlar' },
+        { name: 'İşlem Geçmişi', icon: '🕵️‍♂️', path: '/dashboard/islem-gecmisi' },
+        { name: 'Ayarlar', icon: '⚙️', path: '/dashboard/ayarlar' },
+      ]
+    }
   ]
 
   return (
@@ -101,27 +121,36 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
         )}
       </div>
       
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {menuItems.map(item => {
-          const isActive = pathname === item.path
-          return (
-            <Link 
-              key={item.path} 
-              href={item.path}
-              onClick={() => {
-                if (onCloseMobile) onCloseMobile();
-              }}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                isActive 
-                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
-                  : 'text-stone-400 hover:bg-stone-800 hover:text-white border border-transparent'
-              }`}
-            >
-              <span className="text-xl">{item.icon}</span>
-              <span className="font-medium">{item.name}</span>
-            </Link>
-          )
-        })}
+      <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+        {menuGroups.map((group, groupIndex) => (
+          <div key={groupIndex}>
+            <div className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-3 px-4">
+              {group.title}
+            </div>
+            <div className="space-y-1">
+              {group.items.map(item => {
+                const isActive = pathname === item.path
+                return (
+                  <Link 
+                    key={item.path} 
+                    href={item.path}
+                    onClick={() => {
+                      if (onCloseMobile) onCloseMobile();
+                    }}
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${
+                      isActive 
+                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
+                        : 'text-stone-400 hover:bg-stone-800 hover:text-white border border-transparent'
+                    }`}
+                  >
+                    <span className="text-xl">{item.icon}</span>
+                    <span className="font-medium">{item.name}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
       
       <div className="p-4 border-t border-stone-800 relative mt-auto">
