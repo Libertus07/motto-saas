@@ -264,14 +264,30 @@ export default function KasaSayimPage() {
                 }
             }
 
+            let details = '';
+            if (existingReconciliation) {
+                const changes = [];
+                if (existingReconciliation.counted_cash !== Number(countedCash)) {
+                    changes.push(`Nakit Sayım: ${existingReconciliation.counted_cash} ₺ -> ${countedCash || 0} ₺`)
+                }
+                if (existingReconciliation.counted_credit_card !== Number(countedCreditCard)) {
+                    changes.push(`POS Sayım: ${existingReconciliation.counted_credit_card} ₺ -> ${countedCreditCard || 0} ₺`)
+                }
+                
+                const oldTotal = Number(existingReconciliation.counted_cash) + Number(existingReconciliation.counted_credit_card) + Number(existingReconciliation.counted_meal_card || 0);
+                const oldVariance = oldTotal - (Number(existingReconciliation.expected_cash) + Number(existingReconciliation.expected_credit_card));
+                
+                if (oldVariance !== variance) {
+                    changes.push(`Kasa Farkı: ${oldVariance > 0 ? '+' : ''}${oldVariance} ₺ -> ${variance > 0 ? '+' : ''}${variance} ₺`)
+                }
+                
+                details = changes.length > 0 ? changes.join(' | ') : 'Sayım güncellendi ancak tutarlarda değişiklik olmadı.';
+            } else {
+                details = `Nakit Sayım: ${countedCash || 0} ₺ | POS Sayım: ${countedCreditCard || 0} ₺ | Fark: ${variance > 0 ? '+' : ''}${variance} ₺`;
+            }
+
             // İşlem geçmişine kaydet
-            await logActivity('Kasa', existingReconciliation ? 'GUNCELLEME' : 'EKLEME', `${date} tarihli kasa sayımı yapıldı ve kasa hareketleri (Açık/Fazla) düzeltildi.`, { 
-                nakit_sayim: countedCash, 
-                pos_sayim: countedCreditCard, 
-                nakit_beklenen: expectedNetCash,
-                pos_beklenen: expectedNetCredit,
-                fark: variance 
-            })
+            await logActivity('Kasa', existingReconciliation ? 'GUNCELLEME' : 'EKLEME', `${date} tarihli kasa sayımı ${existingReconciliation ? 'güncellendi' : 'kaydedildi'}.`, { detay: details })
 
             setSuccess(true)
             setTimeout(() => setSuccess(false), 3000)
