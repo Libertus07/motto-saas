@@ -107,6 +107,68 @@ export default function ZRaporuYukle() {
                   .replace(/[^a-z0-9ğüşöçı]/g, '');
     }
 
+    const levenshteinDistance = (s1: string, s2: string) => {
+        if (s1.length === 0) return s2.length;
+        if (s2.length === 0) return s1.length;
+        const matrix = [];
+        for (let i = 0; i <= s2.length; i++) {
+            matrix[i] = [i];
+        }
+        for (let j = 0; j <= s1.length; j++) {
+            matrix[0][j] = j;
+        }
+        for (let i = 1; i <= s2.length; i++) {
+            for (let j = 1; j <= s1.length; j++) {
+                if (s2.charAt(i - 1) === s1.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1,
+                        matrix[i][j - 1] + 1,
+                        matrix[i - 1][j] + 1
+                    );
+                }
+            }
+        }
+        return matrix[s2.length][s1.length];
+    }
+
+    const findBestMatch = (productName: string, systemProducts: any[]) => {
+        let bestMatch = null;
+        let bestScore = 0; 
+        
+        const normTarget = normalizeStr(productName);
+        if (!normTarget) return null;
+        
+        for (const p of systemProducts) {
+            const normP = normalizeStr(p.name);
+            if (normP === normTarget) {
+                return p; // Tam eşleşme %100
+            }
+            
+            // Biri diğerinin içinde geçiyorsa ek bonus (örn: "Kola" -> "Coca Cola")
+            if (normP.includes(normTarget) || normTarget.includes(normP)) {
+                if (bestScore < 0.8) {
+                    bestScore = 0.8;
+                    bestMatch = p;
+                }
+            }
+            
+            // Levenshtein benzerliği
+            const distance = levenshteinDistance(normTarget, normP);
+            const maxLength = Math.max(normTarget.length, normP.length);
+            const similarity = 1 - (distance / maxLength);
+            
+            if (similarity > bestScore) {
+                bestScore = similarity;
+                bestMatch = p;
+            }
+        }
+        
+        // %60 ve üzeri benzerliği kabul et
+        return bestScore >= 0.60 ? bestMatch : null;
+    }
+
     const handleAnalyze = async () => {
         if (!imageUrl && !fileText) return
         setAnalyzing(true)
@@ -127,7 +189,7 @@ export default function ZRaporuYukle() {
 
             // Eşleşmeleri otomatik yap (Akıllı Karşılaştırma)
             const mappedItems = data.items.map((item: any) => {
-                const match = products.find(p => normalizeStr(p.name) === normalizeStr(item.product_name))
+                const match = findBestMatch(item.product_name, products)
                 return { ...item, matchedProductId: match?.id }
             })
 
