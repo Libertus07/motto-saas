@@ -60,6 +60,27 @@ export async function POST(req: Request) {
         // 5. Giderleri sil
         await supabase.from('expenses').delete().eq('batch_id', batch_id)
 
+        // 6. Finans (Kasa/Banka) Hareketlerini Geri Al ve Sil
+        const { data: accMovs } = await supabase
+            .from('account_movements')
+            .select('*')
+            .eq('source_type', 'z_report')
+            .eq('source_id', batch_id)
+
+        if (accMovs && accMovs.length > 0) {
+            for (const oldM of accMovs) {
+                const { data: currAcc } = await supabase.from('accounts').select('balance').eq('id', oldM.account_id).single()
+                if (currAcc) {
+                    const reversedBalance = oldM.movement_type === 'giris'
+                        ? Number(currAcc.balance) - Number(oldM.amount)
+                        : Number(currAcc.balance) + Number(oldM.amount)
+                    await supabase.from('accounts').update({ balance: reversedBalance }).eq('id', oldM.account_id)
+                }
+            }
+            // Hareketleri sil
+            await supabase.from('account_movements').delete().eq('source_type', 'z_report').eq('source_id', batch_id)
+        }
+
         return NextResponse.json({ success: true })
     } catch (error: unknown) {
         console.error('Delete Z-Report Error:', error)
