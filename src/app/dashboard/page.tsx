@@ -69,24 +69,18 @@ export default function Dashboard() {
     });
 
     const recentExpenses = (expenses || []).filter(e => {
-      if (e.period === 'Günlük' || e.period === 'daily' || e.period === 'tek_seferlik') {
-        const d = e.expense_date ? new Date(e.expense_date) : null;
-        return d && d >= thirtyDaysAgo;
-      }
-      return true; // Aylık/yıllık giderleri doğrudan alacağız
+      const d = e.expense_date ? new Date(e.expense_date) : null;
+      return d && d >= thirtyDaysAgo;
     });
 
     const grossRevenue = recentSales.reduce((t, s) => t + Number(s.total_price), 0);
     const totalCogs = recentSales.reduce((t, s) => {
-      // products() join result is array or object depending on relation, usually object for many-to-one
       const cost = s.products ? Number((s.products as any).calculated_cost || 0) : 0;
       return t + (cost * Number(s.quantity));
     }, 0);
 
-    const monthlyExpenses = recentExpenses.reduce((t, e) => {
-      if (e.period === 'Günlük' || e.period === 'daily' || e.period === 'tek_seferlik') return t + Number(e.amount);
-      return t + (e.period === 'yearly' ? e.amount / 12 : e.amount)
-    }, 0);
+    // Son 30 gün içinde gerçekleşen tüm giderleri topluyoruz (Mükerrer toplanmasını engelledik)
+    const monthlyExpenses = recentExpenses.reduce((t, e) => t + Number(e.amount), 0);
 
     const netProfit = grossRevenue - totalCogs - monthlyExpenses;
 
