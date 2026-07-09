@@ -21,6 +21,7 @@ type AccountMovement = {
     description: string
     source_type: string
     created_at: string
+    z_details?: any
 }
 
 export default function FinansPage() {
@@ -108,27 +109,56 @@ export default function FinansPage() {
         // Z-Raporlarını birleştir
         Object.keys(zReportMap).forEach(reportDateStr => {
             const zMoves = zReportMap[reportDateStr]
-            let totalGiris = 0
-            let totalCikis = 0
+            let totalHasilat = 0
+            let totalGider = 0
+            let acikFazla = 0
+            let acikFazlaTipi = ''
             
             zMoves.forEach(m => {
-                if (m.movement_type === 'giris') totalGiris += Number(m.amount)
-                else totalCikis += Number(m.amount)
+                const desc = m.description || ''
+                if (desc.includes('Giderler')) {
+                    totalGider += Number(m.amount)
+                } else if (desc.includes('Hasılat')) {
+                    totalHasilat += Number(m.amount)
+                } else if (desc.includes('Sayım Açığı')) {
+                    acikFazla -= Number(m.amount)
+                    acikFazlaTipi = 'Açık'
+                } else if (desc.includes('Sayım Fazlası')) {
+                    acikFazla += Number(m.amount)
+                    acikFazlaTipi = 'Fazla'
+                } else {
+                    // Fallback
+                    if (m.movement_type === 'giris') totalHasilat += Number(m.amount)
+                    else totalGider += Number(m.amount)
+                }
             })
             
-            const netAmount = totalGiris - totalCikis
+            const netAmount = totalHasilat - totalGider + acikFazla
             
             // Eğer giriş ve çıkış birbirini sıfırlıyorsa (hiç hareket yoksa) ekleme
-            if (netAmount === 0 && totalGiris === 0 && totalCikis === 0) return;
+            if (netAmount === 0 && totalHasilat === 0 && totalGider === 0 && acikFazla === 0) return;
+
+            let descText = `${reportDateStr} Gün Sonu Net Kasa Hareketi (Giriş: ₺${totalHasilat.toLocaleString('tr-TR')} | Gider: ₺${totalGider.toLocaleString('tr-TR')}`
+            if (acikFazlaTipi) {
+                descText += ` | Sayım ${acikFazlaTipi}: ${acikFazla > 0 ? '+' : '-'}₺${Math.abs(acikFazla).toLocaleString('tr-TR')}`
+            }
+            descText += ')'
 
             const combinedMove: AccountMovement = {
                 id: `grouped-z-${reportDateStr}`,
                 account_id: zMoves[0].account_id,
                 movement_type: netAmount >= 0 ? 'giris' : 'cikis',
                 amount: Math.abs(netAmount),
-                description: `${reportDateStr} Net Z-Raporu Özeti (Giriş: ₺${totalGiris.toLocaleString('tr-TR', {minimumFractionDigits: 2})} | Çıkış/Açık: ₺${totalCikis.toLocaleString('tr-TR', {minimumFractionDigits: 2})})`,
+                description: descText,
                 source_type: 'z_report_group',
-                created_at: zMoves[0].created_at // En son işlemin saati
+                created_at: zMoves[0].created_at, // En son işlemin saati
+                z_details: {
+                    hasilat: totalHasilat,
+                    gider: totalGider,
+                    acikFazla: acikFazla,
+                    acikFazlaTipi: acikFazlaTipi,
+                    net: netAmount
+                }
             }
             
             processedMovements.push(combinedMove)
@@ -531,6 +561,7 @@ export default function FinansPage() {
                                     <span className="text-stone-500 text-xs font-bold uppercase tracking-wider">Kaynak</span>
                                     <span className="text-stone-200 text-sm font-medium">
                                         {selectedMovement.source_type === 'z_report' ? 'Z-Raporu' :
+                                         selectedMovement.source_type === 'z_report_group' ? 'Z-Raporu & Kasa Sayımı' :
                                          selectedMovement.source_type === 'supplier_payment' ? 'Tedarikçi Ödemesi' :
                                          selectedMovement.source_type === 'expense' ? 'Masraf/Gider' : 'Manuel İşlem'}
                                     </span>
@@ -548,6 +579,33 @@ export default function FinansPage() {
                                 <p className="text-stone-200 text-sm leading-relaxed">
                                     {selectedMovement.description}
                                 </p>
+                                
+                                {selectedMovement.z_details && (
+                                    <div className="mt-4 pt-4 border-t border-stone-800/50 space-y-3">
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-stone-400 flex items-center gap-2">🟢 <span>Nakit/POS Hasılatı</span></span>
+                                            <span className="text-green-400 font-bold">+₺{selectedMovement.z_details.hasilat.toLocaleString('tr-TR', {minimumFractionDigits: 2})}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-stone-400 flex items-center gap-2">🔴 <span>Kasadan Çıkan Giderler</span></span>
+                                            <span className="text-red-400 font-bold">-₺{selectedMovement.z_details.gider.toLocaleString('tr-TR', {minimumFractionDigits: 2})}</span>
+                                        </div>
+                                        {selectedMovement.z_details.acikFazla !== 0 && (
+                                            <div className="flex justify-between items-center text-sm">
+                                                <span className="text-stone-400 flex items-center gap-2">🟠 <span>Kasa Sayım {selectedMovement.z_details.acikFazlaTipi}</span></span>
+                                                <span className={`${selectedMovement.z_details.acikFazla > 0 ? 'text-green-400' : 'text-red-400'} font-bold`}>
+                                                    {selectedMovement.z_details.acikFazla > 0 ? '+' : '-'}₺{Math.abs(selectedMovement.z_details.acikFazla).toLocaleString('tr-TR', {minimumFractionDigits: 2})}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between items-center pt-3 border-t border-stone-800/50 mt-3">
+                                            <span className="text-stone-300 font-bold text-sm">Kasaya Giren NET Tutar</span>
+                                            <span className="text-amber-400 font-bold text-xl">
+                                                {selectedMovement.z_details.net > 0 ? '+' : ''}₺{selectedMovement.z_details.net.toLocaleString('tr-TR', {minimumFractionDigits: 2})}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
