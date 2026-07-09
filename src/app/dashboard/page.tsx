@@ -330,32 +330,37 @@ export default function Dashboard() {
              </div>
           </div>
 
-          {/* Sağ Taraftaki KPI Grid */}
-          <div className="lg:col-span-1 grid grid-cols-2 gap-4">
-             <div className="bg-stone-900 border border-stone-800 hover:border-stone-700 transition-all duration-300 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group">
+          {/* Sağ Taraftaki KPI Grid (2x2 Dörtlü Düzen) */}
+          <div className="lg:col-span-1 grid grid-cols-2 gap-4 h-full">
+             <div className="bg-stone-900 border border-stone-800 hover:border-stone-700 transition-all duration-300 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group shadow-lg">
                 <div className="absolute -bottom-6 -right-6 text-6xl opacity-5 group-hover:scale-110 transition-transform">🍔</div>
-                <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3">📝</div>
-                <p className="text-stone-400 text-xs mb-1 font-medium">Kayıtlı Ürün</p>
-                <p className="text-2xl font-bold text-white">{loading ? '...' : stats.totalProducts}</p>
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3 shadow-[0_0_15px_rgba(245,158,11,0.15)]">📝</div>
+                <p className="text-stone-400 text-[11px] uppercase tracking-wider mb-1 font-bold">Kayıtlı Ürün</p>
+                <p className="text-3xl font-black text-white">{loading ? '...' : stats.totalProducts}</p>
              </div>
              
-             <div className="bg-stone-900 border border-stone-800 hover:border-stone-700 transition-all duration-300 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group">
+             <div className="bg-stone-900 border border-stone-800 hover:border-stone-700 transition-all duration-300 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group shadow-lg">
                 <div className="absolute -bottom-6 -right-6 text-6xl opacity-5 group-hover:scale-110 transition-transform">🧪</div>
-                <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center mb-3">⚖️</div>
-                <p className="text-stone-400 text-xs mb-1 font-medium">Hammadde</p>
-                <p className="text-2xl font-bold text-white">{loading ? '...' : stats.totalIngredients}</p>
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mb-3 shadow-[0_0_15px_rgba(59,130,246,0.15)]">⚖️</div>
+                <p className="text-stone-400 text-[11px] uppercase tracking-wider mb-1 font-bold">Hammadde</p>
+                <p className="text-3xl font-black text-white">{loading ? '...' : stats.totalIngredients}</p>
              </div>
 
-             <div className="bg-stone-900 border border-stone-800 hover:border-stone-700 transition-all duration-300 rounded-2xl p-6 flex flex-col justify-center col-span-2 relative overflow-hidden group">
+             <div className={`bg-stone-900 border ${stats.criticalStockCount > 0 ? 'border-red-900/50 hover:border-red-500/50' : 'border-stone-800 hover:border-stone-700'} transition-all duration-300 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group shadow-lg`}>
+                <div className="absolute -bottom-6 -right-6 text-6xl opacity-5 group-hover:scale-110 transition-transform">⚠️</div>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${stats.criticalStockCount > 0 ? 'bg-red-500/10 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-pulse' : 'bg-stone-800 text-stone-500'}`}>🔔</div>
+                <p className="text-stone-400 text-[11px] uppercase tracking-wider mb-1 font-bold">Kritik Stok</p>
+                <p className={`text-3xl font-black ${stats.criticalStockCount > 0 ? 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'text-stone-300'}`}>{loading ? '...' : stats.criticalStockCount}</p>
+             </div>
+
+             <div className="bg-stone-900 border border-emerald-900/30 hover:border-emerald-500/50 transition-all duration-300 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden group shadow-lg">
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-colors"></div>
-                <div className="flex items-center gap-3 mb-2 relative z-10">
-                   <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">💎</div>
-                   <p className="text-stone-400 text-xs font-bold uppercase tracking-wider">Güncel Stok Değeri</p>
-                </div>
-                <p className="text-4xl font-bold text-emerald-400 tracking-tight mt-1 relative z-10">
+                <div className="absolute -bottom-6 -right-6 text-6xl opacity-5 group-hover:scale-110 transition-transform">💎</div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-3 shadow-[0_0_15px_rgba(16,185,129,0.15)]">💰</div>
+                <p className="text-stone-400 text-[11px] uppercase tracking-wider mb-1 font-bold relative z-10">Stok Değeri</p>
+                <p className="text-2xl font-black text-emerald-400 tracking-tight truncate relative z-10">
                   {loading ? '...' : `₺${stats.totalStockValue.toLocaleString('tr-TR', { minimumFractionDigits: 0 })}`}
                 </p>
-                <p className="text-stone-500 text-[10px] mt-3 relative z-10">Sistemdeki tüm hammaddelerin anlık toplam sermaye karşılığı.</p>
              </div>
           </div>
 
