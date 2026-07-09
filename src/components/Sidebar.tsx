@@ -59,6 +59,7 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
     { name: 'Giderler', icon: '💸', path: '/dashboard/giderler' },
     { name: 'Tedarikçiler', icon: '🏢', path: '/dashboard/tedarikciler' },
     { name: 'Raporlar', icon: '📊', path: '/dashboard/raporlar' },
+    { name: 'Kasa Sayımı', icon: '🏧', path: '/dashboard/kasa/sayim' },
     { name: 'İşlem Geçmişi', icon: '🕵️‍♂️', path: '/dashboard/islem-gecmisi' },
     { name: 'Ayarlar', icon: '⚙️', path: '/dashboard/ayarlar' },
   ]
