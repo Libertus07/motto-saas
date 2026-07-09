@@ -21,6 +21,7 @@ export default function Giderler() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [customCategory, setCustomCategory] = useState('')
   const [form, setForm] = useState({
     name: '',
     category: 'kira',
@@ -31,7 +32,7 @@ export default function Giderler() {
   const supabase = createClient()
   const router = useRouter()
 
-  const categories = [
+  const defaultCategories = [
     { value: 'kira', label: 'Kira' },
     { value: 'personel', label: 'Personel' },
     { value: 'elektrik', label: 'Elektrik' },
@@ -43,6 +44,16 @@ export default function Giderler() {
     { value: 'pazarlama', label: 'Pazarlama' },
     { value: 'diger', label: 'Diğer' }
   ]
+
+  const uniqueCategories = Array.from(new Set(expenses.map(e => e.category)))
+  uniqueCategories.forEach(cat => {
+    if (!defaultCategories.find(c => c.value === cat)) {
+      const label = cat.charAt(0).toUpperCase() + cat.slice(1)
+      defaultCategories.push({ value: cat, label })
+    }
+  })
+
+  const categories = defaultCategories
 
   useEffect(() => { fetchExpenses() }, [])
 
@@ -63,6 +74,7 @@ export default function Giderler() {
       period: 'monthly',
       expense_date: new Date().toISOString().split('T')[0]
     })
+    setCustomCategory('')
     setEditingId(null)
     setShowForm(false)
   }
@@ -70,9 +82,15 @@ export default function Giderler() {
   const handleSubmit = async () => {
     if (!form.name || !form.amount) return
 
+    const finalCategory = form.category === 'custom' ? customCategory.trim().toLowerCase().replace(/\s+/g, '-') : form.category
+    if (form.category === 'custom' && !finalCategory) {
+        await showConfirm('Lütfen geçerli bir kategori adı girin.', 'Uyarı', 'Tamam')
+        return
+    }
+
     const payload = {
       name: form.name,
-      category: form.category,
+      category: finalCategory,
       amount: parseFloat(form.amount),
       period: form.period,
       expense_date: form.expense_date
@@ -214,10 +232,20 @@ export default function Giderler() {
                 <select
                   value={form.category}
                   onChange={e => setForm({ ...form, category: e.target.value })}
-                  className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400"
+                  className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400 mb-2"
                 >
                   {categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  <option value="custom" className="text-amber-500 font-bold">+ Yeni Kategori Ekle</option>
                 </select>
+                {form.category === 'custom' && (
+                  <input
+                    value={customCategory}
+                    onChange={e => setCustomCategory(e.target.value)}
+                    className="w-full bg-stone-800 border border-amber-500 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400"
+                    placeholder="Yeni kategori adı (örn: Nakliye)"
+                    autoFocus
+                  />
+                )}
               </div>
               <div>
                 <label className="text-stone-400 text-sm mb-1 block">Tutar (₺) *</label>
