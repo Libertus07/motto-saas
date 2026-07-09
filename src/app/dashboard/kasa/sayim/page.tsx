@@ -46,6 +46,13 @@ export default function KasaSayimPage() {
 
             if (recData) {
                 setExistingReconciliation(recData)
+                setCountedCash(recData.counted_cash)
+                setCountedCreditCard(recData.counted_credit_card)
+                setCountedMealCard(recData.counted_meal_card || 0)
+            } else {
+                setCountedCash('')
+                setCountedCreditCard('')
+                setCountedMealCard('')
             }
 
             // 2. Günün Satışlarını Getir
