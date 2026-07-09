@@ -100,6 +100,13 @@ export default function ZRaporuYukle() {
         }
     }
 
+    const normalizeStr = (str: string) => {
+        if (!str) return '';
+        return str.toLocaleLowerCase('tr-TR')
+                  .replace(/[\s\-_]+/g, '')
+                  .replace(/[^a-z0-9ğüşöçı]/g, '');
+    }
+
     const handleAnalyze = async () => {
         if (!imageUrl && !fileText) return
         setAnalyzing(true)
@@ -119,9 +126,9 @@ export default function ZRaporuYukle() {
             const data = await res.json()
             if (data.error) throw new Error(data.error)
 
-            // Eşleşmeleri otomatik yap
+            // Eşleşmeleri otomatik yap (Akıllı Karşılaştırma)
             const mappedItems = data.items.map((item: any) => {
-                const match = products.find(p => p.name.toLowerCase() === item.product_name.toLowerCase())
+                const match = products.find(p => normalizeStr(p.name) === normalizeStr(item.product_name))
                 return { ...item, matchedProductId: match?.id }
             })
 
@@ -550,7 +557,7 @@ export default function ZRaporuYukle() {
                                                     value={item.product_name}
                                                     onChange={(e) => {
                                                         const val = e.target.value;
-                                                        const matched = products.find(p => p.name.toLowerCase() === val.toLowerCase());
+                                                        const matched = products.find(p => normalizeStr(p.name) === normalizeStr(val));
                                                         const newItems = [...parsedData.items];
                                                         newItems[i].product_name = val;
                                                         newItems[i].matchedProductId = matched?.id;
