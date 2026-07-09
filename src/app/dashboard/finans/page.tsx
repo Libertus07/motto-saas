@@ -88,7 +88,57 @@ export default function FinansPage() {
         const yesterday = new Date(today)
         yesterday.setDate(yesterday.getDate() - 1)
 
+        // 1. Z-Raporu ve Sayım hareketlerini tarihe göre gruplayarak "Net" satırlar oluşturalım
+        const processedMovements: AccountMovement[] = []
+        const zReportMap: Record<string, AccountMovement[]> = {}
+
         movements.forEach(move => {
+            if (move.source_type === 'z_report' || move.source_type === 'reconciliation') {
+                // "2026-07-08 Z-Raporu..." veya "2026-07-08 Kasa Sayım..." gibi bir açıklama bekliyoruz.
+                const match = move.description.match(/^\d{4}-\d{2}-\d{2}/)
+                const reportDateStr = match ? match[0] : new Date(move.created_at).toISOString().split('T')[0]
+                
+                if (!zReportMap[reportDateStr]) zReportMap[reportDateStr] = []
+                zReportMap[reportDateStr].push(move)
+            } else {
+                processedMovements.push(move)
+            }
+        })
+
+        // Z-Raporlarını birleştir
+        Object.keys(zReportMap).forEach(reportDateStr => {
+            const zMoves = zReportMap[reportDateStr]
+            let totalGiris = 0
+            let totalCikis = 0
+            
+            zMoves.forEach(m => {
+                if (m.movement_type === 'giris') totalGiris += Number(m.amount)
+                else totalCikis += Number(m.amount)
+            })
+            
+            const netAmount = totalGiris - totalCikis
+            
+            // Eğer giriş ve çıkış birbirini sıfırlıyorsa (hiç hareket yoksa) ekleme
+            if (netAmount === 0 && totalGiris === 0 && totalCikis === 0) return;
+
+            const combinedMove: AccountMovement = {
+                id: `grouped-z-${reportDateStr}`,
+                account_id: zMoves[0].account_id,
+                movement_type: netAmount >= 0 ? 'giris' : 'cikis',
+                amount: Math.abs(netAmount),
+                description: `${reportDateStr} Net Z-Raporu Özeti (Giriş: ₺${totalGiris.toLocaleString('tr-TR', {minimumFractionDigits: 2})} | Çıkış/Açık: ₺${totalCikis.toLocaleString('tr-TR', {minimumFractionDigits: 2})})`,
+                source_type: 'z_report_group',
+                created_at: zMoves[0].created_at // En son işlemin saati
+            }
+            
+            processedMovements.push(combinedMove)
+        })
+
+        // Tekrar tarihe göre sırala
+        processedMovements.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+        // 2. Normal UI gruplamasını (Bugün, Dün vs) yap
+        processedMovements.forEach(move => {
             const date = new Date(move.created_at)
             let dateKey = date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
             
@@ -205,7 +255,7 @@ export default function FinansPage() {
         let path = ''
         let moduleName = ''
         
-        if (move.source_type === 'z_report') {
+        if (move.source_type === 'z_report' || move.source_type === 'reconciliation' || move.source_type === 'z_report_group') {
             path = '/dashboard/raporlar/gecmis'
             moduleName = 'Z-Raporu Geçmişi'
         } else if (move.source_type === 'supplier_payment' || move.source_type === 'supplier') {
