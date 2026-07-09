@@ -65,23 +65,23 @@ export default function Stok() {
     }, [])
 
     const fetchData = async () => {
-        const [{ data: mats }, { data: movs }, { data: settingsData }, { data: lastCount }] = await Promise.all([
+        const [{ data: mats }, { data: movs }, { data: settingsData }] = await Promise.all([
             supabase.from('materials').select('*').order('name'),
             supabase.from('stock_movements')
                 .select('*, materials(name, unit)')
                 .order('created_at', { ascending: false })
                 .limit(50),
-            supabase.from('settings').select('value').eq('key', 'inventory_count_day'),
-            supabase.from('stock_movements').select('created_at').ilike('note', 'Sayım Düzeltmesi%').order('created_at', { ascending: false }).limit(1)
+            supabase.from('settings').select('key, value').in('key', ['inventory_count_day', 'last_inventory_count_date'])
         ])
         setMaterials(mats || [])
         setMovements(movs || [])
         
-        if (settingsData && settingsData.length > 0) {
-            setInventoryCountDay(parseInt(settingsData[0].value) || 1)
-        }
-        if (lastCount && lastCount.length > 0) {
-            setLastCountDate(new Date(lastCount[0].created_at))
+        if (settingsData) {
+            const countDay = settingsData.find(s => s.key === 'inventory_count_day')
+            if (countDay) setInventoryCountDay(parseInt(countDay.value) || 1)
+            
+            const lastDate = settingsData.find(s => s.key === 'last_inventory_count_date')
+            if (lastDate && lastDate.value) setLastCountDate(new Date(lastDate.value))
         }
         setLoading(false)
     }
@@ -182,6 +182,10 @@ export default function Stok() {
         }
 
         setSayimData({})
+        
+        // Save last count date to settings for fast retrieval
+        await supabase.from('settings').upsert({ key: 'last_inventory_count_date', value: new Date().toISOString() })
+        
         fetchData()
         
         logActivity('Stok', 'GUNCELLEME', `Stok sayım düzeltmesi yapıldı. Eksik/Fazla ürünlerin kaydı oluşturuldu.`, sayimDetails.length > 0 ? { detay: sayimDetails.join(', ') } : undefined)
