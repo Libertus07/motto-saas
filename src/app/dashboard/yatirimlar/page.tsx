@@ -229,68 +229,24 @@ export default function YatirimlarPage() {
             const selectedAcc = accounts.find(a => a.id === buyForm.account_id)
             if (!selectedAcc) throw new Error('Hesap bulunamadı.')
 
-            let invId = ''
-            const existingInv = isRE ? null : investments.find(i => i.asset_type === buyForm.asset_type)
-            
-            if (existingInv) {
-                invId = existingInv.id
-                const oldTotalCost = Number(existingInv.quantity) * Number(existingInv.average_cost)
-                const newTotalCost = oldTotalCost + totalAmount
-                const newQuantity = Number(existingInv.quantity) + qty
-                const newAvgCost = newTotalCost / newQuantity
+            let invName = 'Yatırım'
+            if (buyForm.asset_type === 'gold') invName = 'Gram Altın'
+            if (buyForm.asset_type === 'usd') invName = 'Amerikan Doları'
+            if (buyForm.asset_type === 'eur') invName = 'Euro'
+            if (buyForm.asset_type === 'real_estate') invName = 'Gayrimenkul Mülk'
 
-                await supabase.from('investments').update({
-                    quantity: newQuantity,
-                    average_cost: newAvgCost,
-                    updated_at: new Date().toISOString(),
-                    notes: existingInv.notes ? `${existingInv.notes}\n${buyForm.purchase_date}: ${buyForm.notes}` : buyForm.notes,
-                    document_url: buyForm.document_url || existingInv.document_url,
-                }).eq('id', invId)
-            } else {
-                let invName = 'Yatırım'
-                if (buyForm.asset_type === 'gold') invName = 'Gram Altın'
-                if (buyForm.asset_type === 'usd') invName = 'Amerikan Doları'
-                if (buyForm.asset_type === 'eur') invName = 'Euro'
-                if (buyForm.asset_type === 'real_estate') invName = 'Gayrimenkul Mülk'
+            const { error: rpcError } = await supabase.rpc('buy_investment_transaction', {
+                p_asset_type: buyForm.asset_type,
+                p_name: invName,
+                p_quantity: qty,
+                p_price: price,
+                p_account_id: buyForm.account_id,
+                p_notes: buyForm.notes || null,
+                p_purchase_date: buyForm.purchase_date || new Date().toISOString().split('T')[0],
+                p_document_url: buyForm.document_url || null
+            });
 
-                const { data: newInv, error: invError } = await supabase.from('investments').insert({
-                    asset_type: buyForm.asset_type,
-                    name: invName,
-                    quantity: qty,
-                    average_cost: price,
-                    current_manual_value: isRE ? price : 0,
-                    notes: buyForm.notes,
-                    purchase_date: buyForm.purchase_date || new Date().toISOString().split('T')[0],
-                    document_url: buyForm.document_url
-                }).select().single()
-                
-                if (invError) throw invError
-                invId = newInv.id
-            }
-
-            // Kasa hareketini ekle ve source_id olarak invId ata
-            const { error: moveError } = await supabase.from('account_movements').insert({
-                account_id: buyForm.account_id,
-                movement_type: 'cikis',
-                amount: totalAmount,
-                description: `Yatırım Alımı: ${isRE ? 'Gayrimenkul' : `${qty} ${buyForm.asset_type.toUpperCase()}`} alındı.`,
-                source_type: 'investment',
-                source_id: invId
-            })
-            if (moveError) throw moveError
-
-            await supabase.from('accounts').update({
-                balance: selectedAcc.balance - totalAmount
-            }).eq('id', buyForm.account_id)
-
-            await supabase.from('investment_transactions').insert({
-                investment_id: invId,
-                transaction_type: 'buy' as InvestmentTransaction['transaction_type'],
-                quantity: qty,
-                price_per_unit: price,
-                total_amount: totalAmount,
-                account_id: buyForm.account_id
-            })
+            if (rpcError) throw rpcError;
 
             await logActivity('Yatırımlar', 'EKLEME', `Yeni Yatırım Alımı: ${isRE ? 'Gayrimenkul' : `${qty} birim ${buyForm.asset_type.toUpperCase()}`}`, {
                 detay: `Tutar (₺${totalAmount}) | Fiyat (₺${price}) | Not (${buyForm.notes || '-'})`

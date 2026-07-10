@@ -8,15 +8,20 @@ import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
 import { formatCurrency, formatDate } from "@/lib/format";
 
-type Investment = {
+type InvestmentTransaction = {
     id: string
-    asset_type: string
-    name: string
+    investment_id: string
+    transaction_type: string
     quantity: number
-    average_cost: number
-    purchase_date: string
+    price_per_unit: number
+    total_amount: number
+    transaction_date: string
     notes: string
     document_url: string
+    investments: {
+        name: string
+        asset_type: string
+    }
 }
 
 type GroupedMonth = {
@@ -24,11 +29,11 @@ type GroupedMonth = {
     monthLabel: string
     totalAmount: number
     receiptCount: number
-    items: Investment[]
+    items: InvestmentTransaction[]
 }
 
 export default function YatirimGecmisi() {
-    const [investments, setInvestments] = useState<Investment[]>([])
+    const [transactions, setTransactions] = useState<InvestmentTransaction[]>([])
     const [loading, setLoading] = useState(true)
     const [expandedMonth, setExpandedMonth] = useState<string | null>(null)
     const [selectedMonth, setSelectedMonth] = useState<string>('all')
@@ -45,32 +50,34 @@ export default function YatirimGecmisi() {
     const fetchInvestments = async () => {
         setLoading(true)
         const { data, error } = await supabase
-            .from('investments')
-            .select('*')
-            .not('document_url', 'is', null)
-            .order('purchase_date', { ascending: false })
+            .from('investment_transactions')
+            .select(`
+                *,
+                investments (name, asset_type)
+            `)
+            .order('transaction_date', { ascending: false })
 
         if (error) {
-            devError('Yatırımlar çekilirken hata:', error)
+            devError('Yatırım işlemleri çekilirken hata:', error)
             setLoading(false)
             return
         }
 
-        setInvestments(data || [])
+        setTransactions(data || [])
         setLoading(false)
     }
 
     // Ay Listesi (Filtre için)
     const availableMonths = useMemo(() => {
         const months = new Set<string>()
-        investments.forEach(inv => {
-            const dateObj = new Date(inv.purchase_date || new Date().toISOString())
+        transactions.forEach(inv => {
+            const dateObj = new Date(inv.transaction_date || new Date().toISOString())
             const year = dateObj.getFullYear()
             const month = (dateObj.getMonth() + 1).toString().padStart(2, '0')
             months.add(`${year}-${month}`)
         })
         return Array.from(months).sort((a, b) => b.localeCompare(a))
-    }, [investments])
+    }, [transactions])
 
     const formatMonthLabel = (monthKey: string) => {
         const [year, month] = monthKey.split('-')
@@ -81,15 +88,15 @@ export default function YatirimGecmisi() {
 
     // Verileri Hesapla ve Grupla
     const displayData = useMemo(() => {
-        let filtered = [...investments]
+        let filtered = [...transactions]
 
         if (selectedMonth !== 'all') {
-            filtered = filtered.filter(i => (i.purchase_date || '').startsWith(selectedMonth))
+            filtered = filtered.filter(i => (i.transaction_date || '').startsWith(selectedMonth))
         }
 
         const monthMap: Record<string, GroupedMonth> = {}
         filtered.forEach(inv => {
-            const dateObj = new Date(inv.purchase_date || new Date().toISOString())
+            const dateObj = new Date(inv.transaction_date || new Date().toISOString())
             const monthKey = `${dateObj.getFullYear()}-${(dateObj.getMonth() + 1).toString().padStart(2, '0')}`
             
             if (!monthMap[monthKey]) {
@@ -102,74 +109,36 @@ export default function YatirimGecmisi() {
                 }
             }
             monthMap[monthKey].items.push(inv)
-            monthMap[monthKey].totalAmount += (inv.quantity * inv.average_cost)
+            monthMap[monthKey].totalAmount += Number(inv.total_amount)
             monthMap[monthKey].receiptCount += 1
         })
 
         return Object.values(monthMap).sort((a, b) => b.monthKey.localeCompare(a.monthKey))
-    }, [investments, selectedMonth])
+    }, [transactions, selectedMonth])
 
-    const handleDelete = async (id: string, name: string) => {
+    const handleDelete = async (id: string, name: string, amount: number) => {
         const confirmed = await showConfirm(
-            `"${name}" isimli yatırım fişini silmek istediğinize emin misiniz?\n\nBu işlem yatırımı cüzdanınızdan kaldıracak ve ödenen tutarı kasanıza/bankanıza iade edecektir.`,
+            `"${name}" isimli yatırım fişini silmek istediğinize emin misiniz?\\n\\nBu işlem yatırımdan ilgili tutarı cüzdanınızdan düşecek ve ödenen ₺${formatCurrency(amount)} tutarı kasanıza/bankanıza iade edecektir.`,
             'Yatırım Fişini Sil 🗑️'
         )
         if (!confirmed) return
         
         try {
-            // 1. Yatırıma bağlı kasa hareketini bul
-            const { data: movementData, error: movGetError } = await supabase
-                .from('account_movements')
-                .select('*')
-                .eq('source_type', 'investment')
-                .eq('source_id', id)
-                .maybeSingle()
-
-            if (movGetError) {
-                devError('Kasa hareketi aranırken hata oluştu:', movGetError)
-            }
-
-            // 2. Eğer kasa hareketi varsa, kasa/banka bakiyesini geri iade et
-            if (movementData) {
-                const { data: accData, error: accGetError } = await supabase
-                    .from('accounts')
-                    .select('balance, name')
-                    .eq('id', movementData.account_id)
-                    .single()
-
-                if (!accGetError && accData) {
-                    // Yatırım alımı 'cikis' idi, sildiğimiz için bakiyeyi ARTTIRIYORUZ (iade)
-                    const newBalance = Number(accData.balance) + Number(movementData.amount)
-                    
-                    const { error: accUpdError } = await supabase
-                        .from('accounts')
-                        .update({ balance: newBalance })
-                        .eq('id', movementData.account_id)
-
-                    if (accUpdError) throw accUpdError
-
-                    // Kasa hareketini sil
-                    await supabase.from('account_movements').delete().eq('id', movementData.id)
-
-                    // Log activity for refund
-                    await logActivity('Yatırım Fişi', 'GUNCELLEME', `Bakiye İade Edildi: ${accData.name}`, {
-                        detay: `İade Tutarı (₺${movementData.amount}) | Silinen Yatırım (${name})`
-                    })
-                }
-            }
-
-            // 3. Yatırım kaydını sil (DB'de cascade delete olduğu için transactionlar da silinecektir)
-            const { error: delError } = await supabase.from('investments').delete().eq('id', id)
-            if (delError) throw delError
-            
-            // Log activity for delete
-            await logActivity('Yatırım Fişi', 'SILME', `Yatırım Fişi Silindi: ${name}`, {
-                detay: `Silinen Yatırım ID (${id})`
+            const { error: rpcError } = await supabase.rpc('delete_investment_transaction', {
+                p_transaction_id: id
             })
 
-            await showAlert('Yatırım fişi ve ilişkili kasa hareketi başarıyla silindi.', 'success')
+            if (rpcError) throw rpcError;
+
+            // Log activity for delete
+            await logActivity('Yatırım Fişi', 'SILME', `Yatırım İşlemi Silindi: ${name}`, {
+                detay: `Silinen İşlem ID (${id}) | İade Edilen Tutar (₺${amount})`
+            })
+
+            await showAlert('Yatırım işlemi başarıyla silindi ve iade gerçekleştirildi.', 'success')
             fetchInvestments()
         } catch (error: any) {
+            devError('Silme işlemi başarısız oldu:', error)
             await showAlert('Silme işlemi başarısız oldu: ' + error.message, 'error')
         }
     }
@@ -264,12 +233,12 @@ export default function YatirimGecmisi() {
                                                     <div key={inv.id} className="bg-stone-900 border border-stone-800 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                                         <div className="flex items-center gap-3">
                                                             <div className="text-3xl">
-                                                                {inv.asset_type === 'doviz' ? '💵' : inv.asset_type === 'altin' ? '🪙' : '🏢'}
+                                                                {inv.investments?.asset_type === 'eur' || inv.investments?.asset_type === 'usd' ? '💵' : inv.investments?.asset_type === 'gold' ? '🪙' : '🏢'}
                                                             </div>
                                                             <div>
-                                                                <h4 className="font-bold text-white">{inv.name}</h4>
+                                                                <h4 className="font-bold text-white">{inv.investments?.name || 'Yatırım'}</h4>
                                                                 <p className="text-stone-400 text-sm">
-                                                                    {formatDate(new Date(inv.purchase_date))} • {inv.quantity} {inv.asset_type === 'altin' ? 'Gram' : inv.asset_type === 'doviz' ? 'Adet/Birim' : 'Adet'}
+                                                                    {formatDate(new Date(inv.transaction_date || new Date().toISOString()))} • {inv.quantity} {inv.investments?.asset_type === 'gold' ? 'Gram' : inv.investments?.asset_type === 'real_estate' ? 'Adet' : 'Birim'}
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -277,11 +246,11 @@ export default function YatirimGecmisi() {
                                                         <div className="flex flex-wrap items-center gap-6">
                                                             <div className="text-right">
                                                                 <p className="text-stone-500 text-xs">Birim Maliyet</p>
-                                                                <p className="font-medium text-stone-300">{formatCurrency(Number(inv.average_cost))}</p>
+                                                                <p className="font-medium text-stone-300">{formatCurrency(Number(inv.price_per_unit))}</p>
                                                             </div>
                                                             <div className="text-right">
                                                                 <p className="text-stone-500 text-xs">Toplam Tutar</p>
-                                                                <p className="font-bold text-purple-400">{formatCurrency((inv.quantity * inv.average_cost))}</p>
+                                                                <p className="font-bold text-purple-400">{formatCurrency(Number(inv.total_amount))}</p>
                                                             </div>
                                                             
                                                             {inv.document_url && (
@@ -294,7 +263,7 @@ export default function YatirimGecmisi() {
                                                             )}
                                                             
                                                             <button 
-                                                                onClick={(e) => { e.stopPropagation(); handleDelete(inv.id, inv.name); }}
+                                                                onClick={(e) => { e.stopPropagation(); handleDelete(inv.id, inv.investments?.name || 'Yatırım İşlemi', Number(inv.total_amount)); }}
                                                                 className="text-red-400 hover:text-red-300 bg-red-400/10 hover:bg-red-400/20 px-3 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors border border-red-400/20"
                                                                 title="Sil"
                                                             >
