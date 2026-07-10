@@ -40,7 +40,7 @@ BEGIN
         -- Bu işleme bağlı bir kasa hareketi var mı bul ve sil
         FOR v_mov IN 
             DELETE FROM account_movements 
-            WHERE source_type = 'supplier_payment' AND source_id = p_transaction_id 
+            WHERE source_type = 'supplier_payment' AND source_id = p_transaction_id::text 
             RETURNING account_id, amount, movement_type
         LOOP
             -- Eğer kasadan çıkış yapılmışsa, iptal edildiği için kasaya GERİ EKLE

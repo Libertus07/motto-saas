@@ -38,7 +38,7 @@ BEGIN
             p_amount, 
             p_supplier_name || ' firmasına ödeme yapıldı.', 
             'supplier_payment', 
-            v_transaction_id
+            v_transaction_id::text
         );
 
         -- Kasa bakiyesini güncelle

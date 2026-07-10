@@ -190,8 +190,9 @@ export default function Tedarikciler() {
             
             logActivity('Tedarikçi', 'EKLEME', `${selectedSupplier.name} firmasına ${amount} TL ödeme eklendi.`, { amount, note: paymentNote })
             await showAlert('Ödeme başarıyla kaydedildi!', 'success')
-        } catch (error) {
-            await showAlert('Hata oluştu', 'error')
+        } catch (error: any) {
+            console.error("Ödeme ekleme hatası:", error);
+            await showAlert('Hata oluştu: ' + (error.message || 'Bilinmeyen hata'), 'error')
         }
     }
 
