@@ -7,6 +7,7 @@ import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
 import { formatCurrency, formatDate } from "@/lib/format";
+import { deleteInvestmentTransactionWithRefund } from '@/lib/investment-transactions'
 
 type InvestmentTransaction = {
     id: string
@@ -124,15 +125,11 @@ export default function YatirimGecmisi() {
         if (!confirmed) return
         
         try {
-            const { error: rpcError } = await supabase.rpc('delete_investment_transaction', {
-                p_transaction_id: id
-            })
-
-            if (rpcError) throw rpcError;
+            const result = await deleteInvestmentTransactionWithRefund(supabase, id)
 
             // Log activity for delete
             await logActivity('Yatırım Fişi', 'SILME', `Yatırım İşlemi Silindi: ${name}`, {
-                detay: `Silinen İşlem ID (${id}) | İade Edilen Tutar (₺${amount})`
+                detay: `Silinen İşlem ID (${id}) | İade Edilen Tutar (₺${Math.abs(result.refundedAmount || amount)})`
             })
 
             await showAlert('Yatırım işlemi başarıyla silindi ve iade gerçekleştirildi.', 'success')
@@ -262,13 +259,15 @@ export default function YatirimGecmisi() {
                                                                 </button>
                                                             )}
                                                             
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); handleDelete(inv.id, inv.investments?.name || 'Yatırım İşlemi', Number(inv.total_amount)); }}
-                                                                className="text-red-400 hover:text-red-300 bg-red-400/10 hover:bg-red-400/20 px-3 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors border border-red-400/20"
-                                                                title="Sil"
-                                                            >
-                                                                🗑️ Sil
-                                                            </button>
+                                                            {inv.transaction_type === 'buy' && (
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); handleDelete(inv.id, inv.investments?.name || 'Yatırım İşlemi', Number(inv.total_amount)); }}
+                                                                    className="text-red-400 hover:text-red-300 bg-red-400/10 hover:bg-red-400/20 px-3 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors border border-red-400/20"
+                                                                    title="Sil"
+                                                                >
+                                                                    🗑️ Sil
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ))}

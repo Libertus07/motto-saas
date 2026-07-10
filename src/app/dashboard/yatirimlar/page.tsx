@@ -8,6 +8,7 @@ import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
 import { Investment, InvestmentTransaction } from '@/types/database';
 import { formatCurrency, formatDate } from "@/lib/format";
+import { deleteInvestmentTransactionWithRefund } from '@/lib/investment-transactions'
 
 type Account = {
     id: string
@@ -392,48 +393,38 @@ export default function YatirimlarPage() {
         if (!confirmed) return
         setLoading(true)
         try {
-            // 1. Yatırıma bağlı tüm kasa hareketlerini (account_movements) bul
-            const { data: movements, error: movGetError } = await supabase
-                .from('account_movements')
-                .select('*')
-                .eq('source_type', 'investment')
-                .eq('source_id', id)
-            
-            if (movGetError) {
-                devError("Kasa hareketleri bulunamadı:", movGetError)
+            const buyTransactions = transactions.filter(
+                tx => tx.investment_id === id && tx.transaction_type === 'buy'
+            )
+
+            if (buyTransactions.length === 0) {
+                throw new Error('Bu yatırıma bağlı alım işlemi bulunamadı.')
             }
 
-            // 2. Her bir kasa hareketi için bakiye iadesi yap
-            if (movements && movements.length > 0) {
-                for (const mov of movements) {
-                    const { data: accData } = await supabase
-                        .from('accounts')
-                        .select('balance')
-                        .eq('id', mov.account_id)
-                        .single()
-                    
-                    if (accData) {
-                        // Alım çıkış hareketiydi, iade için bakiyeyi arttırıyoruz
-                        const newBalance = Number(accData.balance) + Number(mov.amount)
-                        await supabase
-                            .from('accounts')
-                            .update({ balance: newBalance })
-                            .eq('id', mov.account_id)
-                    }
-                    
-                    // Kasa hareketini sil
-                    await supabase.from('account_movements').delete().eq('id', mov.id)
-                }
-            }
-
-            // 3. Yatırımı sil
-            const invToDelete = investments.find(i => i.id === id)
-            const { error: delError } = await supabase.from('investments').delete().eq('id', id)
-            if (delError) throw delError
-            
             let totalRefunded = 0
-            if (movements && movements.length > 0) {
-                totalRefunded = movements.reduce((acc, mov) => acc + Number(mov.amount), 0)
+
+            for (const transaction of buyTransactions) {
+                const result = await deleteInvestmentTransactionWithRefund(supabase, transaction.id)
+                totalRefunded += result.refundedAmount
+            }
+
+            // 3. Yatırım artık silinmediyse veri tutarlılığı için kaldırmayı dene.
+            const invToDelete = investments.find(i => i.id === id)
+            const { data: remainingInvestment, error: remainingInvestmentError } = await supabase
+                .from('investments')
+                .select('id')
+                .eq('id', id)
+                .maybeSingle()
+
+            if (remainingInvestmentError) throw remainingInvestmentError
+
+            if (remainingInvestment) {
+                const { error: deleteInvestmentError } = await supabase
+                    .from('investments')
+                    .delete()
+                    .eq('id', id)
+
+                if (deleteInvestmentError) throw deleteInvestmentError
             }
 
             if (invToDelete) {

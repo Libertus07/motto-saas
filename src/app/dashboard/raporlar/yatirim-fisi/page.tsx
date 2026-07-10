@@ -128,50 +128,23 @@ export default function YatirimFisiYukle() {
             const acc = accounts.find(a => a.id === selectedAccount)
             if (!acc) throw new Error("Hesap bulunamadı")
 
-            // 1. Yeni yatırım kaydı oluştur
-            const { data: invData, error: invError } = await supabase.from('investments').insert({
-                asset_type: parsedData.asset_type,
-                name: parsedData.name || `${parsedData.quantity} Birim ${parsedData.asset_type.toUpperCase()}`,
-                quantity: parsedData.quantity,
-                average_cost: parsedData.price_per_unit,
-                current_manual_value: parsedData.price_per_unit,
-                purchase_date: parsedData.purchase_date,
-                notes: parsedData.notes,
-                document_url: imageUrl // Eğer base64 değilse veya storage'a atılırsa buraya url gelir. Şimdilik metin veya base64 duruyor.
-            }).select('id').single()
+            const investmentName = parsedData.name || `${parsedData.quantity} Birim ${parsedData.asset_type.toUpperCase()}`
 
-            if (invError) throw invError
-            const invId = invData.id
-
-            // 2. Yatırım transaction kaydı
-            const { error: txnError } = await supabase.from('investment_transactions').insert({
-                investment_id: invId,
-                transaction_type: 'buy',
-                quantity: parsedData.quantity,
-                price_per_unit: parsedData.price_per_unit,
-                total_amount: parsedData.total_amount,
-                transaction_date: parsedData.purchase_date,
-                account_id: selectedAccount
+            const { error: rpcError } = await supabase.rpc('buy_investment_transaction', {
+                p_asset_type: parsedData.asset_type,
+                p_name: investmentName,
+                p_quantity: parsedData.quantity,
+                p_price: parsedData.price_per_unit,
+                p_account_id: selectedAccount,
+                p_notes: parsedData.notes || null,
+                p_purchase_date: parsedData.purchase_date,
+                p_document_url: imageUrl || null
             })
-            if (txnError) throw txnError
 
-            // 3. Hesap bakiyesini düş ve Account Movement oluştur
-            const { error: movError } = await supabase.from('account_movements').insert({
-                account_id: selectedAccount,
-                movement_type: 'cikis',
-                amount: parsedData.total_amount,
-                description: `${parsedData.name || 'Yatırım'} Alımı (${parsedData.quantity}x${parsedData.price_per_unit})`,
-                source_type: 'investment',
-                source_id: invId
-            })
-            if (movError) throw movError
-
-            await supabase.from('accounts').update({
-                balance: Number(acc.balance) - Number(parsedData.total_amount)
-            }).eq('id', selectedAccount)
+            if (rpcError) throw rpcError
 
             // 4. Log
-            await logActivity('Yatırım Fişi', 'EKLEME', `Yatırım eklendi: ${parsedData.name || parsedData.asset_type}`, {
+            await logActivity('Yatırım Fişi', 'EKLEME', `Yatırım eklendi: ${investmentName}`, {
                 detay: `Tutar (₺${parsedData.total_amount}) | Ödenen Hesap (${acc.name})`
             })
 

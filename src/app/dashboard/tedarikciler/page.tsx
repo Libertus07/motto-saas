@@ -25,6 +25,7 @@ type Transaction = {
     transaction_type: 'invoice' | 'payment'
     note: string
     created_at: string
+    batch_id?: string | null
 }
 
 type SupplierMovement = {
@@ -214,6 +215,9 @@ export default function Tedarikciler() {
         let confirmMessage = `Emin misiniz?\n\n${formatDate(trx.transaction_date)} tarihli ve ${formatCurrency(trx.amount)} tutarındaki bu `;
         if (trx.transaction_type === 'invoice') {
             confirmMessage += `fatura işlemi silindiğinde:\n- ${selectedSupplier.name} bakiyesinden bu borç tutarı SİLİNECEK.`;
+            if (trx.batch_id) {
+                confirmMessage += `\n- Bu fişe bağlı stok girişleri de GERİ ALINACAK.`;
+            }
         } else {
             confirmMessage += `ödeme işlemi silindiğinde:\n- ${selectedSupplier.name} bakiyesine bu borç tutarı EKLENECEK.`;
             if (accountName) {
@@ -228,26 +232,39 @@ export default function Tedarikciler() {
         if (!confirmed) return;
 
         try {
-            const { error: rpcError } = await supabase.rpc('delete_supplier_transaction', {
-                p_transaction_id: trx.id
-            });
-            if (rpcError) throw rpcError;
+            if (trx.transaction_type === 'invoice' && trx.batch_id) {
+                const response = await fetch('/api/delete-receipt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ batch_id: trx.batch_id })
+                })
 
-            let debtChange = 0;
-            if (trx.transaction_type === 'invoice') debtChange = -trx.amount;
-            if (trx.transaction_type === 'payment') debtChange = trx.amount;
+                const data = await response.json()
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || 'Fiş silme işlemi başarısız oldu.')
+                }
+            } else {
+                const { error: rpcError } = await supabase.rpc('delete_supplier_transaction', {
+                    p_transaction_id: trx.id
+                })
+                if (rpcError) throw rpcError
+            }
 
-            const currentDebt = parseFloat((selectedSupplier.total_debt || 0).toString());
-            const newDebt = currentDebt + debtChange;
+            let debtChange = 0
+            if (trx.transaction_type === 'invoice') debtChange = -trx.amount
+            if (trx.transaction_type === 'payment') debtChange = trx.amount
+
+            const currentDebt = parseFloat((selectedSupplier.total_debt || 0).toString())
+            const newDebt = currentDebt + debtChange
 
             // 3. Ekranı Yenile
-            fetchSuppliers();
-            viewTransactions({ ...selectedSupplier, total_debt: newDebt });
+            fetchSuppliers()
+            viewTransactions({ ...selectedSupplier, total_debt: newDebt })
             
             logActivity('Tedarikçi', 'SILME', `${selectedSupplier.name} firmasına ait ${trx.amount} TL tutarındaki cari işlem silindi.`, { transaction: trx })
-            await showAlert('İşlem silindi ve bakiye güncellendi!', 'success');
-        } catch (error) {
-            await showAlert('Silme işlemi başarısız oldu.', 'error');
+            await showAlert('İşlem silindi ve bakiye güncellendi!', 'success')
+        } catch (error: any) {
+            await showAlert('Silme işlemi başarısız oldu: ' + (error.message || 'Bilinmeyen hata'), 'error')
         }
     }
 
