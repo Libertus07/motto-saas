@@ -55,6 +55,7 @@ export default function Stok() {
     const [movementStartDate, setMovementStartDate] = useState('')
     const [movementEndDate, setMovementEndDate] = useState('')
     const [movementPage, setMovementPage] = useState(1)
+    const [movementExpandedDates, setMovementExpandedDates] = useState<string[]>(['Bugün'])
     const [zayiDateFilter, setZayiDateFilter] = useState<'bugun' | 'bu_hafta' | 'bu_ay' | 'tumu'>('bu_ay')
     const [zayiSortBy, setZayiSortBy] = useState<'tarih_yeni' | 'tarih_eski' | 'tutar_yuksek' | 'tutar_dusuk'>('tarih_yeni')
     const [zayiSearchTerm, setZayiSearchTerm] = useState('')
@@ -373,6 +374,50 @@ export default function Stok() {
     const totalMovementPages = Math.max(1, Math.ceil(filteredMovementRows.length / movementPageSize))
     const safeMovementPage = Math.min(movementPage, totalMovementPages)
     const paginatedMovements = filteredMovementRows.slice((safeMovementPage - 1) * movementPageSize, safeMovementPage * movementPageSize)
+    const groupedMovementRows = useMemo(() => {
+        const groups: Array<{ dateKey: string; items: Movement[] }> = []
+        const todayDateObj = new Date()
+        const yesterday = new Date(todayDateObj)
+        yesterday.setDate(yesterday.getDate() - 1)
+
+        paginatedMovements.forEach((mov) => {
+            const date = new Date(mov.created_at)
+            let dateKey = formatDate(date)
+
+            if (date.toDateString() === todayDateObj.toDateString()) {
+                dateKey = 'Bugün'
+            } else if (date.toDateString() === yesterday.toDateString()) {
+                dateKey = 'Dün'
+            }
+
+            const existingGroup = groups.find((group) => group.dateKey === dateKey)
+            if (existingGroup) {
+                existingGroup.items.push(mov)
+            } else {
+                groups.push({ dateKey, items: [mov] })
+            }
+        })
+
+        return groups
+    }, [paginatedMovements])
+
+    useEffect(() => {
+        if (groupedMovementRows.length === 0) {
+            setMovementExpandedDates([])
+            return
+        }
+
+        const visibleDateKeys = groupedMovementRows.map(group => group.dateKey)
+        setMovementExpandedDates(prev => {
+            const preserved = prev.filter(dateKey => visibleDateKeys.includes(dateKey))
+            return preserved.length > 0 ? preserved : [visibleDateKeys[0]]
+        })
+    }, [groupedMovementRows])
+
+    const toggleMovementDate = (dateKey: string) => {
+        setMovementExpandedDates(prev => prev.includes(dateKey) ? prev.filter(d => d !== dateKey) : [...prev, dateKey])
+    }
+
     const activeMovementFilters = useMemo(() => {
         const filters: string[] = []
 
@@ -895,53 +940,81 @@ export default function Stok() {
                                     </div>
                                 </div>
 
-                                <div className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
-                                    <div className="overflow-x-auto w-full">
-<table className="w-full">
-                                    <thead>
-                                        <tr className="border-b border-stone-800">
-                                            <th className="text-left px-4 py-3 text-stone-400 text-sm">Tarih</th>
-                                            <th className="text-left px-4 py-3 text-stone-400 text-sm">Hammadde</th>
-                                            <th className="text-left px-4 py-3 text-stone-400 text-sm">Tür</th>
-                                            <th className="text-right px-4 py-3 text-stone-400 text-sm">Miktar</th>
-                                            <th className="text-left px-4 py-3 text-stone-400 text-sm">Not</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredMovementRows.length === 0 ? (
-                                            <tr><td colSpan={5} className="text-center py-8 text-stone-500">Seçili filtrelere uygun hareket bulunamadı.</td></tr>
-                                        ) : paginatedMovements.map(mov => {
-                                            const typeConfig = {
-                                                giris: { label: 'Giriş', color: 'text-green-400' },
-                                                cikis: { label: 'Çıkış', color: 'text-red-400' },
-                                                fire: { label: 'Fire', color: 'text-orange-400' },
-                                                sayim: { label: 'Sayım', color: 'text-blue-400' }
-                                            }[mov.movement_type] || { label: mov.movement_type, color: 'text-stone-400' }
+                                <div className="space-y-3">
+                                    {filteredMovementRows.length === 0 ? (
+                                        <div className="bg-stone-900 rounded-xl border border-stone-800 p-8 text-center text-stone-500">
+                                            Seçili filtrelere uygun hareket bulunamadı.
+                                        </div>
+                                    ) : (
+                                        groupedMovementRows.map(({ dateKey, items }) => {
+                                            const isExpanded = movementExpandedDates.includes(dateKey)
 
                                             return (
-                                                <tr key={mov.id} className="border-b border-stone-800 hover:bg-stone-800 transition-colors">
-                                                    <td className="px-4 py-3 text-stone-400 text-sm">
-                                                        {formatDate(new Date(mov.created_at))}
-                                                    </td>
-                                                    <td className="px-4 py-3 font-medium">
-                                                        {mov.materials?.name}
-                                                    </td>
-                                                    <td className={`px-4 py-3 text-sm font-bold ${typeConfig.color}`}>
-                                                        {typeConfig.label}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right">
-                                                        {mov.quantity} {mov.materials?.unit}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-stone-400 text-sm">{mov.note}</td>
-                                                </tr>
+                                                <div key={dateKey} className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
+                                                    <button
+                                                        onClick={() => toggleMovementDate(dateKey)}
+                                                        className="w-full flex items-center justify-between px-6 py-4 bg-stone-800/30 hover:bg-stone-800/50 transition-colors"
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-lg">{dateKey === 'Bugün' ? '📅' : dateKey === 'Dün' ? '⏱️' : '🗓️'}</span>
+                                                            <h3 className="font-bold text-stone-200">{dateKey}</h3>
+                                                            <span className="bg-stone-800 text-xs px-2 py-1 rounded-full text-stone-400 border border-stone-700">{items.length} hareket</span>
+                                                        </div>
+                                                        <span className="text-stone-500 text-sm font-bold bg-stone-800 w-8 h-8 flex items-center justify-center rounded-lg">{isExpanded ? '▲' : '▼'}</span>
+                                                    </button>
+
+                                                    {isExpanded && (
+                                                        <div className="overflow-x-auto border-t border-stone-800">
+                                                            <div className="overflow-x-auto w-full">
+<table className="w-full">
+                                                                <thead>
+                                                                    <tr className="border-b border-stone-800 bg-stone-800/20">
+                                                                        <th className="text-left px-4 py-3 text-stone-400 text-sm">Saat</th>
+                                                                        <th className="text-left px-4 py-3 text-stone-400 text-sm">Hammadde</th>
+                                                                        <th className="text-left px-4 py-3 text-stone-400 text-sm">Tür</th>
+                                                                        <th className="text-right px-4 py-3 text-stone-400 text-sm">Miktar</th>
+                                                                        <th className="text-left px-4 py-3 text-stone-400 text-sm">Not</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {items.map(mov => {
+                                                                        const typeConfig = {
+                                                                            giris: { label: 'Giriş', color: 'text-green-400' },
+                                                                            cikis: { label: 'Çıkış', color: 'text-red-400' },
+                                                                            fire: { label: 'Fire', color: 'text-orange-400' },
+                                                                            sayim: { label: 'Sayım', color: 'text-blue-400' }
+                                                                        }[mov.movement_type] || { label: mov.movement_type, color: 'text-stone-400' }
+
+                                                                        return (
+                                                                            <tr key={mov.id} className="border-b border-stone-800 hover:bg-stone-800 transition-colors">
+                                                                                <td className="px-4 py-3 text-stone-400 text-sm whitespace-nowrap">
+                                                                                    {new Date(mov.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                                                                </td>
+                                                                                <td className="px-4 py-3 font-medium">
+                                                                                    {mov.materials?.name}
+                                                                                </td>
+                                                                                <td className={`px-4 py-3 text-sm font-bold ${typeConfig.color}`}>
+                                                                                    {typeConfig.label}
+                                                                                </td>
+                                                                                <td className="px-4 py-3 text-right">
+                                                                                    {mov.quantity} {mov.materials?.unit}
+                                                                                </td>
+                                                                                <td className="px-4 py-3 text-stone-400 text-sm">{mov.note}</td>
+                                                                            </tr>
+                                                                        )
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )
-                                        })}
-                                    </tbody>
-                                </table>
-                                    </div>
+                                        })
+                                    )}
 
                                     {filteredMovementRows.length > 0 && (
-                                        <div className="border-t border-stone-800 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-stone-900/80">
+                                        <div className="bg-stone-900 rounded-xl border border-stone-800 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                             <div className="text-sm text-stone-400">
                                                 {((safeMovementPage - 1) * movementPageSize) + 1} - {Math.min(safeMovementPage * movementPageSize, filteredMovementRows.length)} / {filteredMovementRows.length} kayıt gösteriliyor
                                             </div>
