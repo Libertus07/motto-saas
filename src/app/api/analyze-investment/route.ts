@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
+import { devLog, devError } from '@/lib/debug';
 
 function isSafeImageUrl(url: string): boolean {
     try {
@@ -107,7 +108,7 @@ Yanıtı SADECE aşağıdaki formatta saf JSON olarak dön (markdown kullanma):
         return NextResponse.json(parsed);
 
     } catch (error: unknown) {
-        console.error('Investment receipt parsing error:', error);
+        devError('Investment receipt parsing error:', error);
         const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
         return NextResponse.json({ error: 'Yapay zeka analiz yaparken bir hata oluştu: ' + message }, { status: 500 });
     }

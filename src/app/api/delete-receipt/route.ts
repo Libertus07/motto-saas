@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/lib/supabase-server'
+import { devLog, devError } from '@/lib/debug';
 
 export async function POST(req: Request) {
     try {
@@ -97,7 +98,7 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ success: true })
     } catch (error: unknown) {
-        console.error('Delete Receipt Error:', error)
+        devError('Delete Receipt Error:', error)
         const message = error instanceof Error ? error.message : 'Silme işlemi başarısız'
         return NextResponse.json({ error: message }, { status: 500 })
     }

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
+import { devLog, devError } from '@/lib/debug';
 
 type ParsedItem = {
     name: string
@@ -272,7 +273,7 @@ export default function FisYukle() {
                 }).select().single()
                 
                 if (insertError) {
-                    console.error("Yeni tedarikçi eklenirken hata oluştu:", insertError)
+                    devError("Yeni tedarikçi eklenirken hata oluştu:", insertError)
                 }
                 
                 if (newSup) globalSupplierId = newSup.id
@@ -292,7 +293,7 @@ export default function FisYukle() {
                     note: 'Sistemden Fiş Yükleme (Otomatik Borç)',
                     user_id: user?.id
                 })
-                if (txErr1) console.error("Fatura borcu eklenemedi:", txErr1)
+                if (txErr1) devError("Fatura borcu eklenemedi:", txErr1)
 
                 // Ödenen kısmı payment olarak ekle
                 if (paid > 0) {
@@ -305,7 +306,7 @@ export default function FisYukle() {
                         note: 'Fiş Yükleme Anında Ödeme',
                         user_id: user?.id
                     })
-                    if (txErr2) console.error("Fatura ödemesi eklenemedi:", txErr2)
+                    if (txErr2) devError("Fatura ödemesi eklenemedi:", txErr2)
                 }
 
                 const netDebtIncrease = totalInvoice - paid
@@ -414,7 +415,7 @@ export default function FisYukle() {
                             source: 'receipt_upload'
                         })
                     } else if (insertError) {
-                        console.error("Hammadde eklenirken hata:", insertError.message || JSON.stringify(insertError), "Payload:", insertPayload);
+                        devError("Hammadde eklenirken hata:", insertError.message || JSON.stringify(insertError), "Payload:", insertPayload);
                     }
                 }
             }
@@ -436,7 +437,7 @@ export default function FisYukle() {
                 })
                 
                 if (smError) {
-                    console.error('Stok hareketi eklenirken hata:', smError)
+                    devError('Stok hareketi eklenirken hata:', smError)
                 }
             }
         }

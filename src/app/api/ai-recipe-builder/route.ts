@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
+import { devLog, devError } from '@/lib/debug';
 
 export async function POST(req: Request) {
     try {
@@ -67,7 +68,7 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra markdown (\`\`\`json v
         return NextResponse.json(parsed);
 
     } catch (error: unknown) {
-        console.error('AI Recipe Builder error:', error);
+        devError('AI Recipe Builder error:', error);
         const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
         return NextResponse.json({ error: 'Yapay zeka reçete oluştururken bir hata oluştu: ' + message }, { status: 500 });
     }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { devLog, devError } from '@/lib/debug';
 
 // String formatındaki Türk lirası tutarını (örn: 6.180,61) Float'a çevirir
 const parseTRNumber = (val: string | undefined, fallback: number) => {
@@ -38,7 +39,7 @@ export async function GET() {
         return NextResponse.json({ success: true, rates })
 
     } catch (error: any) {
-        console.error('Exchange rates fetch error:', error)
+        devError('Exchange rates fetch error:', error)
         return NextResponse.json({ 
             success: true, 
             rates: { usd: 33.0, eur: 35.5, gold: 2450.0 }, 

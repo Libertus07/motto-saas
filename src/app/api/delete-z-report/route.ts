@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/lib/supabase-server'
+import { devLog, devError } from '@/lib/debug';
 
 export async function POST(req: Request) {
     try {
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ success: true })
     } catch (error: unknown) {
-        console.error('Delete Z-Report Error:', error)
+        devError('Delete Z-Report Error:', error)
         const message = error instanceof Error ? error.message : 'Silme işlemi başarısız'
         return NextResponse.json({ error: message }, { status: 500 })
     }

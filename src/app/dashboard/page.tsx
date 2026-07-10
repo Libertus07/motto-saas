@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { devLog, devError } from '@/lib/debug';
 
 export default function Dashboard() {
   const router = useRouter()
@@ -55,7 +56,7 @@ export default function Dashboard() {
       const res = await fetch('/api/exchange-rates')
       const data = await res.json()
       if (data.success) rates = data.rates
-    } catch (e) { console.error('Kurlar çekilemedi', e) }
+    } catch (e) { devError('Kurlar çekilemedi', e) }
 
     const criticalItems = (materials || []).filter(
       i => (i.stock_quantity || 0) <= (i.critical_stock_level || 0) && (i.critical_stock_level || 0) > 0

@@ -1,4 +1,5 @@
 import { createClient } from './supabase'
+import { devLog, devError } from '@/lib/debug';
 
 export type LogAction = 'EKLEME' | 'SILME' | 'GUNCELLEME'
 
@@ -23,7 +24,7 @@ export async function logActivity(
             const data = await res.json()
             ipAddress = data.ip
         } catch (e) {
-            console.error("IP alinmadi")
+            devError("IP alinmadi")
         }
 
         const enrichedDetails = {
@@ -43,9 +44,9 @@ export async function logActivity(
         })
         
         if (error) {
-            console.error('Loglama tablosuna eklenemedi:', JSON.stringify(error, null, 2))
+            devError('Loglama tablosuna eklenemedi:', JSON.stringify(error, null, 2))
         }
     } catch (error: any) {
-        console.error('Loglama kritik hatası:', error?.message || error)
+        devError('Loglama kritik hatası:', error?.message || error)
     }
 }

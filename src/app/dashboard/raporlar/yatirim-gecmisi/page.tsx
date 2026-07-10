@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { devLog, devError } from '@/lib/debug';
 
 type Investment = {
     id: string
@@ -49,7 +50,7 @@ export default function YatirimGecmisi() {
             .order('purchase_date', { ascending: false })
 
         if (error) {
-            console.error('Yatırımlar çekilirken hata:', error)
+            devError('Yatırımlar çekilirken hata:', error)
             setLoading(false)
             return
         }
@@ -124,7 +125,7 @@ export default function YatirimGecmisi() {
                 .maybeSingle()
 
             if (movGetError) {
-                console.error('Kasa hareketi aranırken hata oluştu:', movGetError)
+                devError('Kasa hareketi aranırken hata oluştu:', movGetError)
             }
 
             // 2. Eğer kasa hareketi varsa, kasa/banka bakiyesini geri iade et

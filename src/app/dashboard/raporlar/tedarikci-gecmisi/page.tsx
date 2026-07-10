@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { devLog, devError } from '@/lib/debug';
 
 type StockMovement = {
     id: string
@@ -97,7 +98,7 @@ export default function TedarikciGecmisi() {
             .order('created_at', { ascending: false })
 
         if (error) {
-            console.error('Fişler çekilirken hata:', error)
+            devError('Fişler çekilirken hata:', error)
             setLoading(false)
             return
         }

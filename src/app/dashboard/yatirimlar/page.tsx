@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { devLog, devError } from '@/lib/debug';
 
 type Account = {
     id: string
@@ -121,7 +122,7 @@ export default function YatirimlarPage() {
                 setRates(data.rates)
             }
         } catch (error) {
-            console.error('Kurlar çekilemedi', error)
+            devError('Kurlar çekilemedi', error)
         }
     }
 
@@ -465,7 +466,7 @@ export default function YatirimlarPage() {
                 .eq('source_id', id)
             
             if (movGetError) {
-                console.error("Kasa hareketleri bulunamadı:", movGetError)
+                devError("Kasa hareketleri bulunamadı:", movGetError)
             }
 
             // 2. Her bir kasa hareketi için bakiye iadesi yap

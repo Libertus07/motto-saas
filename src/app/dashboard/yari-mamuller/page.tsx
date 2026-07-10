@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { devLog, devError } from '@/lib/debug';
 
 type Material = {
   id: string
@@ -122,7 +123,7 @@ export default function YariMamuller() {
     } else {
       details = `Verim: ${payload.yield_quantity} ${payload.yield_unit}, Fire: %${payload.wastage_percent}`
       const { data, error } = await supabase.from('sub_recipes').insert(payload).select().single()
-      if (error) { console.error(error); return }
+      if (error) { devError(error); return }
       recipeId = data?.id
     }
     if (recipeId && ingredients.length > 0) {

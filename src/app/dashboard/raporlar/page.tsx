@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useNotification } from '@/components/NotificationProvider'
+import { devLog, devError } from '@/lib/debug';
 
 type Product = {
     id: string
@@ -86,7 +87,7 @@ export default function Raporlar() {
                 setAiModalOpen(false)
             }
         } catch (e) {
-            console.error(e)
+            devError(e)
             await showAlert('Yapay zeka ile bağlantı kurulamadı.', 'error')
             setAiModalOpen(false)
         }

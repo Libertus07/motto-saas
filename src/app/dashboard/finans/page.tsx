@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { devLog, devError } from '@/lib/debug';
 
 type Account = {
     id: string
@@ -59,7 +60,7 @@ export default function FinansPage() {
         setLoading(true)
         const { data, error } = await supabase.from('accounts').select('*').order('created_at', { ascending: true })
         if (error) {
-            console.error('Hesaplar çekilemedi', error)
+            devError('Hesaplar çekilemedi', error)
         } else {
             setAccounts(data || [])
             if (data && data.length > 0 && !selectedAccount) {
@@ -77,7 +78,7 @@ export default function FinansPage() {
             .order('created_at', { ascending: false })
             
         if (error) {
-            console.error('Hareketler çekilemedi', error)
+            devError('Hareketler çekilemedi', error)
         } else {
             setMovements(data || [])
         }

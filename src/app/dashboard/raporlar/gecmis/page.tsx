@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { devLog, devError } from '@/lib/debug';
 
 type SaleItem = {
     id: string
@@ -70,7 +71,7 @@ export default function GecmisRaporlar() {
             .order('sale_date', { ascending: false })
 
         if (error) {
-            console.error('Satışlar çekilirken hata:', error)
+            devError('Satışlar çekilirken hata:', error)
             setLoading(false)
             return
         }

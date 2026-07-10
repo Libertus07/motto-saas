@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
+import { devLog, devError } from '@/lib/debug';
 
 export async function POST(req: Request) {
     try {
@@ -62,7 +63,7 @@ Yanıtı SADECE şu JSON formatında ver:
         return NextResponse.json({ suggestions });
 
     } catch (error: unknown) {
-        console.error('Auto-categorize error:', error);
+        devError('Auto-categorize error:', error);
         const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
         return NextResponse.json({ error: message }, { status: 500 });
     }
