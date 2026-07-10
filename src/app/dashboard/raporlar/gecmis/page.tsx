@@ -196,7 +196,7 @@ export default function GecmisRaporlar() {
         }
 
         const confirmed = await showConfirm(
-            `Emin misiniz?\n\n${group.date} tarihli bu rapor silindiğinde:\n- Satışlar silinecek.\n- Düşülen hammadde stokları geri eklenecek.\n\nBu işlem geri alınamaz!`,
+            `Emin misiniz?\n\n${formatDate(group.date)} tarihli bu rapor silindiğinde:\n- Satışlar silinecek.\n- Düşülen hammadde stokları geri eklenecek.\n\nBu işlem geri alınamaz!`,
             'Z-Raporunu Sil 🗑'
         )
         if (!confirmed) return
@@ -212,7 +212,7 @@ export default function GecmisRaporlar() {
             const data = await res.json()
             if (data.error) throw new Error(data.error)
             
-            logActivity('Z-Raporu', 'SILME', `${group.date} tarihli Z-Raporu silindi ve içerisindeki ${group.totalItems} kalem ürünün stokları geri yüklendi.`, { batchId: group.batchId })
+            logActivity('Z-Raporu', 'SILME', `${formatDate(group.date)} tarihli Z-Raporu silindi ve içerisindeki ${group.totalItems} kalem ürünün stokları geri yüklendi.`, { batchId: group.batchId })
             
             await showAlert('Z-Raporu başarıyla silindi ve stoklar geri alındı.', 'success')
             fetchSales()
