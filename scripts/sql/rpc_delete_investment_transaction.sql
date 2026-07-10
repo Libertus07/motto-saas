@@ -32,7 +32,25 @@ BEGIN
     -- 2. Cüzdanı (investments) bul
     SELECT * INTO v_inv FROM investments WHERE id = v_tx.investment_id;
 
-    -- 3. Cüzdan Güncellemesi (Rollback)
+    -- 3. Kasa İadesi (Önce Kasa Hareketlerini sil ve iade et)
+    FOR v_mov IN 
+        DELETE FROM account_movements 
+        WHERE source_type = 'investment' AND source_id = p_transaction_id::text 
+        RETURNING account_id, amount, movement_type
+    LOOP
+        IF v_mov.movement_type = 'cikis' THEN
+            -- Alım iptal edildi, parayı kasaya GERİ EKLE
+            UPDATE accounts SET balance = COALESCE(balance, 0) + v_mov.amount WHERE id = v_mov.account_id;
+        ELSIF v_mov.movement_type = 'giris' THEN
+            -- Satış iptal edildi, parayı kasadan GERİ DÜŞ
+            UPDATE accounts SET balance = COALESCE(balance, 0) - v_mov.amount WHERE id = v_mov.account_id;
+        END IF;
+    END LOOP;
+
+    -- 4. İşlemi Sil
+    DELETE FROM investment_transactions WHERE id = p_transaction_id;
+
+    -- 5. Cüzdan Güncellemesi (Rollback)
     IF v_inv IS NOT NULL THEN
         IF v_tx.transaction_type = 'buy' THEN
             v_new_qty := COALESCE(v_inv.quantity, 0) - v_tx.quantity;
@@ -57,24 +75,6 @@ BEGIN
         END IF;
         -- TODO: ileride 'sell' gelirse quantity artırılmalı vb.
     END IF;
-
-    -- 4. İşlemi Sil
-    DELETE FROM investment_transactions WHERE id = p_transaction_id;
-
-    -- 5. Kasa İadesi
-    FOR v_mov IN 
-        DELETE FROM account_movements 
-        WHERE source_type = 'investment' AND source_id = p_transaction_id::text 
-        RETURNING account_id, amount, movement_type
-    LOOP
-        IF v_mov.movement_type = 'cikis' THEN
-            -- Alım iptal edildi, parayı kasaya GERİ EKLE
-            UPDATE accounts SET balance = COALESCE(balance, 0) + v_mov.amount WHERE id = v_mov.account_id;
-        ELSIF v_mov.movement_type = 'giris' THEN
-            -- Satış iptal edildi, parayı kasadan GERİ DÜŞ
-            UPDATE accounts SET balance = COALESCE(balance, 0) - v_mov.amount WHERE id = v_mov.account_id;
-        END IF;
-    END LOOP;
 
     RETURN true;
 EXCEPTION WHEN OTHERS THEN
