@@ -63,10 +63,9 @@ BEGIN
         WHERE id = v_inv_id;
     ELSE
         -- Yeni yatırım kaydı aç
-        INSERT INTO investments (id, user_id, asset_type, name, quantity, average_cost, current_manual_value, notes, purchase_date, document_url)
+        INSERT INTO investments (id, asset_type, name, quantity, average_cost, current_manual_value, notes, purchase_date, document_url)
         VALUES (
             gen_random_uuid(),
-            auth.uid(),
             p_asset_type,
             p_name,
             p_quantity,
@@ -79,11 +78,10 @@ BEGIN
     END IF;
 
     -- İşlem Geçmişine Ekle (investment_transactions)
-    INSERT INTO investment_transactions (id, investment_id, user_id, transaction_type, quantity, price_per_unit, total_amount, account_id, document_url, notes, transaction_date)
+    INSERT INTO investment_transactions (id, investment_id, transaction_type, quantity, price_per_unit, total_amount, account_id, document_url, notes, transaction_date)
     VALUES (
         gen_random_uuid(),
         v_inv_id,
-        auth.uid(),
         'buy',
         p_quantity,
         p_price,
