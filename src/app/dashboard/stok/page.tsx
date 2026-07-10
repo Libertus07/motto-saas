@@ -112,31 +112,20 @@ export default function Stok() {
         }
 
         const unitPrice = form.unit_price ? parseFloat(form.unit_price) : material.price_per_unit
-        const { error: movementError } = await supabase.from('stock_movements').insert({
-            material_id: form.material_id,
-            movement_type: form.movement_type,
-            quantity,
-            unit_price: unitPrice,
-            note: form.note
+        const { data: movementResult, error: movementError } = await supabase.rpc('record_stock_movement', {
+            p_material_id: form.material_id,
+            p_movement_type: form.movement_type,
+            p_quantity: quantity,
+            p_unit_price: unitPrice,
+            p_note: form.note || null
         })
 
         if (movementError) {
-            await showAlert('Stok hareketi kaydedilirken hata oluştu.', 'error')
+            await showAlert(movementError.message || 'Stok hareketi kaydedilirken hata oluştu.', 'error')
             return
         }
 
-        const newQuantity = form.movement_type === 'giris'
-            ? currentStock + quantity
-            : currentStock - quantity
-
-        const { error: updateError } = await supabase.from('materials')
-            .update({ stock_quantity: newQuantity })
-            .eq('id', form.material_id)
-
-        if (updateError) {
-            await showAlert('Stok miktarı güncellenirken hata oluştu.', 'error')
-            return
-        }
+        const newQuantity = Number(movementResult?.new_stock ?? currentStock)
 
         setForm({ material_id: '', movement_type: 'giris', quantity: '', unit_price: '', note: '' })
         setShowForm(false)
@@ -171,31 +160,20 @@ export default function Stok() {
         }
 
         const unitPrice = inlineForm.unit_price ? parseFloat(inlineForm.unit_price) : material.price_per_unit
-        const { error: movementError } = await supabase.from('stock_movements').insert({
-            material_id: inlineMovementMatId,
-            movement_type: inlineMovementType,
-            quantity,
-            unit_price: unitPrice,
-            note: inlineForm.note || (inlineMovementType === 'giris' ? 'Hızlı Giriş' : 'Hızlı Çıkış')
+        const { data: movementResult, error: movementError } = await supabase.rpc('record_stock_movement', {
+            p_material_id: inlineMovementMatId,
+            p_movement_type: inlineMovementType,
+            p_quantity: quantity,
+            p_unit_price: unitPrice,
+            p_note: inlineForm.note || (inlineMovementType === 'giris' ? 'Hızlı Giriş' : 'Hızlı Çıkış')
         })
 
         if (movementError) {
-            await showAlert('Hızlı stok hareketi kaydedilirken hata oluştu.', 'error')
+            await showAlert(movementError.message || 'Hızlı stok hareketi kaydedilirken hata oluştu.', 'error')
             return
         }
 
-        const newQuantity = inlineMovementType === 'giris'
-            ? currentStock + quantity
-            : currentStock - quantity
-
-        const { error: updateError } = await supabase.from('materials')
-            .update({ stock_quantity: newQuantity })
-            .eq('id', inlineMovementMatId)
-
-        if (updateError) {
-            await showAlert('Stok miktarı güncellenirken hata oluştu.', 'error')
-            return
-        }
+        const newQuantity = Number(movementResult?.new_stock ?? currentStock)
 
         setInlineMovementMatId(null)
         setInlineForm({ quantity: '', unit_price: '', note: '' })
@@ -250,54 +228,29 @@ export default function Stok() {
         )
         if (!confirmed) return
 
-        const sayimDetails: string[] = []
-
-        for (const item of pendingAdjustments) {
-            const direction = item.diff < 0 ? 'Eksik' : 'Fazla'
-            sayimDetails.push(`${item.material.name} (${item.currentStock} -> ${item.sayimQty})`)
-
-            const { error: movementError } = await supabase.from('stock_movements').insert({
+        const sayimDetails = pendingAdjustments.map(item => `${item.material.name} (${item.currentStock} -> ${item.sayimQty})`)
+        const { data: countResult, error: countError } = await supabase.rpc('apply_stock_count', {
+            p_items: pendingAdjustments.map(item => ({
                 material_id: item.materialId,
-                movement_type: 'sayim',
-                quantity: Math.abs(item.diff),
-                unit_price: item.material.price_per_unit,
-                note: `Sayım Düzeltmesi (${direction}): Teorik ${item.currentStock}, Gerçek ${item.sayimQty}`
-            })
+                counted_quantity: item.sayimQty
+            }))
+        })
 
-            if (movementError) {
-                await showAlert(`${item.material.name} için sayım hareketi kaydedilemedi.`, 'error')
-                return
-            }
-
-            const { error: updateError } = await supabase.from('materials')
-                .update({ stock_quantity: item.sayimQty })
-                .eq('id', item.materialId)
-
-            if (updateError) {
-                await showAlert(`${item.material.name} için stok miktarı güncellenemedi.`, 'error')
-                return
-            }
+        if (countError) {
+            await showAlert(countError.message || 'Sayım işlemi uygulanırken hata oluştu.', 'error')
+            return
         }
 
         setSayimData({})
         
-        const { error: settingsError } = await supabase
-            .from('settings')
-            .upsert({ key: 'last_inventory_count_date', value: new Date().toISOString() })
-
-        if (settingsError) {
-            await showAlert('Sayım kaydedildi ancak son sayım tarihi güncellenemedi.', 'warning')
-            return
-        }
-
         await logActivity('Stok', 'GUNCELLEME', 'Son stok sayım tarihi güncellendi.', {
-            detay: `Sayım tarihi: ${new Date().toISOString()}`
+            detay: `Sayım tarihi: ${countResult?.counted_at || new Date().toISOString()}`
         })
         
         fetchData()
         
         await logActivity('Stok', 'GUNCELLEME', `Stok sayım düzeltmesi yapıldı. Farklar ayrı sayım hareketi olarak kaydedildi.`, sayimDetails.length > 0 ? { detay: sayimDetails.join(', ') } : undefined)
-        await showAlert('Sayım tamamlandı! Farklar sayım düzeltmesi olarak kaydedildi.', 'success')
+        await showAlert(`Sayım tamamlandı! ${countResult?.updated_count || pendingAdjustments.length} ürün için sayım düzeltmesi kaydedildi.`, 'success')
     }
 
     const criticalMaterials = materials.filter(i => (i.stock_quantity || 0) <= (i.critical_stock_level || 0) && (i.critical_stock_level || 0) > 0)
