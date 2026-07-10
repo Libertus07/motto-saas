@@ -70,8 +70,7 @@ export default function Stok() {
             supabase.from('materials').select('*').order('name'),
             supabase.from('stock_movements')
                 .select('*, materials(name, unit)')
-                .order('created_at', { ascending: false })
-                .limit(50),
+                .order('created_at', { ascending: false }),
             supabase.from('settings').select('key, value').in('key', ['inventory_count_day', 'last_inventory_count_date'])
         ])
         setMaterials(mats || [])
@@ -274,8 +273,9 @@ export default function Stok() {
     const filteredSayimMaterials = materials.filter(mat => mat.name.toLowerCase().includes(sayimSearchTerm.toLowerCase()))
 
     const fireMovements = movements.filter(m => m.movement_type === 'fire')
+    const sayimMovements = movements.filter(m => m.movement_type === 'sayim')
     
-    const filteredZayiMovements = fireMovements.filter(m => {
+    const filteredZayiMovements = [...fireMovements.filter(m => {
         const matchesSearch = m.materials?.name?.toLowerCase().includes(zayiSearchTerm.toLowerCase()) || 
                               m.note?.toLowerCase().includes(zayiSearchTerm.toLowerCase())
         if (!matchesSearch) return false
@@ -296,7 +296,7 @@ export default function Stok() {
             return movDate.getMonth() === todayDateObj.getMonth() && movDate.getFullYear() === todayDateObj.getFullYear()
         }
         return true
-    }).sort((a, b) => {
+    })].sort((a, b) => {
         if (zayiSortBy === 'tarih_yeni') {
             return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         } else if (zayiSortBy === 'tarih_eski') {
@@ -392,7 +392,7 @@ export default function Stok() {
                             <span className="text-3xl">🔔</span>
                             <div>
                                 <h3 className="font-bold text-amber-400">Bugün Sayım Günü!</h3>
-                                <p className="text-stone-300 text-sm">Ayarlarınızda belirlenen aylık sayım günü geldi. Lütfen "Sayım Yap" sekmesinden stoklarınızı güncelleyin.</p>
+                                <p className="text-stone-300 text-sm">Ayarlarınızda belirlenen aylık sayım günü geldi. Lütfen sayım sekmesinden stoklarınızı güncelleyin.</p>
                             </div>
                         </div>
                         <button onClick={() => setActiveTab('sayim')} className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap">
@@ -655,8 +655,20 @@ export default function Stok() {
 
                         {/* Hareketler */}
                         {activeTab === 'hareket' && (
-                            <div className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
-                                <div className="overflow-x-auto w-full">
+                            <div className="space-y-4">
+                                <div className="bg-stone-900 border border-stone-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="font-bold text-stone-200">Tüm Stok Hareketleri</h3>
+                                        <p className="text-stone-400 text-sm">Liste artık son 50 kayıtla sınırlı değil; tüm stok hareketleri gösterilir.</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 text-xs">
+                                        <span className="bg-stone-800 text-stone-300 px-3 py-1 rounded-full border border-stone-700">Toplam {movements.length} hareket</span>
+                                        <span className="bg-orange-900/30 text-orange-300 px-3 py-1 rounded-full border border-orange-500/20">{fireMovements.length} fire kaydı</span>
+                                        <span className="bg-blue-900/30 text-blue-300 px-3 py-1 rounded-full border border-blue-500/20">{sayimMovements.length} sayım düzeltmesi</span>
+                                    </div>
+                                </div>
+                                <div className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
+                                    <div className="overflow-x-auto w-full">
 <table className="w-full">
                                     <thead>
                                         <tr className="border-b border-stone-800">
@@ -698,7 +710,8 @@ export default function Stok() {
                                         })}
                                     </tbody>
                                 </table>
-</div>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -785,6 +798,17 @@ export default function Stok() {
                         {/* Fire ve Zayi Analizi */}
                         {activeTab === 'zayi' && (
                             <div className="space-y-6">
+                                <div className="bg-stone-900 border border-stone-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="font-bold text-stone-200">Gerçek Fire / Zayi Analizi</h3>
+                                        <p className="text-stone-400 text-sm">Bu analiz yalnızca gerçek <code className="text-orange-300">fire</code> kayıtlarını içerir. <code className="text-blue-300">sayim</code> düzeltmeleri bu tabloya dahil edilmez.</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 text-xs">
+                                        <span className="bg-orange-900/30 text-orange-300 px-3 py-1 rounded-full border border-orange-500/20">Analizde {filteredZayiMovements.length} fire kaydı</span>
+                                        <span className="bg-blue-900/30 text-blue-300 px-3 py-1 rounded-full border border-blue-500/20">Hariç tutulan {sayimMovements.length} sayım hareketi</span>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-6 flex flex-col justify-center">
                                         <h3 className="font-bold text-red-400 text-lg mb-1">Toplam Fire Maliyeti</h3>
