@@ -465,7 +465,7 @@ function ProfilTab() {
   )
 }
 
-function GenelTab({ s, set, onSave, saving }: { s: Settings; set: (k: keyof Settings, v: any) => void; onSave: () => void; saving: boolean }) {
+function GenelTab({ s, set, onSave, saving }: { s: Settings; set: (k: keyof Settings, v: Settings[keyof Settings]) => void; onSave: () => void; saving: boolean }) {
   const { showAlert } = useNotification()
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const supabase = createClient()
@@ -567,7 +567,7 @@ function GenelTab({ s, set, onSave, saving }: { s: Settings; set: (k: keyof Sett
 }
 
 function FinansalTab({ s, set, onSave, saving, categories, setCategories }: {
-  s: Settings; set: (k: keyof Settings, v: any) => void; onSave: () => void; saving: boolean
+  s: Settings; set: (k: keyof Settings, v: Settings[keyof Settings]) => void; onSave: () => void; saving: boolean
   categories: string[]; setCategories: (cats: string[]) => void
 }) {
   const [newCat, setNewCat] = useState('')
@@ -681,7 +681,7 @@ function FinansalTab({ s, set, onSave, saving, categories, setCategories }: {
   )
 }
 
-function BildirimlerTab({ s, set, onSave, saving }: { s: Settings; set: (k: keyof Settings, v: any) => void; onSave: () => void; saving: boolean }) {
+function BildirimlerTab({ s, set, onSave, saving }: { s: Settings; set: (k: keyof Settings, v: Settings[keyof Settings]) => void; onSave: () => void; saving: boolean }) {
   return (
     <div className="space-y-6">
       <SectionCard title="Uygulama Bildirimleri" description="Dashboard'da hangi uyarı türleri gösterilsin?">
@@ -763,7 +763,7 @@ function EkipTab() {
   )
 }
 
-function EntegrasyonlarTab({ s, set }: { s: Settings; set: (k: keyof Settings, v: any) => void }) {
+function EntegrasyonlarTab({ s, set }: { s: Settings; set: (k: keyof Settings, v: Settings[keyof Settings]) => void }) {
   const integrations = [
     { name: 'Paraşüt', description: 'Muhasebe yazılımı entegrasyonu', icon: '📑', tag: 'Yakında' },
     { name: 'Logo', description: 'ERP entegrasyonu', icon: '🔗', tag: 'Yakında' },
@@ -880,7 +880,7 @@ export default function Ayarlar() {
     setLoading(false)
   }
 
-  const set = (key: keyof Settings, value: any) => {
+  const set = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }))
   }
 
@@ -895,7 +895,7 @@ export default function Ayarlar() {
         const label = SETTINGS_LABELS[key] || key
         
         // Boolean değerleri daha okunaklı yapalım
-        const formatVal = (v: any) => v === true ? 'Açık' : v === false ? 'Kapalı' : v
+        const formatVal = (v: string | boolean | string[]) => v === true ? 'Açık' : v === false ? 'Kapalı' : v
         changes.push(`${label} (${formatVal(initialVal)} -> ${formatVal(value)})`)
       }
     }

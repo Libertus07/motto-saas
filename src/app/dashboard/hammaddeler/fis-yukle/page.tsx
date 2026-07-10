@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { devLog, devError } from '@/lib/debug';
+import { formatCurrency } from "@/lib/format";
 
 type ParsedItem = {
     name: string
@@ -599,7 +600,7 @@ export default function FisYukle() {
                                     <div>
                                         <label className="text-stone-500 text-xs mb-1 block">Önceki Bakiye (Borç)</label>
                                         <div className="w-full bg-stone-900 border border-stone-800 rounded-lg px-3 py-2 text-stone-400 font-medium">
-                                            ₺{supplierDebt.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                            ₺{formatCurrency(supplierDebt)}
                                         </div>
                                     </div>
                                     <div>
@@ -614,10 +615,10 @@ export default function FisYukle() {
                                     <div>
                                         <label className="text-stone-500 text-xs mb-1 block">Genel Toplam Borç (=)</label>
                                         <div className="w-full bg-stone-900 border border-stone-800 rounded-lg px-3 py-2 text-white font-bold text-lg relative group">
-                                            ₺{(supplierDebt + parsedSupplier.totalAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                            ₺{formatCurrency((supplierDebt + parsedSupplier.totalAmount))}
                                             {parsedSupplier.statedDebt != null && (
                                                 <div className="absolute top-full left-0 mt-2 w-full bg-blue-950/80 border border-blue-500 rounded p-2 text-xs text-blue-200 shadow-xl z-10">
-                                                    📄 Faturada yazan güncel bakiye: <strong>₺{parsedSupplier.statedDebt.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</strong>
+                                                    📄 Faturada yazan güncel bakiye: <strong>₺{formatCurrency(parsedSupplier.statedDebt)}</strong>
                                                     <br/>(Sistemdeki bakiye ile kıyaslayabilirsiniz)
                                                 </div>
                                             )}

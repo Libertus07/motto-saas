@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { formatCurrency } from "@/lib/format";
 
 type Expense = {
   id: string
@@ -177,15 +178,15 @@ export default function Giderler() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
             <p className="text-stone-400 text-sm mb-1">Aylık Toplam Gider</p>
-            <p className="text-3xl font-bold text-amber-400">₺{monthlyTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+            <p className="text-3xl font-bold text-amber-400">₺{formatCurrency(monthlyTotal)}</p>
           </div>
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
             <p className="text-stone-400 text-sm mb-1">Günlük Gider</p>
-            <p className="text-3xl font-bold text-white">₺{(monthlyTotal / 30).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+            <p className="text-3xl font-bold text-white">₺{formatCurrency((monthlyTotal / 30))}</p>
           </div>
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
             <p className="text-stone-400 text-sm mb-1">Saatlik Gider (12 saat)</p>
-            <p className="text-3xl font-bold text-white">₺{(monthlyTotal / 30 / 12).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+            <p className="text-3xl font-bold text-white">₺{formatCurrency((monthlyTotal / 30 / 12))}</p>
           </div>
         </div>
 
@@ -203,7 +204,7 @@ export default function Giderler() {
                       style={{ width: `${(cat.total / monthlyTotal) * 100}%` }}
                     />
                   </div>
-                  <span className="text-amber-400 text-sm w-24 text-right">₺{cat.total.toLocaleString('tr-TR', { minimumFractionDigits: 0 })}</span>
+                  <span className="text-amber-400 text-sm w-24 text-right">₺{formatCurrency(cat.total)}</span>
                   <span className="text-stone-500 text-xs w-10 text-right">%{((cat.total / monthlyTotal) * 100).toFixed(0)}</span>
                 </div>
               ))}
@@ -327,9 +328,9 @@ export default function Giderler() {
                     <td className="px-4 py-3 text-stone-400 text-sm">
                       {exp.period === 'monthly' ? 'Aylık' : 'Yıllık'}
                     </td>
-                    <td className="px-4 py-3 text-right">₺{exp.amount.toLocaleString('tr-TR')}</td>
+                    <td className="px-4 py-3 text-right">₺{formatCurrency(exp.amount)}</td>
                     <td className="px-4 py-3 text-right text-amber-400">
-                      ₺{(exp.period === 'yearly' ? exp.amount / 12 : exp.amount).toLocaleString('tr-TR', { minimumFractionDigits: 0 })}
+                      ₺{formatCurrency((exp.period === 'yearly' ? exp.amount / 12 : exp.amount))}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={() => handleEdit(exp)} className="text-blue-400 hover:text-blue-300 text-sm mr-3">Düzenle</button>

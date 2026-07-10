@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
+import { formatCurrency, formatDate } from "@/lib/format";
 
 type StockMovement = {
     id: string
@@ -169,7 +170,7 @@ export default function TedarikciGecmisi() {
     const formatMonthLabel = (monthKey: string) => {
         const [year, month] = monthKey.split('-')
         const dateObj = new Date(parseInt(year), parseInt(month) - 1, 1)
-        const name = dateObj.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+        const name = formatDate(dateObj)
         return name.charAt(0).toUpperCase() + name.slice(1)
     }
 
@@ -256,7 +257,7 @@ export default function TedarikciGecmisi() {
             const data = await res.json()
             if (data.error) throw new Error(data.error)
             
-            const formattedDate = new Date(group.date).toLocaleDateString('tr-TR');
+            const formattedDate = formatDate(new Date(group.date));
             await logActivity('Tedarikçi Geçmişi', 'SILME', `${formattedDate} tarihli ${group.supplierName} fişi silindi. Stoklar ve cari bakiyeler geri alındı.`, { batchId: group.id })
             
             await showAlert('Fiş başarıyla silindi ve işlemler geri alındı.', 'success')
@@ -366,7 +367,7 @@ export default function TedarikciGecmisi() {
                                         <div className="flex items-center gap-6">
                                             <div className="text-right hidden sm:block">
                                                 <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Toplam Alış Tutarı</p>
-                                                <p className="text-2xl font-bold text-white">₺{mainGroup.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                                                <p className="text-2xl font-bold text-white">₺{formatCurrency(mainGroup.totalAmount)}</p>
                                             </div>
                                             <div className={`text-stone-500 p-2 transform transition-transform duration-200 ${isMainExpanded ? 'rotate-180' : ''}`}>
                                                 ▼
@@ -380,7 +381,7 @@ export default function TedarikciGecmisi() {
                                             {mainGroup.receipts.map((receipt: GroupedReceipt) => {
                                                 const isReceiptExpanded = expandedReceipt === receipt.id;
                                                 const dateObj = new Date(receipt.date)
-                                                const dateStr = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                                const dateStr = formatDate(dateObj)
 
                                                 return (
                                                     <div key={receipt.id} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden transition-all duration-200">
@@ -390,7 +391,7 @@ export default function TedarikciGecmisi() {
                                                                 className="flex-1 text-left flex items-center gap-3"
                                                             >
                                                                 <div className="bg-stone-800 px-3 py-1.5 rounded-lg text-green-400 font-bold tracking-wider text-sm whitespace-nowrap">
-                                                                    {dateObj.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}
+                                                                    {formatDate(dateObj)}
                                                                 </div>
                                                                 <div>
                                                                     <h4 className="font-bold text-stone-200">{groupBy === 'supplier' ? dateStr : receipt.supplierName}</h4>
@@ -400,7 +401,7 @@ export default function TedarikciGecmisi() {
                                                             
                                                             <div className="flex items-center gap-4">
                                                                 <div className="text-right">
-                                                                    <p className="text-lg font-bold text-white">₺{receipt.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                                                                    <p className="text-lg font-bold text-white">₺{formatCurrency(receipt.totalAmount)}</p>
                                                                 </div>
                                                                 
                                                                 <div className="flex items-center gap-1">
@@ -453,7 +454,7 @@ export default function TedarikciGecmisi() {
                                                                                         {item.materials?.name || 'Bilinmeyen'}
                                                                                     </td>
                                                                                     <td className="px-5 py-2.5 text-center text-stone-400">
-                                                                                        ₺{item.unit_price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                                                                                        ₺{formatCurrency(item.unit_price)}
                                                                                     </td>
                                                                                     <td className="px-5 py-2.5 text-center">
                                                                                         <span className="inline-block bg-stone-800 text-green-400 px-2 py-0.5 rounded text-xs font-bold min-w-[2rem]">
@@ -461,7 +462,7 @@ export default function TedarikciGecmisi() {
                                                                                         </span>
                                                                                     </td>
                                                                                     <td className="px-5 py-2.5 text-right font-medium text-white">
-                                                                                        ₺{(item.quantity * item.unit_price).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                                                        ₺{formatCurrency((item.quantity * item.unit_price))}
                                                                                     </td>
                                                                                 </tr>
                                                                             ))}

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
+import { formatCurrency } from "@/lib/format";
 
 type Product = {
     id: string
@@ -255,7 +256,7 @@ export default function Raporlar() {
                             <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
                                 <p className="text-stone-400 text-xs mb-1">Aylık Gider</p>
                                 <p className="text-2xl font-bold text-amber-400">
-                                    ₺{monthlyExpenses.toLocaleString('tr-TR', { minimumFractionDigits: 0 })}
+                                    ₺{formatCurrency(monthlyExpenses)}
                                 </p>
                             </div>
                             <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
@@ -281,7 +282,7 @@ export default function Raporlar() {
                                                     <p className="font-medium text-sm">{p.name}</p>
                                                     <p className="text-stone-500 text-xs">{p.totalQuantity} adet satıldı</p>
                                                 </div>
-                                                <span className="text-blue-400 font-bold">₺{p.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                                                <span className="text-blue-400 font-bold">₺{formatCurrency(p.totalRevenue)}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -300,7 +301,7 @@ export default function Raporlar() {
                                                     <p className="font-medium text-sm">{p.name}</p>
                                                     <p className="text-stone-500 text-xs">Marj: %{p.margin.toFixed(1)}</p>
                                                 </div>
-                                                <span className="text-green-400 font-bold">₺{p.totalProfit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                                                <span className="text-green-400 font-bold">₺{formatCurrency(p.totalProfit)}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -351,7 +352,7 @@ export default function Raporlar() {
                                                     />
                                                 </div>
                                                 <span className="text-red-400 text-sm w-24 text-right">
-                                                    ₺{amount.toLocaleString('tr-TR', { minimumFractionDigits: 0 })}
+                                                    ₺{formatCurrency(amount)}
                                                 </span>
                                                 <span className="text-stone-500 text-xs w-10 text-right">
                                                     %{((amount / monthlyExpenses) * 100).toFixed(0)}

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { formatCurrency } from "@/lib/format";
 
 type Account = {
     id: string
@@ -264,7 +265,7 @@ export default function YatirimFisiYukle() {
                             <div className="text-left md:text-right w-full md:w-auto">
                                 <p className="text-purple-400 text-sm mb-1 font-bold">Toplam Ödenen</p>
                                 <div className="text-3xl font-bold text-purple-400 bg-stone-900 px-4 py-2 rounded-lg border border-purple-500/30 inline-block">
-                                    ₺{Number(parsedData.total_amount).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                    ₺{formatCurrency(Number(parsedData.total_amount))}
                                 </div>
                             </div>
                         </div>

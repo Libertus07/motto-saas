@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
+import { formatCurrency, formatDate } from "@/lib/format";
 
 type ActivityLog = {
     id: string
@@ -59,7 +60,7 @@ export default function IslemGecmisi() {
 
         processedLogs.forEach(log => {
             const date = new Date(log.created_at)
-            let dateKey = date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+            let dateKey = formatDate(date)
             
             if (date.toDateString() === today.toDateString()) {
                 dateKey = 'Bugün'
@@ -191,7 +192,7 @@ export default function IslemGecmisi() {
                                                             className="hover:bg-stone-800/40 transition-colors cursor-pointer"
                                                         >
                                                             <td className="px-6 py-4 text-sm text-stone-400 whitespace-nowrap">
-                                                                {new Date(log.created_at).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                                                {formatDate(new Date(log.created_at))}
                                                             </td>
                                                             <td className="px-6 py-4">
                                                                 <span className="inline-block whitespace-nowrap bg-stone-800 text-stone-300 px-2 py-1 rounded text-xs border border-stone-700">
@@ -247,7 +248,7 @@ export default function IslemGecmisi() {
                                 <div className="bg-stone-800/50 p-3 rounded-lg border border-stone-800">
                                     <p className="text-stone-500 text-xs mb-1">Tarih / Saat</p>
                                     <p className="text-stone-200 text-sm font-medium">
-                                        {new Date(selectedLog.created_at).toLocaleString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        {formatDate(new Date(selectedLog.created_at))}
                                     </p>
                                 </div>
                                 <div className="bg-stone-800/50 p-3 rounded-lg border border-stone-800">

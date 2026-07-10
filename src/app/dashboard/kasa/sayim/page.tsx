@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
+import { formatCurrency } from "@/lib/format";
 
 export default function KasaSayimPage() {
     const supabase = createClient()
@@ -300,8 +301,8 @@ export default function KasaSayimPage() {
     }
 
     const getVarianceBadge = () => {
-        if (variance > 0) return <span className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-sm font-bold border border-emerald-500/30">+ ₺{variance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} Fazla</span>
-        if (variance < 0) return <span className="bg-rose-500/20 text-rose-400 px-3 py-1 rounded-full text-sm font-bold border border-rose-500/30">- ₺{Math.abs(variance).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} Açık</span>
+        if (variance > 0) return <span className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-sm font-bold border border-emerald-500/30">+ ₺{formatCurrency(variance)} Fazla</span>
+        if (variance < 0) return <span className="bg-rose-500/20 text-rose-400 px-3 py-1 rounded-full text-sm font-bold border border-rose-500/30">- ₺{formatCurrency(Math.abs(variance))} Açık</span>
         return <span className="bg-amber-500/20 text-amber-400 px-3 py-1 rounded-full text-sm font-bold border border-amber-500/30">✓ Kasa Denk</span>
     }
 
@@ -376,7 +377,7 @@ export default function KasaSayimPage() {
                         <div className="pt-4 border-t border-stone-800">
                             <div className="flex justify-between items-center text-stone-300">
                                 <span className="font-medium">Sizin Saydığınız Toplam:</span>
-                                <span className="text-2xl font-bold text-white">₺{countedTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                                <span className="text-2xl font-bold text-white">₺{formatCurrency(countedTotal)}</span>
                             </div>
                         </div>
                     </div>
@@ -400,17 +401,17 @@ export default function KasaSayimPage() {
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center p-4 bg-stone-950 rounded-xl border border-stone-800">
                                     <span className="text-stone-400">Günün Toplam Satışı (Z-Raporu)</span>
-                                    <span className="font-bold text-emerald-400">+ ₺{expectedSales.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                                    <span className="font-bold text-emerald-400">+ ₺{formatCurrency(expectedSales)}</span>
                                 </div>
                                 <div className="flex justify-between items-center p-4 bg-stone-950 rounded-xl border border-stone-800">
                                     <span className="text-stone-400">Günün Kasa Giderleri</span>
-                                    <span className="font-bold text-rose-400">- ₺{expectedExpenses.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                                    <span className="font-bold text-rose-400">- ₺{formatCurrency(expectedExpenses)}</span>
                                 </div>
                                 
                                 <div className="pt-4 border-t border-stone-800 mt-6">
                                     <div className="flex justify-between items-center">
                                         <span className="font-medium text-stone-300">Kasada Olması Gereken:</span>
-                                        <span className="text-3xl font-bold text-white">₺{expectedTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                                        <span className="text-3xl font-bold text-white">₺{formatCurrency(expectedTotal)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -428,7 +429,7 @@ export default function KasaSayimPage() {
                         <h2 className="text-lg font-medium text-stone-300 mb-2 text-center">Mutabakat Sonucu</h2>
                         <div className="flex flex-col items-center justify-center gap-4">
                             <div className="text-5xl font-black tracking-tighter">
-                                {variance > 0 ? '+' : ''}₺{variance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                {variance > 0 ? '+' : ''}₺{formatCurrency(variance)}
                             </div>
                             {getVarianceBadge()}
 
@@ -437,13 +438,13 @@ export default function KasaSayimPage() {
                                     <div className="flex-1 bg-stone-950 p-4 rounded-xl border border-stone-800 text-center">
                                         <div className="text-stone-400 text-sm mb-1">POS Farkı</div>
                                         <div className={`font-bold text-lg ${creditVariance === 0 ? 'text-amber-500' : creditVariance > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                            {creditVariance > 0 ? '+' : ''}₺{creditVariance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                            {creditVariance > 0 ? '+' : ''}₺{formatCurrency(creditVariance)}
                                         </div>
                                     </div>
                                     <div className="flex-1 bg-stone-950 p-4 rounded-xl border border-stone-800 text-center">
                                         <div className="text-stone-400 text-sm mb-1">Nakit Farkı</div>
                                         <div className={`font-bold text-lg ${cashVariance === 0 ? 'text-amber-500' : cashVariance > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                            {cashVariance > 0 ? '+' : ''}₺{cashVariance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                            {cashVariance > 0 ? '+' : ''}₺{formatCurrency(cashVariance)}
                                         </div>
                                     </div>
                                 </div>

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { formatCurrency, formatDate } from "@/lib/format";
 
 type Material = {
     id: string
@@ -273,7 +274,7 @@ export default function Stok() {
 
         filteredZayiMovements.forEach(log => {
             const date = new Date(log.created_at)
-            let dateKey = date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+            let dateKey = formatDate(date)
             
             if (date.toDateString() === todayDateObj2.toDateString()) {
                 dateKey = 'Bugün'
@@ -492,7 +493,7 @@ export default function Stok() {
                                                             {mat.critical_stock_level || 0} {mat.unit}
                                                         </td>
                                                         <td className="px-4 py-3 text-right text-amber-400">
-                                                            ₺{stockValue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                            ₺{formatCurrency(stockValue)}
                                                         </td>
                                                         <td className="px-4 py-3 text-right">
                                                             {isCritical
@@ -584,7 +585,7 @@ export default function Stok() {
                                         <tr className="bg-stone-800">
                                             <td colSpan={3} className="px-4 py-3 font-bold text-stone-300">Toplam Stok Değeri</td>
                                             <td className="px-4 py-3 text-right font-bold text-amber-400">
-                                                ₺{materials.reduce((t, i) => t + (i.stock_quantity || 0) * i.price_per_unit, 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                ₺{formatCurrency(materials.reduce((t, i) => t + (i.stock_quantity || 0) * i.price_per_unit, 0))}
                                             </td>
                                             <td></td>
                                         </tr>
@@ -622,7 +623,7 @@ export default function Stok() {
                                             return (
                                                 <tr key={mov.id} className="border-b border-stone-800 hover:bg-stone-800 transition-colors">
                                                     <td className="px-4 py-3 text-stone-400 text-sm">
-                                                        {new Date(mov.created_at).toLocaleDateString('tr-TR')}
+                                                        {formatDate(new Date(mov.created_at))}
                                                     </td>
                                                     <td className="px-4 py-3 font-medium">
                                                         {mov.materials?.name}
@@ -731,7 +732,7 @@ export default function Stok() {
                                         <h3 className="font-bold text-red-400 text-lg mb-1">Toplam Fire Maliyeti</h3>
                                         <p className="text-stone-400 text-xs mb-4">Seçili dönemdeki toplam maddi kayıp</p>
                                         <div className="text-4xl font-black text-red-400">
-                                            ₺{totalZayiMaliyeti.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                            ₺{formatCurrency(totalZayiMaliyeti)}
                                         </div>
                                     </div>
                                     
@@ -747,7 +748,7 @@ export default function Stok() {
                                                             <span className="bg-stone-950 text-stone-500 font-bold w-6 h-6 flex items-center justify-center rounded-md text-xs">{idx + 1}</span>
                                                             <span className="font-medium text-stone-200">{p.name}</span>
                                                         </div>
-                                                        <span className="font-bold text-red-400">₺{p.total.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                                                        <span className="font-bold text-red-400">₺{formatCurrency(p.total)}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -839,7 +840,7 @@ export default function Stok() {
                                                                             return (
                                                                                 <tr key={mov.id} className="hover:bg-stone-800/40 transition-colors">
                                                                                     <td className="px-6 py-4 text-sm text-stone-400 whitespace-nowrap">
-                                                                                        {new Date(mov.created_at).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                                                                        {formatDate(new Date(mov.created_at))}
                                                                                     </td>
                                                                                     <td className="px-6 py-4 font-medium">
                                                                                         {mov.materials?.name}
@@ -889,7 +890,7 @@ export default function Stok() {
                                                                 return (
                                                                     <tr key={mov.id} className="hover:bg-stone-800/40 transition-colors">
                                                                         <td className="px-6 py-4 text-sm text-stone-400 whitespace-nowrap">
-                                                                            {new Date(mov.created_at).toLocaleDateString('tr-TR')}
+                                                                            {formatDate(new Date(mov.created_at))}
                                                                         </td>
                                                                         <td className="px-6 py-4 font-medium">
                                                                             {mov.materials?.name}

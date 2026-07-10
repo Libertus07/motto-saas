@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { formatCurrency } from "@/lib/format";
 
 type Material = { id: string; name: string; unit: string; price_per_unit: number }
 type SubRecipe = { id: string; name: string; yield_quantity: number; yield_unit: string; wastage_percent: number; cost_per_yield?: number }
@@ -328,7 +329,7 @@ export default function Urunler() {
         <div><span className="text-stone-400 text-sm block">Food Cost</span><span className="text-white font-bold text-lg">₺{liveCost.toFixed(2)}</span></div>
         <div><span className="text-stone-400 text-sm block">Satış Fiyatı</span><span className="text-white font-bold text-lg">₺{salePrice.toFixed(2)}</span></div>
         <div><span className="text-stone-400 text-sm block">Kâr Marjı</span><span className={`font-bold text-lg ${getMarginColor(liveMargin)}`}>%{liveMargin.toFixed(1)}</span></div>
-        <div className="bg-amber-500/10 p-2 rounded-lg border border-amber-500/20"><span className="text-amber-400 text-xs block">Aylık Nakit Katkı</span><span className="text-amber-400 font-bold text-xl">₺{liveCashContribution.toLocaleString('tr-TR', { minimumFractionDigits: 0 })}</span></div>
+        <div className="bg-amber-500/10 p-2 rounded-lg border border-amber-500/20"><span className="text-amber-400 text-xs block">Aylık Nakit Katkı</span><span className="text-amber-400 font-bold text-xl">₺{formatCurrency(liveCashContribution)}</span></div>
       </div>
 
       <div className="flex gap-3">
@@ -346,7 +347,7 @@ export default function Urunler() {
           <span className="text-2xl">📋</span>
           <div>
             <h1 className="font-bold text-amber-400">Menü & Ürünler</h1>
-            <p className="text-stone-500 text-xs">{products.length} ürün &nbsp;·&nbsp; Son 30 gün ciro: <span className="text-amber-400 font-bold">₺{totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span></p>
+            <p className="text-stone-500 text-xs">{products.length} ürün &nbsp;·&nbsp; Son 30 gün ciro: <span className="text-amber-400 font-bold">₺{formatCurrency(totalRevenue)}</span></p>
           </div>
         </div>
         <div className="flex gap-2">

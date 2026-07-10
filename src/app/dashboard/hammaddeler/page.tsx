@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { formatDate } from "@/lib/format";
 
 type Material = {
   id: string
@@ -1001,10 +1002,7 @@ export default function Hammaddeler() {
                     <div key={hist.id} className="bg-stone-800 rounded-lg p-4 flex items-center justify-between">
                       <div>
                         <p className="text-stone-400 text-xs mb-1">
-                          {new Date(hist.created_at).toLocaleDateString('tr-TR', {
-                            day: '2-digit', month: 'long', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit'
-                          })}
+                          {formatDate(new Date(hist.created_at))}
                         </p>
                         <div className="flex items-center gap-2">
                           <span className="text-stone-500 line-through">₺{hist.old_price.toFixed(2)}</span>

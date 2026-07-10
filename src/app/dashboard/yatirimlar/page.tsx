@@ -6,6 +6,8 @@ import * as XLSX from 'xlsx'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
+import { Investment, InvestmentTransaction } from '@/types/database';
+import { formatCurrency, formatDate } from "@/lib/format";
 
 type Account = {
     id: string
@@ -13,30 +15,6 @@ type Account = {
     type: string
     balance: number
 }
-
-type Investment = {
-    id: string
-    asset_type: 'gold' | 'usd' | 'eur' | 'real_estate'
-    name: string
-    quantity: number
-    average_cost: number
-    current_manual_value?: number
-    notes?: string
-    purchase_date?: string
-    document_url?: string
-    created_at?: string
-}
-
-type Transaction = {
-    id: string
-    investment_id: string
-    transaction_type: 'buy' | 'sell' | 'rent' | 'value_update'
-    total_amount: number
-    quantity_changed?: number
-    notes?: string
-    created_at?: string
-}
-
 type Rates = {
     gold: number
     usd: number
@@ -47,7 +25,7 @@ export default function YatirimlarPage() {
     const { showAlert, showConfirm } = useNotification()
     const [accounts, setAccounts] = useState<Account[]>([])
     const [investments, setInvestments] = useState<Investment[]>([])
-    const [transactions, setTransactions] = useState<Transaction[]>([])
+    const [transactions, setTransactions] = useState<InvestmentTransaction[]>([])
     const [rates, setRates] = useState<Rates>(null)
     const [loading, setLoading] = useState(true)
 
@@ -307,7 +285,7 @@ export default function YatirimlarPage() {
 
             await supabase.from('investment_transactions').insert({
                 investment_id: invId,
-                transaction_type: 'buy',
+                transaction_type: 'buy' as InvestmentTransaction['transaction_type'],
                 quantity: qty,
                 price_per_unit: price,
                 total_amount: totalAmount,
@@ -360,7 +338,7 @@ export default function YatirimlarPage() {
 
             await supabase.from('investment_transactions').insert({
                 investment_id: selectedInvestment.id,
-                transaction_type: 'rent',
+                transaction_type: 'rent' as InvestmentTransaction['transaction_type'],
                 quantity: 1,
                 price_per_unit: amount,
                 total_amount: amount,
@@ -592,7 +570,7 @@ export default function YatirimlarPage() {
         } else {
             if (inv.purchase_date) {
                 const d = new Date(inv.purchase_date)
-                groupKey = d.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+                groupKey = formatDate(d)
             } else {
                 groupKey = 'Tarih Belirtilmeyenler'
             }
@@ -605,7 +583,7 @@ export default function YatirimlarPage() {
     const renderInvestmentList = (investmentList: any[]) => {
         return investmentList.map(inv => {
             const isExpanded = expandedInvestment === inv.id;
-            const invTransactions = transactions.filter(t => t.investment_id === inv.id);
+            const invTransactions = transactions.filter((t: InvestmentTransaction) => t.investment_id === inv.id);
 
             return (
             <div key={inv.id} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden transition-all duration-200">
@@ -620,8 +598,8 @@ export default function YatirimlarPage() {
                         <div>
                             <h4 className="font-bold text-stone-200 text-lg">{inv.name}</h4>
                             <p className="text-xs text-stone-500 mt-0.5">
-                                {!inv.isRE && <span className="font-medium text-stone-400 mr-2">{inv.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 4 })} {inv.asset_type === 'gold' ? 'Gram' : inv.asset_type === 'usd' ? 'USD' : 'EUR'}</span>}
-                                {inv.purchase_date && <span>📅 {new Date(inv.purchase_date).toLocaleDateString('tr-TR')}</span>}
+                                {!inv.isRE && <span className="font-medium text-stone-400 mr-2">{formatCurrency(inv.quantity)} {inv.asset_type === 'gold' ? 'Gram' : inv.asset_type === 'usd' ? 'USD' : 'EUR'}</span>}
+                                {inv.purchase_date && <span>📅 {formatDate(new Date(inv.purchase_date))}</span>}
                             </p>
                         </div>
                     </div>
@@ -629,9 +607,9 @@ export default function YatirimlarPage() {
                     <div className="flex items-center gap-6 justify-between sm:justify-end w-full sm:w-auto pl-16 sm:pl-0">
                         <div className="text-left sm:text-right">
                             <p className="text-stone-400 text-xs font-bold mb-0.5">Güncel Değer</p>
-                            <p className="text-lg font-bold text-white">₺{inv.currentValue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                            <p className="text-lg font-bold text-white">₺{formatCurrency(inv.currentValue)}</p>
                             <p className={`text-xs font-bold mt-0.5 ${inv.isProfit ? 'text-green-400' : 'text-red-400'}`}>
-                                {inv.isProfit ? 'Kâr: +' : 'Zarar: '}₺{inv.profit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                {inv.isProfit ? 'Kâr: +' : 'Zarar: '}₺{formatCurrency(inv.profit)}
                             </p>
                         </div>
                         
@@ -676,7 +654,7 @@ export default function YatirimlarPage() {
                                         invTransactions.map(tx => (
                                             <tr key={tx.id} className="hover:bg-stone-800/20 transition-colors">
                                                 <td className="px-5 py-3 text-stone-400 whitespace-nowrap">
-                                                    {tx.created_at ? new Date(tx.created_at).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                                    {tx.created_at ? formatDate(new Date(tx.created_at)) : '-'}
                                                 </td>
                                                 <td className="px-5 py-3">
                                                     <span className={`px-2 py-1 rounded-md text-xs font-bold border ${
@@ -695,7 +673,7 @@ export default function YatirimlarPage() {
                                                     {tx.notes || '-'}
                                                 </td>
                                                 <td className="px-5 py-3 text-right font-bold text-white whitespace-nowrap">
-                                                    {tx.transaction_type === 'value_update' ? '' : (tx.transaction_type === 'buy' ? '-' : '+')}₺{tx.total_amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                    {tx.transaction_type === 'value_update' ? '' : (tx.transaction_type === 'buy' ? '-' : '+')}₺{formatCurrency(tx.total_amount)}
                                                 </td>
                                             </tr>
                                         ))
@@ -740,7 +718,7 @@ export default function YatirimlarPage() {
                         <div className="absolute -right-4 -top-4 text-7xl opacity-5">💰</div>
                         <p className="text-stone-400 text-sm mb-1 font-bold">Toplam Yatırım Maliyeti</p>
                         <h2 className="text-3xl font-bold text-white mb-2">
-                            ₺{totalCostValue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                            ₺{formatCurrency(totalCostValue)}
                         </h2>
                         <p className="text-xs text-stone-500">Ödediğiniz toplam anapara</p>
                     </div>
@@ -749,7 +727,7 @@ export default function YatirimlarPage() {
                         <div className="absolute -right-4 -top-4 text-7xl opacity-5">💎</div>
                         <p className="text-amber-500/80 text-sm mb-1 font-bold">Güncel Varlık Değeri</p>
                         <h2 className="text-3xl font-bold text-amber-500 mb-2">
-                            ₺{totalCurrentValue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                            ₺{formatCurrency(totalCurrentValue)}
                         </h2>
                         <p className="text-xs text-amber-500/50">Canlı kurlar ve ekspertiz değerleri</p>
                     </div>
@@ -761,7 +739,7 @@ export default function YatirimlarPage() {
                                 Toplam Kâr / Zarar
                             </p>
                             <h2 className={`text-3xl font-bold mb-2 flex flex-wrap items-center gap-2 ${totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                {totalProfit >= 0 ? '+' : ''}₺{totalProfit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                {totalProfit >= 0 ? '+' : ''}₺{formatCurrency(totalProfit)}
                                 <span className="text-lg bg-black/20 px-2 py-1 rounded-lg">
                                     {totalProfit >= 0 ? '+' : ''}{profitPercentage.toFixed(2)}%
                                 </span>
@@ -769,7 +747,7 @@ export default function YatirimlarPage() {
                         </div>
                         {totalRentIncome > 0 && (
                             <p className={`text-xs mt-2 ${totalProfit >= 0 ? 'text-green-500/70' : 'text-red-500/70'}`}>
-                                (Bu kâra ₺{totalRentIncome.toLocaleString('tr-TR')} toplam kira geliri dahildir)
+                                (Bu kâra ₺{formatCurrency(totalRentIncome)} toplam kira geliri dahildir)
                             </p>
                         )}
                     </div>
@@ -833,10 +811,10 @@ export default function YatirimlarPage() {
                                         <div className="flex items-center gap-6 mt-3 sm:mt-0 text-sm pl-7 sm:pl-0">
                                             <div>
                                                 <span className="text-stone-500 mr-2 font-medium">Toplam Değer:</span>
-                                                <span className="font-bold text-white">₺{groupTotalValue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                                                <span className="font-bold text-white">₺{formatCurrency(groupTotalValue)}</span>
                                             </div>
                                             <div className={`font-bold px-2 py-1 rounded-md ${isGroupProfit ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                                                {isGroupProfit ? 'Kâr: +' : 'Zarar: '}₺{groupProfit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                {isGroupProfit ? 'Kâr: +' : 'Zarar: '}₺{formatCurrency(groupProfit)}
                                             </div>
                                         </div>
                                     </summary>
@@ -850,7 +828,7 @@ export default function YatirimlarPage() {
                                             <div className="flex flex-col gap-3 mt-3">
                                                 {Object.entries(
                                                     items.reduce((acc, curr) => {
-                                                        const dateStr = curr.purchase_date ? new Date(curr.purchase_date).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) : 'Tarih Belirtilmeyenler'
+                                                        const dateStr = curr.purchase_date ? formatDate(new Date(curr.purchase_date)) : 'Tarih Belirtilmeyenler'
                                                         if (!acc[dateStr]) acc[dateStr] = []
                                                         acc[dateStr].push(curr)
                                                         return acc
@@ -956,7 +934,7 @@ export default function YatirimlarPage() {
                             <div className="bg-stone-950 p-4 rounded-xl border border-stone-800 flex justify-between items-center">
                                 <span className="text-stone-400 font-bold">Ödenecek Toplam Tutar:</span>
                                 <span className="text-xl font-bold text-red-400">
-                                    ₺{((buyForm.asset_type === 'real_estate' ? 1 : (parseFloat(buyForm.quantity) || 0)) * (parseFloat(buyForm.price_per_unit) || 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                    ₺{formatCurrency(((buyForm.asset_type === 'real_estate' ? 1 : (parseFloat(buyForm.quantity) || 0)) * (parseFloat(buyForm.price_per_unit) || 0)))}
                                 </span>
                             </div>
 
@@ -970,7 +948,7 @@ export default function YatirimlarPage() {
                                 >
                                     <option value="" disabled>Hesap Seçin...</option>
                                     {accounts.map(acc => (
-                                        <option key={acc.id} value={acc.id}>{acc.name} (Bakiye: ₺{acc.balance.toLocaleString('tr-TR')})</option>
+                                        <option key={acc.id} value={acc.id}>{acc.name} (Bakiye: ₺{formatCurrency(acc.balance)})</option>
                                     ))}
                                 </select>
                             </div>
@@ -1193,7 +1171,7 @@ export default function YatirimlarPage() {
                                 >
                                     <option value="" disabled>Hesap Seçin...</option>
                                     {accounts.map(acc => (
-                                        <option key={acc.id} value={acc.id}>{acc.name} (Bakiye: ₺{acc.balance.toLocaleString('tr-TR')})</option>
+                                        <option key={acc.id} value={acc.id}>{acc.name} (Bakiye: ₺{formatCurrency(acc.balance)})</option>
                                     ))}
                                 </select>
                             </div>

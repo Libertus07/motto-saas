@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
+import { formatCurrency, formatDate } from "@/lib/format";
 
 type SaleItem = {
     id: string
@@ -129,7 +130,7 @@ export default function GecmisRaporlar() {
             const monthKey = `${year}-${month}`
             
             if (!monthGroups[monthKey]) {
-                const monthName = dateObj.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+                const monthName = formatDate(dateObj)
                 monthGroups[monthKey] = {
                     monthKey,
                     monthLabel: monthName.charAt(0).toUpperCase() + monthName.slice(1),
@@ -176,7 +177,7 @@ export default function GecmisRaporlar() {
     const formatMonthLabel = (monthKey: string) => {
         const [year, month] = monthKey.split('-')
         const dateObj = new Date(parseInt(year), parseInt(month) - 1, 1)
-        const name = dateObj.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+        const name = formatDate(dateObj)
         return name.charAt(0).toUpperCase() + name.slice(1)
     }
 
@@ -303,7 +304,7 @@ export default function GecmisRaporlar() {
                                         <div className="flex items-center gap-6">
                                             <div className="text-right hidden sm:block">
                                                 <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Aylık Toplam Ciro</p>
-                                                <p className="text-2xl font-bold text-green-400">₺{month.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                                                <p className="text-2xl font-bold text-green-400">₺{formatCurrency(month.totalRevenue)}</p>
                                             </div>
                                             <div className={`text-stone-500 p-2 transform transition-transform duration-200 ${isMonthExpanded ? 'rotate-180' : ''}`}>
                                                 ▼
@@ -317,8 +318,8 @@ export default function GecmisRaporlar() {
                                             {month.days.map(day => {
                                                 const isDateExpanded = expandedDate === day.date;
                                                 const dateObj = new Date(day.date)
-                                                const dayName = dateObj.toLocaleDateString('tr-TR', { weekday: 'long' })
-                                                const dayNum = dateObj.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })
+                                                const dayName = formatDate(dateObj)
+                                                const dayNum = formatDate(dateObj)
 
                                                 return (
                                                     <div key={day.date} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden transition-all duration-200">
@@ -338,7 +339,7 @@ export default function GecmisRaporlar() {
                                                             
                                                             <div className="flex items-center gap-4">
                                                                 <div className="text-right">
-                                                                    <p className="text-lg font-bold text-green-400">₺{day.totalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                                                                    <p className="text-lg font-bold text-green-400">₺{formatCurrency(day.totalRevenue)}</p>
                                                                 </div>
                                                                 
                                                                 <div className="flex items-center gap-1">
@@ -395,7 +396,7 @@ export default function GecmisRaporlar() {
                                                                                         </span>
                                                                                     </td>
                                                                                     <td className="px-5 py-2.5 text-right font-medium text-white">
-                                                                                        ₺{item.total_price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                                                        ₺{formatCurrency(item.total_price)}
                                                                                     </td>
                                                                                 </tr>
                                                                             ))}

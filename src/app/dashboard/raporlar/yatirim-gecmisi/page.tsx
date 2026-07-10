@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
+import { formatCurrency, formatDate } from "@/lib/format";
 
 type Investment = {
     id: string
@@ -74,7 +75,7 @@ export default function YatirimGecmisi() {
     const formatMonthLabel = (monthKey: string) => {
         const [year, month] = monthKey.split('-')
         const dateObj = new Date(parseInt(year), parseInt(month) - 1, 1)
-        const name = dateObj.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+        const name = formatDate(dateObj)
         return name.charAt(0).toUpperCase() + name.slice(1)
     }
 
@@ -248,7 +249,7 @@ export default function YatirimGecmisi() {
                                         <div className="flex items-center gap-6">
                                             <div className="text-right hidden sm:block">
                                                 <p className="text-stone-500 text-xs uppercase tracking-wider mb-1">Toplam Yatırım Tutarı</p>
-                                                <p className="font-bold text-purple-400">₺{group.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                                                <p className="font-bold text-purple-400">₺{formatCurrency(group.totalAmount)}</p>
                                             </div>
                                             <div className={`text-stone-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
                                                 ▼
@@ -268,7 +269,7 @@ export default function YatirimGecmisi() {
                                                             <div>
                                                                 <h4 className="font-bold text-white">{inv.name}</h4>
                                                                 <p className="text-stone-400 text-sm">
-                                                                    {new Date(inv.purchase_date).toLocaleDateString('tr-TR')} • {inv.quantity} {inv.asset_type === 'altin' ? 'Gram' : inv.asset_type === 'doviz' ? 'Adet/Birim' : 'Adet'}
+                                                                    {formatDate(new Date(inv.purchase_date))} • {inv.quantity} {inv.asset_type === 'altin' ? 'Gram' : inv.asset_type === 'doviz' ? 'Adet/Birim' : 'Adet'}
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -276,11 +277,11 @@ export default function YatirimGecmisi() {
                                                         <div className="flex flex-wrap items-center gap-6">
                                                             <div className="text-right">
                                                                 <p className="text-stone-500 text-xs">Birim Maliyet</p>
-                                                                <p className="font-medium text-stone-300">₺{Number(inv.average_cost).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                                                                <p className="font-medium text-stone-300">₺{formatCurrency(Number(inv.average_cost))}</p>
                                                             </div>
                                                             <div className="text-right">
                                                                 <p className="text-stone-500 text-xs">Toplam Tutar</p>
-                                                                <p className="font-bold text-purple-400">₺{(inv.quantity * inv.average_cost).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+                                                                <p className="font-bold text-purple-400">₺{formatCurrency((inv.quantity * inv.average_cost))}</p>
                                                             </div>
                                                             
                                                             {inv.document_url && (

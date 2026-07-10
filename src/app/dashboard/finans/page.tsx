@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
+import { formatCurrency, formatDate } from "@/lib/format";
 
 type Account = {
     id: string
@@ -139,9 +140,9 @@ export default function FinansPage() {
             // Eğer giriş ve çıkış birbirini sıfırlıyorsa (hiç hareket yoksa) ekleme
             if (netAmount === 0 && totalHasilat === 0 && totalGider === 0 && acikFazla === 0) return;
 
-            let descText = `${reportDateStr} Gün Sonu Net Kasa Hareketi (Giriş: ₺${totalHasilat.toLocaleString('tr-TR')} | Gider: ₺${totalGider.toLocaleString('tr-TR')}`
+            let descText = `${reportDateStr} Gün Sonu Net Kasa Hareketi (Giriş: ₺${formatCurrency(totalHasilat)} | Gider: ₺${formatCurrency(totalGider)}`
             if (acikFazlaTipi) {
-                descText += ` | Sayım ${acikFazlaTipi}: ${acikFazla > 0 ? '+' : '-'}₺${Math.abs(acikFazla).toLocaleString('tr-TR')}`
+                descText += ` | Sayım ${acikFazlaTipi}: ${acikFazla > 0 ? '+' : '-'}₺${formatCurrency(Math.abs(acikFazla))}`
             }
             descText += ')'
 
@@ -171,7 +172,7 @@ export default function FinansPage() {
         // 2. Normal UI gruplamasını (Bugün, Dün vs) yap
         processedMovements.forEach(move => {
             const date = new Date(move.created_at)
-            let dateKey = date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+            let dateKey = formatDate(date)
             
             if (date.toDateString() === today.toDateString()) {
                 dateKey = 'Bugün'
@@ -352,7 +353,7 @@ export default function FinansPage() {
                                 {acc.name}
                             </p>
                             <h3 className={`text-2xl font-bold ${selectedAccount?.id === acc.id ? 'text-amber-500' : 'text-white'}`}>
-                                ₺{acc.balance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                ₺{formatCurrency(acc.balance)}
                             </h3>
                         </div>
                     ))}
@@ -418,7 +419,7 @@ export default function FinansPage() {
                                                                         className="hover:bg-stone-800/30 transition-colors cursor-pointer group"
                                                                     >
                                                                         <td className="px-6 py-4 text-stone-400 whitespace-nowrap group-hover:text-amber-400/70 transition-colors">
-                                                                            {new Date(move.created_at).toLocaleString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                                                            {formatDate(new Date(move.created_at))}
                                                                         </td>
                                                                         <td className="px-6 py-4">
                                                                             <p className="font-medium text-stone-300 group-hover:text-amber-400 transition-colors">{move.description}</p>
@@ -430,7 +431,7 @@ export default function FinansPage() {
                                                                         </td>
                                                                         <td className="px-6 py-4 text-right whitespace-nowrap">
                                                                             <span className={`font-bold px-3 py-1.5 rounded-lg ${isGiris ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                                                                                {isGiris ? '+' : '-'} ₺{move.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                                                                {isGiris ? '+' : '-'} ₺{formatCurrency(move.amount)}
                                                                             </span>
                                                                         </td>
                                                                     </tr>
@@ -539,7 +540,7 @@ export default function FinansPage() {
                                 {selectedMovement.movement_type === 'giris' ? '⬇️' : '⬆️'}
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-1">
-                                {selectedMovement.movement_type === 'giris' ? '+' : '-'} ₺{selectedMovement.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                {selectedMovement.movement_type === 'giris' ? '+' : '-'} ₺{formatCurrency(selectedMovement.amount)}
                             </h2>
                             <p className="text-stone-400 text-sm font-medium">İşlem Tutarı</p>
                         </div>
@@ -549,7 +550,7 @@ export default function FinansPage() {
                                 <div className="flex justify-between items-center pb-3 border-b border-stone-800/50">
                                     <span className="text-stone-500 text-xs font-bold uppercase tracking-wider">İşlem Tarihi</span>
                                     <span className="text-stone-200 text-sm font-medium">
-                                        {new Date(selectedMovement.created_at).toLocaleString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        {formatDate(new Date(selectedMovement.created_at))}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center pb-3 border-b border-stone-800/50">
@@ -585,24 +586,24 @@ export default function FinansPage() {
                                     <div className="mt-4 pt-4 border-t border-stone-800/50 space-y-3">
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-stone-400 flex items-center gap-2">🟢 <span>Nakit/POS Hasılatı</span></span>
-                                            <span className="text-green-400 font-bold">+₺{selectedMovement.z_details.hasilat.toLocaleString('tr-TR', {minimumFractionDigits: 2})}</span>
+                                            <span className="text-green-400 font-bold">+₺{formatCurrency(selectedMovement.z_details.hasilat)}</span>
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-stone-400 flex items-center gap-2">🔴 <span>Kasadan Çıkan Giderler</span></span>
-                                            <span className="text-red-400 font-bold">-₺{selectedMovement.z_details.gider.toLocaleString('tr-TR', {minimumFractionDigits: 2})}</span>
+                                            <span className="text-red-400 font-bold">-₺{formatCurrency(selectedMovement.z_details.gider)}</span>
                                         </div>
                                         {selectedMovement.z_details.acikFazla !== 0 && (
                                             <div className="flex justify-between items-center text-sm">
                                                 <span className="text-stone-400 flex items-center gap-2">🟠 <span>Kasa Sayım {selectedMovement.z_details.acikFazlaTipi}</span></span>
                                                 <span className={`${selectedMovement.z_details.acikFazla > 0 ? 'text-green-400' : 'text-red-400'} font-bold`}>
-                                                    {selectedMovement.z_details.acikFazla > 0 ? '+' : '-'}₺{Math.abs(selectedMovement.z_details.acikFazla).toLocaleString('tr-TR', {minimumFractionDigits: 2})}
+                                                    {selectedMovement.z_details.acikFazla > 0 ? '+' : '-'}₺{formatCurrency(Math.abs(selectedMovement.z_details.acikFazla))}
                                                 </span>
                                             </div>
                                         )}
                                         <div className="flex justify-between items-center pt-3 border-t border-stone-800/50 mt-3">
                                             <span className="text-stone-300 font-bold text-sm">Kasaya Giren NET Tutar</span>
                                             <span className="text-amber-400 font-bold text-xl">
-                                                {selectedMovement.z_details.net > 0 ? '+' : ''}₺{selectedMovement.z_details.net.toLocaleString('tr-TR', {minimumFractionDigits: 2})}
+                                                {selectedMovement.z_details.net > 0 ? '+' : ''}₺{formatCurrency(selectedMovement.z_details.net)}
                                             </span>
                                         </div>
                                     </div>

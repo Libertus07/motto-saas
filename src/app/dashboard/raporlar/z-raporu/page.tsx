@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { formatCurrency } from "@/lib/format";
 
 type Product = {
     id: string
@@ -133,7 +134,7 @@ export default function ZRaporuYukle() {
         return matrix[s2.length][s1.length];
     }
 
-    const findBestMatch = (productName: string, systemProducts: any[]) => {
+    const findBestMatch = (productName: string, systemProducts: Product[]) => {
         let bestMatch = null;
         let bestScore = 0; 
         
@@ -188,7 +189,7 @@ export default function ZRaporuYukle() {
             if (data.error) throw new Error(data.error)
 
             // Eşleşmeleri otomatik yap (Akıllı Karşılaştırma)
-            const mappedItems = data.items.map((item: any) => {
+            const mappedItems = data.items.map((item: ParsedSaleItem) => {
                 const match = findBestMatch(item.product_name, products)
                 return { ...item, matchedProductId: match?.id }
             })
@@ -422,7 +423,7 @@ export default function ZRaporuYukle() {
                             const subIngredients = subRecipe.sub_recipe_ingredients || []
                             
                             // 1 Porsiyon ürün için gereken hammadde = (Alt reçetedeki toplam hammadde) / (Alt reçete verimi)
-                            subIngredients.forEach((subIng: any) => {
+                            subIngredients.forEach((subIng: { material_id: string; quantity: number }) => {
                                 const qtyPerYield = subIng.quantity / (subRecipe.yield_quantity || 1)
                                 const totalQty = sale.quantity * ingredient.quantity * qtyPerYield
                                 stockDeductions[subIng.material_id] = (stockDeductions[subIng.material_id] || 0) + totalQty
@@ -603,13 +604,13 @@ export default function ZRaporuYukle() {
                                 <div className="border-l border-stone-700/50 pl-4">
                                     <p className="text-stone-400 text-sm mb-1">Toplam Ciro</p>
                                     <div className="text-xl font-bold text-white bg-stone-900 px-4 py-2 rounded-lg border border-stone-800 inline-block">
-                                        ₺{parsedData.items.reduce((acc, item) => acc + (Number(item.total_price) || 0), 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                        ₺{formatCurrency(parsedData.items.reduce((acc, item) => acc + (Number(item.total_price) || 0), 0))}
                                     </div>
                                 </div>
                                 <div>
                                     <p className="text-green-400 text-sm mb-1 font-bold">Kalan Net Kasa</p>
                                     <div className="text-2xl font-bold text-green-400 bg-stone-900 px-4 py-2 rounded-lg border border-green-500/30 inline-block">
-                                        ₺{((parsedData.payment_methods?.cash || 0) - (parsedData.expenses || []).reduce((acc, exp) => acc + (Number(exp.amount) || 0), 0)).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                        ₺{formatCurrency(((parsedData.payment_methods?.cash || 0) - (parsedData.expenses || []).reduce((acc, exp) => acc + (Number(exp.amount) || 0), 0)))}
                                     </div>
                                 </div>
                             </div>
