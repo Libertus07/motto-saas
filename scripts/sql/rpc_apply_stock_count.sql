@@ -21,7 +21,14 @@ DECLARE
     v_count integer := 0;
     v_details text[] := '{}';
     v_now text := now()::text;
+    v_user_id uuid;
 BEGIN
+    v_user_id := auth.uid();
+
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'Oturum bilgisi bulunamadı. Sayım kaydı için kullanıcı gerekli.';
+    END IF;
+
     IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' THEN
         RAISE EXCEPTION 'Sayım verisi geçersiz.';
     END IF;
@@ -58,13 +65,14 @@ BEGIN
 
         v_direction := CASE WHEN v_diff < 0 THEN 'Eksik' ELSE 'Fazla' END;
 
-        INSERT INTO stock_movements (material_id, movement_type, quantity, unit_price, note)
+        INSERT INTO stock_movements (material_id, movement_type, quantity, unit_price, note, user_id)
         VALUES (
             v_material_id,
             'sayim',
             abs(v_diff),
             COALESCE(v_material.price_per_unit, 0),
-            'Sayım Düzeltmesi (' || v_direction || '): Teorik ' || v_current_stock || ', Gerçek ' || v_counted_qty
+            'Sayım Düzeltmesi (' || v_direction || '): Teorik ' || v_current_stock || ', Gerçek ' || v_counted_qty,
+            v_user_id
         );
 
         UPDATE materials

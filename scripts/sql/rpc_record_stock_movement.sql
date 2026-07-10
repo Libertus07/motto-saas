@@ -20,6 +20,7 @@ DECLARE
     v_old_stock numeric;
     v_new_stock numeric;
     v_final_price numeric;
+    v_user_id uuid;
 BEGIN
     IF p_material_id IS NULL THEN
         RAISE EXCEPTION 'Hammadde seçimi zorunludur.';
@@ -31,6 +32,12 @@ BEGIN
 
     IF p_movement_type NOT IN ('giris', 'cikis', 'fire') THEN
         RAISE EXCEPTION 'Geçersiz stok hareket türü: %', p_movement_type;
+    END IF;
+
+    v_user_id := auth.uid();
+
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'Oturum bilgisi bulunamadı. Stok hareketi kaydı için kullanıcı gerekli.';
     END IF;
 
     SELECT id, name, unit, price_per_unit, stock_quantity
@@ -56,8 +63,8 @@ BEGIN
         v_new_stock := v_old_stock - p_quantity;
     END IF;
 
-    INSERT INTO stock_movements (material_id, movement_type, quantity, unit_price, note)
-    VALUES (p_material_id, p_movement_type, p_quantity, v_final_price, COALESCE(p_note, ''));
+    INSERT INTO stock_movements (material_id, movement_type, quantity, unit_price, note, user_id)
+    VALUES (p_material_id, p_movement_type, p_quantity, v_final_price, COALESCE(p_note, ''), v_user_id);
 
     UPDATE materials
     SET stock_quantity = v_new_stock
