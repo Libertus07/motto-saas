@@ -241,7 +241,7 @@ export default function TedarikciGecmisi() {
         }
 
         const confirmed = await showConfirm(
-            `Emin misiniz?\n\nBu fiş silindiğinde:\n- Fişten gelen stoklar silinecek.\n- Tedarikçi borç/ödeme kayıtları geri alınacak.\n\nBu işlem geri alınamaz!`,
+            `Emin misiniz?\n\n${formatDate(group.date)} tarihli ve ₺${formatCurrency(group.totalAmount)} tutarındaki fiş silindiğinde:\n- Fişten gelen stoklar silinecek.\n- ${group.supplierName || 'Tedarikçi'} carisindeki borç/ödeme kayıtları geri alınacak.\n\nBu işlem geri alınamaz!`,
             'Fişi Sil 🗑️'
         )
         if (!confirmed) return

@@ -170,35 +170,16 @@ export default function Tedarikciler() {
         if (amount <= 0) return
 
         try {
-            // 1. Ödeme kaydını ekle
-            await supabase.from('supplier_transactions').insert({
-                supplier_id: selectedSupplier.id,
-                transaction_date: new Date().toISOString().split('T')[0],
-                amount: amount,
-                transaction_type: 'payment',
-                note: paymentNote || 'Manuel Ödeme'
+            const { error: rpcError } = await supabase.rpc('add_supplier_payment_transaction', {
+                p_supplier_id: selectedSupplier.id,
+                p_supplier_name: selectedSupplier.name,
+                p_amount: amount,
+                p_note: paymentNote || 'Manuel Ödeme',
+                p_account_id: paymentAccountId || null
             })
+            if (rpcError) throw rpcError
 
-            // 2. Tedarikçi bakiyesini güncelle
             const newDebt = parseFloat((selectedSupplier.total_debt || 0).toString()) - amount
-            await supabase.from('suppliers').update({ total_debt: newDebt }).eq('id', selectedSupplier.id)
-
-            // 3. Finans Hesabından düş (Eğer hesap seçildiyse)
-            if (paymentAccountId) {
-                await supabase.from('account_movements').insert({
-                    account_id: paymentAccountId,
-                    movement_type: 'cikis',
-                    amount: amount,
-                    description: `${selectedSupplier.name} firmasına ödeme yapıldı.`,
-                    source_type: 'supplier_payment',
-                    source_id: selectedSupplier.id
-                })
-
-                const { data: currAcc } = await supabase.from('accounts').select('balance').eq('id', paymentAccountId).single()
-                if (currAcc) {
-                    await supabase.from('accounts').update({ balance: Number(currAcc.balance) - amount }).eq('id', paymentAccountId)
-                }
-            }
 
             // UI Güncelle
             setShowPaymentModal(false)
@@ -217,27 +198,46 @@ export default function Tedarikciler() {
     const handleDeleteTransaction = async (trx: Transaction) => {
         if (!selectedSupplier) return;
         
-        const confirmed = await showConfirm(
-            'Bu hareketi silmek istediğinize emin misiniz? (Fişten gelen ürünler silinmez, sadece cari hesap geri alınır)',
-            'İşlemi Sil 🗑️'
-        )
+        let accountName = null;
+        if (trx.transaction_type === 'payment') {
+            const { data: mov } = await supabase.from('account_movements')
+                .select('accounts(name)')
+                .eq('source_type', 'supplier_payment')
+                .eq('source_id', trx.id)
+                .single();
+            if (mov && mov.accounts) {
+                accountName = (mov.accounts as any).name;
+            }
+        }
+        
+        let confirmMessage = `Emin misiniz?\n\n${formatDate(trx.transaction_date)} tarihli ve ${formatCurrency(trx.amount)} tutarındaki bu `;
+        if (trx.transaction_type === 'invoice') {
+            confirmMessage += `fatura işlemi silindiğinde:\n- ${selectedSupplier.name} bakiyesinden bu borç tutarı SİLİNECEK.`;
+        } else {
+            confirmMessage += `ödeme işlemi silindiğinde:\n- ${selectedSupplier.name} bakiyesine bu borç tutarı EKLENECEK.`;
+            if (accountName) {
+                confirmMessage += `\n- Bu ödeme için kasadan çıkan tutar, ${accountName} hesabınıza GERİ İADE EDİLECEK!`;
+            } else {
+                confirmMessage += `\n- (Uyarı: Bu işlem herhangi bir banka/kasa hesabına bağlı görünmüyor)`;
+            }
+        }
+        confirmMessage += `\n\nBu işlem geri alınamaz!`;
+
+        const confirmed = await showConfirm(confirmMessage, 'İşlemi Sil 🗑️');
         if (!confirmed) return;
 
         try {
-            // 1. İşlemi sil
-            await supabase.from('supplier_transactions').delete().eq('id', trx.id);
+            const { error: rpcError } = await supabase.rpc('delete_supplier_transaction', {
+                p_transaction_id: trx.id
+            });
+            if (rpcError) throw rpcError;
 
-            // 2. Bakiyeyi geri al (Rollback)
-            // Eğer silinen bir faturaysa (borç arttıran), bakiyeyi DÜŞÜR.
-            // Eğer silinen bir ödemeyse (borç azaltan), bakiyeyi ARTIR.
             let debtChange = 0;
             if (trx.transaction_type === 'invoice') debtChange = -trx.amount;
             if (trx.transaction_type === 'payment') debtChange = trx.amount;
 
             const currentDebt = parseFloat((selectedSupplier.total_debt || 0).toString());
             const newDebt = currentDebt + debtChange;
-
-            await supabase.from('suppliers').update({ total_debt: newDebt }).eq('id', selectedSupplier.id);
 
             // 3. Ekranı Yenile
             fetchSuppliers();
