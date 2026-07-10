@@ -49,6 +49,12 @@ export default function Stok() {
 
     const [sayimData, setSayimData] = useState<{ [key: string]: string }>({})
     const [sayimSearchTerm, setSayimSearchTerm] = useState('')
+    const [movementSearchTerm, setMovementSearchTerm] = useState('')
+    const [movementTypeFilter, setMovementTypeFilter] = useState<'tumu' | 'giris' | 'cikis' | 'fire' | 'sayim'>('tumu')
+    const [movementDateFilter, setMovementDateFilter] = useState<'bugun' | 'bu_hafta' | 'bu_ay' | 'custom' | 'tumu'>('bu_ay')
+    const [movementStartDate, setMovementStartDate] = useState('')
+    const [movementEndDate, setMovementEndDate] = useState('')
+    const [movementPage, setMovementPage] = useState(1)
     const [zayiDateFilter, setZayiDateFilter] = useState<'bugun' | 'bu_hafta' | 'bu_ay' | 'tumu'>('bu_ay')
     const [zayiSortBy, setZayiSortBy] = useState<'tarih_yeni' | 'tarih_eski' | 'tutar_yuksek' | 'tutar_dusuk'>('tarih_yeni')
     const [zayiSearchTerm, setZayiSearchTerm] = useState('')
@@ -271,6 +277,139 @@ export default function Stok() {
     }
 
     const filteredSayimMaterials = materials.filter(mat => mat.name.toLowerCase().includes(sayimSearchTerm.toLowerCase()))
+
+    const handleMovementSearchChange = (value: string) => {
+        setMovementSearchTerm(value)
+        setMovementPage(1)
+    }
+
+    const handleMovementTypeFilterChange = (value: 'tumu' | 'giris' | 'cikis' | 'fire' | 'sayim') => {
+        setMovementTypeFilter(value)
+        setMovementPage(1)
+    }
+
+    const handleMovementDateFilterChange = (value: 'bugun' | 'bu_hafta' | 'bu_ay' | 'custom' | 'tumu') => {
+        setMovementDateFilter(value)
+        setMovementPage(1)
+
+        if (value !== 'custom') {
+            setMovementStartDate('')
+            setMovementEndDate('')
+        }
+    }
+
+    const handleMovementStartDateChange = async (value: string) => {
+        if (movementEndDate && value && value > movementEndDate) {
+            await showAlert('Başlangıç tarihi bitiş tarihinden sonra olamaz.', 'warning', 'Geçersiz Tarih Aralığı')
+            return
+        }
+
+        setMovementStartDate(value)
+        setMovementPage(1)
+    }
+
+    const handleMovementEndDateChange = async (value: string) => {
+        if (movementStartDate && value && value < movementStartDate) {
+            await showAlert('Bitiş tarihi başlangıç tarihinden önce olamaz.', 'warning', 'Geçersiz Tarih Aralığı')
+            return
+        }
+
+        setMovementEndDate(value)
+        setMovementPage(1)
+    }
+
+    const clearMovementFilters = () => {
+        setMovementSearchTerm('')
+        setMovementTypeFilter('tumu')
+        setMovementDateFilter('bu_ay')
+        setMovementStartDate('')
+        setMovementEndDate('')
+        setMovementPage(1)
+    }
+
+    const movementPageSize = 25
+    const filteredMovementRows = useMemo(() => {
+        return movements.filter(mov => {
+            const materialName = mov.materials?.name?.toLowerCase() || ''
+            const noteText = mov.note?.toLowerCase() || ''
+            const search = movementSearchTerm.trim().toLowerCase()
+
+            const matchesSearch = search.length === 0 || materialName.includes(search) || noteText.includes(search)
+            if (!matchesSearch) return false
+
+            const matchesType = movementTypeFilter === 'tumu' || mov.movement_type === movementTypeFilter
+            if (!matchesType) return false
+
+            if (movementDateFilter === 'tumu') return true
+
+            const movementDate = new Date(mov.created_at)
+            const todayStart = new Date()
+            todayStart.setHours(0, 0, 0, 0)
+
+            if (movementDateFilter === 'bugun') {
+                return movementDate >= todayStart
+            }
+
+            if (movementDateFilter === 'bu_hafta') {
+                const weekStart = new Date(todayStart)
+                weekStart.setDate(weekStart.getDate() - 7)
+                return movementDate >= weekStart
+            }
+
+            if (movementDateFilter === 'bu_ay') {
+                return movementDate.getMonth() === todayStart.getMonth() && movementDate.getFullYear() === todayStart.getFullYear()
+            }
+
+            if (movementDateFilter === 'custom') {
+                const dateStr = mov.created_at.split('T')[0]
+                if (movementStartDate && dateStr < movementStartDate) return false
+                if (movementEndDate && dateStr > movementEndDate) return false
+            }
+
+            return true
+        })
+    }, [movements, movementSearchTerm, movementTypeFilter, movementDateFilter, movementStartDate, movementEndDate])
+
+    const totalMovementPages = Math.max(1, Math.ceil(filteredMovementRows.length / movementPageSize))
+    const safeMovementPage = Math.min(movementPage, totalMovementPages)
+    const paginatedMovements = filteredMovementRows.slice((safeMovementPage - 1) * movementPageSize, safeMovementPage * movementPageSize)
+    const activeMovementFilters = useMemo(() => {
+        const filters: string[] = []
+
+        if (movementSearchTerm.trim()) {
+            filters.push(`Arama: "${movementSearchTerm.trim()}"`)
+        }
+
+        if (movementTypeFilter !== 'tumu') {
+            const typeLabelMap = {
+                giris: 'Giriş',
+                cikis: 'Çıkış',
+                fire: 'Fire',
+                sayim: 'Sayım'
+            }
+            filters.push(`Tür: ${typeLabelMap[movementTypeFilter]}`)
+        }
+
+        const dateLabelMap = {
+            bugun: 'Bugün',
+            bu_hafta: 'Son 7 Gün',
+            bu_ay: 'Bu Ay',
+            tumu: 'Tüm Zamanlar',
+            custom: 'Özel Aralık'
+        }
+
+        if (movementDateFilter === 'custom') {
+            if (movementStartDate || movementEndDate) {
+                filters.push(`Tarih: ${movementStartDate || '...'} → ${movementEndDate || '...'}`)
+            } else {
+                filters.push(`Tarih: ${dateLabelMap[movementDateFilter]}`)
+            }
+        } else if (movementDateFilter !== 'tumu') {
+            filters.push(`Tarih: ${dateLabelMap[movementDateFilter]}`)
+        }
+
+        return filters
+    }, [movementSearchTerm, movementTypeFilter, movementDateFilter, movementStartDate, movementEndDate])
 
     const fireMovements = movements.filter(m => m.movement_type === 'fire')
     const sayimMovements = movements.filter(m => m.movement_type === 'sayim')
@@ -659,14 +798,103 @@ export default function Stok() {
                                 <div className="bg-stone-900 border border-stone-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                                     <div>
                                         <h3 className="font-bold text-stone-200">Tüm Stok Hareketleri</h3>
-                                        <p className="text-stone-400 text-sm">Liste artık son 50 kayıtla sınırlı değil; tüm stok hareketleri gösterilir.</p>
+                                        <p className="text-stone-400 text-sm">Liste artık son 50 kayıtla sınırlı değil; filtreleme ve sayfalama ile tüm stok hareketlerini rahatça inceleyebilirsiniz.</p>
                                     </div>
                                     <div className="flex flex-wrap gap-2 text-xs">
                                         <span className="bg-stone-800 text-stone-300 px-3 py-1 rounded-full border border-stone-700">Toplam {movements.length} hareket</span>
+                                        <span className="bg-amber-900/30 text-amber-300 px-3 py-1 rounded-full border border-amber-500/20">Filtre sonucu {filteredMovementRows.length} kayıt</span>
                                         <span className="bg-orange-900/30 text-orange-300 px-3 py-1 rounded-full border border-orange-500/20">{fireMovements.length} fire kaydı</span>
                                         <span className="bg-blue-900/30 text-blue-300 px-3 py-1 rounded-full border border-blue-500/20">{sayimMovements.length} sayım düzeltmesi</span>
                                     </div>
                                 </div>
+
+                                <div className="bg-stone-900 border border-stone-800 rounded-xl p-4 space-y-4">
+                                    <div className="grid grid-cols-1 xl:grid-cols-4 gap-3">
+                                        <div className="xl:col-span-2 relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">🔍</span>
+                                            <input
+                                                type="text"
+                                                placeholder="Hammadde adı veya not ara..."
+                                                value={movementSearchTerm}
+                                                onChange={(e) => handleMovementSearchChange(e.target.value)}
+                                                className="w-full bg-stone-800 border border-stone-700 rounded-lg pl-9 pr-4 py-2 text-white text-sm focus:outline-none focus:border-amber-400"
+                                            />
+                                        </div>
+                                        <select
+                                            value={movementTypeFilter}
+                                            onChange={(e) => handleMovementTypeFilterChange(e.target.value as 'tumu' | 'giris' | 'cikis' | 'fire' | 'sayim')}
+                                            className="bg-stone-800 border border-stone-700 text-stone-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-amber-400"
+                                        >
+                                            <option value="tumu">Tüm Hareket Türleri</option>
+                                            <option value="giris">Sadece Giriş</option>
+                                            <option value="cikis">Sadece Çıkış</option>
+                                            <option value="fire">Sadece Fire</option>
+                                            <option value="sayim">Sadece Sayım</option>
+                                        </select>
+                                        <select
+                                            value={movementDateFilter}
+                                            onChange={(e) => handleMovementDateFilterChange(e.target.value as 'bugun' | 'bu_hafta' | 'bu_ay' | 'custom' | 'tumu')}
+                                            className="bg-stone-800 border border-stone-700 text-stone-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-amber-400"
+                                        >
+                                            <option value="bugun">Bugün</option>
+                                            <option value="bu_hafta">Son 7 Gün</option>
+                                            <option value="bu_ay">Bu Ay</option>
+                                            <option value="custom">Özel Tarih Aralığı</option>
+                                            <option value="tumu">Tüm Zamanlar</option>
+                                        </select>
+                                    </div>
+
+                                    {movementDateFilter === 'custom' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="text-stone-400 text-xs mb-1 block">Başlangıç Tarihi</label>
+                                                <input
+                                                    type="date"
+                                                    value={movementStartDate}
+                                                    onChange={(e) => void handleMovementStartDateChange(e.target.value)}
+                                                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-400"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-stone-400 text-xs mb-1 block">Bitiş Tarihi</label>
+                                                <input
+                                                    type="date"
+                                                    value={movementEndDate}
+                                                    onChange={(e) => void handleMovementEndDateChange(e.target.value)}
+                                                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-400"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-sm">
+                                        <div className="space-y-2">
+                                            <p className="text-stone-400">
+                                                {filteredMovementRows.length === 0
+                                                    ? 'Seçili kriterlerde hareket bulunamadı.'
+                                                    : `${filteredMovementRows.length} kayıt bulundu. Sayfa ${safeMovementPage} / ${totalMovementPages}`}
+                                            </p>
+                                            {activeMovementFilters.length > 0 ? (
+                                                <div className="flex flex-wrap gap-2">
+                                                    {activeMovementFilters.map((filter) => (
+                                                        <span key={filter} className="bg-stone-800 text-stone-300 px-3 py-1 rounded-full border border-stone-700 text-xs">
+                                                            {filter}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-stone-500 text-xs">Aktif filtre yok. Tüm hareketler listeleniyor.</p>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={clearMovementFilters}
+                                            className="bg-stone-800 hover:bg-stone-700 text-stone-200 px-4 py-2 rounded-lg text-sm transition-colors border border-stone-700"
+                                        >
+                                            Filtreleri Temizle
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <div className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
                                     <div className="overflow-x-auto w-full">
 <table className="w-full">
@@ -680,9 +908,9 @@ export default function Stok() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {movements.length === 0 ? (
-                                            <tr><td colSpan={5} className="text-center py-8 text-stone-500">Henüz hareket yok</td></tr>
-                                        ) : movements.map(mov => {
+                                        {filteredMovementRows.length === 0 ? (
+                                            <tr><td colSpan={5} className="text-center py-8 text-stone-500">Seçili filtrelere uygun hareket bulunamadı.</td></tr>
+                                        ) : paginatedMovements.map(mov => {
                                             const typeConfig = {
                                                 giris: { label: 'Giriş', color: 'text-green-400' },
                                                 cikis: { label: 'Çıkış', color: 'text-red-400' },
@@ -711,6 +939,33 @@ export default function Stok() {
                                     </tbody>
                                 </table>
                                     </div>
+
+                                    {filteredMovementRows.length > 0 && (
+                                        <div className="border-t border-stone-800 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-stone-900/80">
+                                            <div className="text-sm text-stone-400">
+                                                {((safeMovementPage - 1) * movementPageSize) + 1} - {Math.min(safeMovementPage * movementPageSize, filteredMovementRows.length)} / {filteredMovementRows.length} kayıt gösteriliyor
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => setMovementPage(prev => Math.max(1, prev - 1))}
+                                                    disabled={safeMovementPage === 1}
+                                                    className="bg-stone-800 hover:bg-stone-700 disabled:opacity-50 disabled:hover:bg-stone-800 text-white px-4 py-2 rounded-lg text-sm transition-colors border border-stone-700"
+                                                >
+                                                    ← Önceki
+                                                </button>
+                                                <span className="text-sm text-stone-300 px-3 py-2 bg-stone-800 rounded-lg border border-stone-700">
+                                                    Sayfa {safeMovementPage} / {totalMovementPages}
+                                                </span>
+                                                <button
+                                                    onClick={() => setMovementPage(prev => Math.min(totalMovementPages, prev + 1))}
+                                                    disabled={safeMovementPage === totalMovementPages}
+                                                    className="bg-stone-800 hover:bg-stone-700 disabled:opacity-50 disabled:hover:bg-stone-800 text-white px-4 py-2 rounded-lg text-sm transition-colors border border-stone-700"
+                                                >
+                                                    Sonraki →
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
