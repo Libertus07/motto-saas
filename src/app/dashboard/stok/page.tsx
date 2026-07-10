@@ -55,7 +55,7 @@ export default function Stok() {
     const [movementStartDate, setMovementStartDate] = useState('')
     const [movementEndDate, setMovementEndDate] = useState('')
     const [movementPage, setMovementPage] = useState(1)
-    const [movementExpandedDates, setMovementExpandedDates] = useState<string[]>(['Bugün'])
+    const [movementCollapsedDates, setMovementCollapsedDates] = useState<Set<string>>(() => new Set())
     const [zayiDateFilter, setZayiDateFilter] = useState<'bugun' | 'bu_hafta' | 'bu_ay' | 'tumu'>('bu_ay')
     const [zayiSortBy, setZayiSortBy] = useState<'tarih_yeni' | 'tarih_eski' | 'tutar_yuksek' | 'tutar_dusuk'>('tarih_yeni')
     const [zayiSearchTerm, setZayiSearchTerm] = useState('')
@@ -404,23 +404,16 @@ export default function Stok() {
         return groups
     }, [paginatedMovements])
 
-    useEffect(() => {
-        const nextExpandedDates = groupedMovementRows.length === 0
-            ? []
-            : (() => {
-                const visibleDateKeys = groupedMovementRows.map(group => group.dateKey)
-                const preserved = movementExpandedDates.filter(dateKey => visibleDateKeys.includes(dateKey))
-                return preserved.length > 0 ? preserved : [visibleDateKeys[0]]
-            })()
-
-        const isSame = nextExpandedDates.length === movementExpandedDates.length && nextExpandedDates.every((dateKey, index) => dateKey === movementExpandedDates[index])
-        if (!isSame) {
-            setMovementExpandedDates(nextExpandedDates)
-        }
-    }, [groupedMovementRows, movementExpandedDates])
-
     const toggleMovementDate = (dateKey: string) => {
-        setMovementExpandedDates(prev => prev.includes(dateKey) ? prev.filter(d => d !== dateKey) : [...prev, dateKey])
+        setMovementCollapsedDates(prev => {
+            const next = new Set(prev)
+            if (next.has(dateKey)) {
+                next.delete(dateKey)
+            } else {
+                next.add(dateKey)
+            }
+            return next
+        })
     }
 
     const activeMovementFilters = useMemo(() => {
@@ -952,7 +945,7 @@ export default function Stok() {
                                         </div>
                                     ) : (
                                         groupedMovementRows.map(({ dateKey, items }) => {
-                                            const isExpanded = movementExpandedDates.includes(dateKey)
+                                            const isExpanded = !movementCollapsedDates.has(dateKey)
 
                                             return (
                                                 <div key={dateKey} className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
