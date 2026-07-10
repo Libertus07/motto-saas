@@ -277,8 +277,9 @@ export default function FisYukle() {
         const { data: rpcResult, error: rpcError } = await supabase.rpc('process_receipt_upload', { payload })
 
         if (rpcError) {
-            devError("Fiş yükleme atomic işlem hatası:", rpcError)
-            setError("Kayıt sırasında kritik bir hata oluştu. İşlem geri alındı: " + rpcError.message)
+            console.error("RPC ERROR DETAILS:", rpcError);
+            devError("Fiş yükleme atomic işlem hatası:", rpcError?.message, rpcError?.details, rpcError?.hint, rpcError?.code)
+            setError("Kayıt sırasında kritik bir hata oluştu. İşlem geri alındı: " + (rpcError?.message || JSON.stringify(rpcError)))
             setLoading(false)
             return
         }
