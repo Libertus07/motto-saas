@@ -327,7 +327,7 @@ export default function Tedarikciler() {
                 <div className="flex-1 bg-stone-900 rounded-xl border border-stone-800 overflow-hidden flex flex-col min-h-[400px] h-auto md:h-[calc(100vh-120px)]">
                     <div className="p-4 border-b border-stone-800 flex justify-between items-center bg-stone-800/30">
                         <h2 className="font-bold text-stone-300">Tedarikçi Listesi</h2>
-                        <span className="text-sm text-stone-400">Toplam Borç: ₺{formatCurrency(suppliers.reduce((t, s) => t + parseFloat((s.total_debt || 0).toString()), 0))}</span>
+                        <span className="text-sm text-stone-400">Toplam Borç:{formatCurrency(suppliers.reduce((t, s) => t + parseFloat((s.total_debt || 0).toString()), 0))}</span>
                     </div>
                     
                     <div className="flex-1 overflow-y-auto">
@@ -350,8 +350,7 @@ export default function Tedarikciler() {
                                             className={`border-b border-stone-800 cursor-pointer transition-colors ${selectedSupplier?.id === sup.id ? 'bg-amber-500/10 border-amber-500/30' : 'hover:bg-stone-800'}`}
                                         >
                                             <td className="px-4 py-4 font-medium text-stone-300">{sup.name}</td>
-                                            <td className={`px-4 py-4 text-right font-bold ${(sup.total_debt || 0) > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                                                ₺{formatCurrency(parseFloat((sup.total_debt || 0).toString()))}
+                                            <td className={`px-4 py-4 text-right font-bold ${(sup.total_debt || 0) > 0 ? 'text-red-400' : 'text-green-400'}`}>{formatCurrency(parseFloat((sup.total_debt || 0).toString()))}
                                             </td>
                                         </tr>
                                     ))}
@@ -372,8 +371,7 @@ export default function Tedarikciler() {
                             </div>
                             <div className="text-right">
                                 <p className="text-stone-400 text-sm mb-1">Kalan Borç</p>
-                                <p className={`text-3xl font-bold ${(selectedSupplier.total_debt || 0) > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                                    ₺{formatCurrency(parseFloat((selectedSupplier.total_debt || 0).toString()))}
+                                <p className={`text-3xl font-bold ${(selectedSupplier.total_debt || 0) > 0 ? 'text-red-400' : 'text-green-400'}`}>{formatCurrency(parseFloat((selectedSupplier.total_debt || 0).toString()))}
                                 </p>
                             </div>
                         </div>
@@ -437,7 +435,7 @@ export default function Tedarikciler() {
                                                 </td>
                                                 <td className="px-4 py-3 text-stone-300 text-sm">{trx.note}</td>
                                                 <td className={`px-4 py-3 text-right font-bold whitespace-nowrap ${trx.transaction_type === 'invoice' ? 'text-red-400' : 'text-green-400'}`}>
-                                                    {trx.transaction_type === 'invoice' ? '+' : '-'}₺{formatCurrency(parseFloat(trx.amount.toString()))}
+                                                    {trx.transaction_type === 'invoice' ? '+' : '-'}{formatCurrency(parseFloat(trx.amount.toString()))}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <button 
@@ -477,7 +475,7 @@ export default function Tedarikciler() {
                                                     <div className="flex items-center gap-4">
                                                         <div className="text-right">
                                                             <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Fiş Toplamı</p>
-                                                            <p className="font-bold text-red-400">₺{formatCurrency(group.totalAmount)}</p>
+                                                            <p className="font-bold text-red-400">{formatCurrency(group.totalAmount)}</p>
                                                         </div>
                                                         {group.batchId && (
                                                             <button 
@@ -513,8 +511,8 @@ export default function Tedarikciler() {
                                                                         <tr key={item.id} className="hover:bg-stone-900 transition-colors">
                                                                             <td className="px-4 py-2 font-medium text-stone-200">{item.materials?.name}</td>
                                                                             <td className="px-4 py-2 text-right">{item.quantity} {item.materials?.unit}</td>
-                                                                            <td className="px-4 py-2 text-right text-stone-400">₺{formatCurrency(parseFloat((item.unit_price || 0).toString()))}</td>
-                                                                            <td className="px-4 py-2 text-right font-bold text-red-400">₺{formatCurrency(total)}</td>
+                                                                            <td className="px-4 py-2 text-right text-stone-400">{formatCurrency(parseFloat((item.unit_price || 0).toString()))}</td>
+                                                                            <td className="px-4 py-2 text-right font-bold text-red-400">{formatCurrency(total)}</td>
                                                                         </tr>
                                                                     )
                                                                 })}

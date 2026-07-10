@@ -249,7 +249,7 @@ export default function YatirimGecmisi() {
                                         <div className="flex items-center gap-6">
                                             <div className="text-right hidden sm:block">
                                                 <p className="text-stone-500 text-xs uppercase tracking-wider mb-1">Toplam Yatırım Tutarı</p>
-                                                <p className="font-bold text-purple-400">₺{formatCurrency(group.totalAmount)}</p>
+                                                <p className="font-bold text-purple-400">{formatCurrency(group.totalAmount)}</p>
                                             </div>
                                             <div className={`text-stone-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
                                                 ▼
@@ -277,11 +277,11 @@ export default function YatirimGecmisi() {
                                                         <div className="flex flex-wrap items-center gap-6">
                                                             <div className="text-right">
                                                                 <p className="text-stone-500 text-xs">Birim Maliyet</p>
-                                                                <p className="font-medium text-stone-300">₺{formatCurrency(Number(inv.average_cost))}</p>
+                                                                <p className="font-medium text-stone-300">{formatCurrency(Number(inv.average_cost))}</p>
                                                             </div>
                                                             <div className="text-right">
                                                                 <p className="text-stone-500 text-xs">Toplam Tutar</p>
-                                                                <p className="font-bold text-purple-400">₺{formatCurrency((inv.quantity * inv.average_cost))}</p>
+                                                                <p className="font-bold text-purple-400">{formatCurrency((inv.quantity * inv.average_cost))}</p>
                                                             </div>
                                                             
                                                             {inv.document_url && (

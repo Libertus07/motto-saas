@@ -207,22 +207,22 @@ export default function Dashboard() {
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-6 relative overflow-hidden">
              <div className="absolute -right-4 -top-4 text-7xl opacity-5">💵</div>
              <p className="text-stone-400 text-sm mb-1 font-bold">Nakit Kasa</p>
-             <h2 className="text-2xl font-bold text-white">₺{formatCurrency(stats.totalCash)}</h2>
+             <h2 className="text-2xl font-bold text-white">{formatCurrency(stats.totalCash)}</h2>
           </div>
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-6 relative overflow-hidden">
              <div className="absolute -right-4 -top-4 text-7xl opacity-5">🏦</div>
              <p className="text-stone-400 text-sm mb-1 font-bold">Banka Hesapları</p>
-             <h2 className="text-2xl font-bold text-white">₺{formatCurrency(stats.totalBank)}</h2>
+             <h2 className="text-2xl font-bold text-white">{formatCurrency(stats.totalBank)}</h2>
           </div>
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-6 relative overflow-hidden cursor-pointer hover:border-amber-500/50 transition-colors" onClick={() => router.push('/dashboard/yatirimlar')}>
              <div className="absolute -right-4 -top-4 text-7xl opacity-5">📈</div>
              <p className="text-stone-400 text-sm mb-1 font-bold">Yatırımlar Değeri (Canlı)</p>
-             <h2 className="text-2xl font-bold text-amber-500">₺{formatCurrency(stats.totalInvestments)}</h2>
+             <h2 className="text-2xl font-bold text-amber-500">{formatCurrency(stats.totalInvestments)}</h2>
           </div>
           <div className="bg-stone-800 border border-amber-500/30 rounded-xl p-6 relative overflow-hidden shadow-[0_0_20px_rgba(245,158,11,0.1)]">
              <div className="absolute -right-4 -top-4 text-7xl opacity-5">👑</div>
              <p className="text-amber-400/80 text-sm mb-1 font-bold">TOPLAM NET VARLIK</p>
-             <h2 className="text-3xl font-black text-amber-500">₺{formatCurrency((stats.totalCash + stats.totalBank + stats.totalInvestments))}</h2>
+             <h2 className="text-3xl font-black text-amber-500">{formatCurrency((stats.totalCash + stats.totalBank + stats.totalInvestments))}</h2>
           </div>
         </div>
 
@@ -249,7 +249,7 @@ export default function Dashboard() {
                       <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">📈</div>
                       <div>
                          <p className="text-stone-400 text-xs">Brüt Satışlar (Liste Fiyatı)</p>
-                         <p className="font-bold text-white text-lg">₺{formatCurrency(stats.grossRevenue)}</p>
+                         <p className="font-bold text-white text-lg">{formatCurrency(stats.grossRevenue)}</p>
                       </div>
                    </div>
                 </div>
@@ -261,7 +261,7 @@ export default function Dashboard() {
                       <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400">✂️</div>
                       <div>
                          <p className="text-stone-400 text-xs">- İndirim ve İkramlar</p>
-                         <p className="font-bold text-red-400 text-lg">₺{formatCurrency(stats.totalDiscounts)}</p>
+                         <p className="font-bold text-red-400 text-lg">{formatCurrency(stats.totalDiscounts)}</p>
                       </div>
                    </div>
                    <div className="text-right hidden sm:block">
@@ -277,7 +277,7 @@ export default function Dashboard() {
                       <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">💵</div>
                       <div>
                          <p className="text-emerald-400/80 text-xs font-bold">NET SATIŞ (KASAYA GİREN)</p>
-                         <p className="font-bold text-emerald-400 text-xl">₺{formatCurrency(stats.netRevenue)}</p>
+                         <p className="font-bold text-emerald-400 text-xl">{formatCurrency(stats.netRevenue)}</p>
                       </div>
                    </div>
                 </div>
@@ -289,7 +289,7 @@ export default function Dashboard() {
                       <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400">📦</div>
                       <div>
                          <p className="text-stone-400 text-xs">- Satılan Malın Maliyeti (SMM)</p>
-                         <p className="font-bold text-red-300 text-lg">₺{formatCurrency(stats.totalCogs)}</p>
+                         <p className="font-bold text-red-300 text-lg">{formatCurrency(stats.totalCogs)}</p>
                       </div>
                    </div>
                    <div className="text-right hidden sm:block">
@@ -305,7 +305,7 @@ export default function Dashboard() {
                       <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-400">💸</div>
                       <div>
                          <p className="text-stone-400 text-xs">- Operasyonel Giderler</p>
-                         <p className="font-bold text-red-300 text-lg">₺{formatCurrency(stats.monthlyExpenses)}</p>
+                         <p className="font-bold text-red-300 text-lg">{formatCurrency(stats.monthlyExpenses)}</p>
                       </div>
                    </div>
                    <div className="text-right hidden sm:block">
@@ -322,7 +322,7 @@ export default function Dashboard() {
                       </div>
                       <div className="text-right">
                          <h2 className={`text-4xl font-black tracking-tight ${stats.netProfit >= 0 ? 'text-green-400 drop-shadow-[0_0_15px_rgba(74,222,128,0.2)]' : 'text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.2)]'}`}>
-                           {stats.netProfit >= 0 ? '+' : ''}₺{formatCurrency(stats.netProfit)}
+                           {stats.netProfit >= 0 ? '+' : ''}{formatCurrency(stats.netProfit)}
                          </h2>
                          <p className={`text-xs mt-1 font-medium ${stats.netProfit >= 0 ? 'text-green-500/70' : 'text-red-500/70'}`}>
                            Net Kâr Marjı: %{stats.grossRevenue > 0 ? ((stats.netProfit / stats.grossRevenue) * 100).toFixed(1) : '0.0'}
@@ -364,7 +364,7 @@ export default function Dashboard() {
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-3 shadow-[0_0_15px_rgba(16,185,129,0.15)]">💰</div>
                 <p className="text-stone-400 text-[11px] uppercase tracking-wider mb-1 font-bold relative z-10">Stok Değeri</p>
                 <p className="text-2xl font-black text-emerald-400 tracking-tight truncate relative z-10">
-                  {loading ? '...' : `₺${formatCurrency(stats.totalStockValue)}`}
+                  {loading ? '...' : `${formatCurrency(stats.totalStockValue)}`}
                 </p>
              </div>
           </div>

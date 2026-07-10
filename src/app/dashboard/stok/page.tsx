@@ -492,8 +492,7 @@ export default function Stok() {
                                                         <td className="px-4 py-3 text-right text-stone-400">
                                                             {mat.critical_stock_level || 0} {mat.unit}
                                                         </td>
-                                                        <td className="px-4 py-3 text-right text-amber-400">
-                                                            ₺{formatCurrency(stockValue)}
+                                                        <td className="px-4 py-3 text-right text-amber-400">{formatCurrency(stockValue)}
                                                         </td>
                                                         <td className="px-4 py-3 text-right">
                                                             {isCritical
@@ -584,8 +583,7 @@ export default function Stok() {
                                     <tfoot>
                                         <tr className="bg-stone-800">
                                             <td colSpan={3} className="px-4 py-3 font-bold text-stone-300">Toplam Stok Değeri</td>
-                                            <td className="px-4 py-3 text-right font-bold text-amber-400">
-                                                ₺{formatCurrency(materials.reduce((t, i) => t + (i.stock_quantity || 0) * i.price_per_unit, 0))}
+                                            <td className="px-4 py-3 text-right font-bold text-amber-400">{formatCurrency(materials.reduce((t, i) => t + (i.stock_quantity || 0) * i.price_per_unit, 0))}
                                             </td>
                                             <td></td>
                                         </tr>
@@ -731,8 +729,7 @@ export default function Stok() {
                                     <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-6 flex flex-col justify-center">
                                         <h3 className="font-bold text-red-400 text-lg mb-1">Toplam Fire Maliyeti</h3>
                                         <p className="text-stone-400 text-xs mb-4">Seçili dönemdeki toplam maddi kayıp</p>
-                                        <div className="text-4xl font-black text-red-400">
-                                            ₺{formatCurrency(totalZayiMaliyeti)}
+                                        <div className="text-4xl font-black text-red-400">{formatCurrency(totalZayiMaliyeti)}
                                         </div>
                                     </div>
                                     
@@ -748,7 +745,7 @@ export default function Stok() {
                                                             <span className="bg-stone-950 text-stone-500 font-bold w-6 h-6 flex items-center justify-center rounded-md text-xs">{idx + 1}</span>
                                                             <span className="font-medium text-stone-200">{p.name}</span>
                                                         </div>
-                                                        <span className="font-bold text-red-400">₺{formatCurrency(p.total)}</span>
+                                                        <span className="font-bold text-red-400">{formatCurrency(p.total)}</span>
                                                     </div>
                                                 ))}
                                             </div>

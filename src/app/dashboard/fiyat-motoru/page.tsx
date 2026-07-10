@@ -307,22 +307,20 @@ export default function FiyatMotoru() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
             <p className="text-stone-400 text-xs mb-1">Günlük Ciro</p>
-            <p className="text-xl font-bold text-amber-400">₺{formatCurrency(totalDailyRevenue)}</p>
+            <p className="text-xl font-bold text-amber-400">{formatCurrency(totalDailyRevenue)}</p>
           </div>
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
             <p className="text-stone-400 text-xs mb-1">Günlük Gider</p>
-            <p className="text-xl font-bold text-red-400">₺{formatCurrency(dailyExpenses)}</p>
+            <p className="text-xl font-bold text-red-400">{formatCurrency(dailyExpenses)}</p>
           </div>
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
             <p className="text-stone-400 text-xs mb-1">Günlük Net Kar</p>
-            <p className={`text-xl font-bold ${totalDailyProfit > 0 ? 'text-green-400' : 'text-red-400'}`}>
-              ₺{formatCurrency(totalDailyProfit)}
+            <p className={`text-xl font-bold ${totalDailyProfit > 0 ? 'text-green-400' : 'text-red-400'}`}>{formatCurrency(totalDailyProfit)}
             </p>
           </div>
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
             <p className="text-stone-400 text-xs mb-1">Aylık Tahmini Kar</p>
-            <p className={`text-xl font-bold ${totalDailyProfit * 30 > 0 ? 'text-green-400' : 'text-red-400'}`}>
-              ₺{formatCurrency((totalDailyProfit * 30))}
+            <p className={`text-xl font-bold ${totalDailyProfit * 30 > 0 ? 'text-green-400' : 'text-red-400'}`}>{formatCurrency((totalDailyProfit * 30))}
             </p>
           </div>
         </div>
@@ -397,8 +395,7 @@ export default function FiyatMotoru() {
                           placeholder="0"
                         />
                       </td>
-                      <td className="px-4 py-2 text-right text-stone-300">
-                        ₺{formatCurrency(((product.sale_price || 0) * sales))}
+                      <td className="px-4 py-2 text-right text-stone-300">{formatCurrency(((product.sale_price || 0) * sales))}
                       </td>
                     </tr>
                   )
@@ -410,8 +407,7 @@ export default function FiyatMotoru() {
                   <td className="px-4 py-3 text-right font-bold text-white">
                     {Object.values(productSales).reduce((t, s) => t + (s.dailySales || 0), 0)} adet
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-amber-400">
-                    ₺{formatCurrency(totalDailyRevenue)}
+                  <td className="px-4 py-3 text-right font-bold text-amber-400">{formatCurrency(totalDailyRevenue)}
                   </td>
                 </tr>
               </tfoot>

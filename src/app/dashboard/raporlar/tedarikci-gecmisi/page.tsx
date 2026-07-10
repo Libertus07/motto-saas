@@ -367,7 +367,7 @@ export default function TedarikciGecmisi() {
                                         <div className="flex items-center gap-6">
                                             <div className="text-right hidden sm:block">
                                                 <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Toplam Alış Tutarı</p>
-                                                <p className="text-2xl font-bold text-white">₺{formatCurrency(mainGroup.totalAmount)}</p>
+                                                <p className="text-2xl font-bold text-white">{formatCurrency(mainGroup.totalAmount)}</p>
                                             </div>
                                             <div className={`text-stone-500 p-2 transform transition-transform duration-200 ${isMainExpanded ? 'rotate-180' : ''}`}>
                                                 ▼
@@ -401,7 +401,7 @@ export default function TedarikciGecmisi() {
                                                             
                                                             <div className="flex items-center gap-4">
                                                                 <div className="text-right">
-                                                                    <p className="text-lg font-bold text-white">₺{formatCurrency(receipt.totalAmount)}</p>
+                                                                    <p className="text-lg font-bold text-white">{formatCurrency(receipt.totalAmount)}</p>
                                                                 </div>
                                                                 
                                                                 <div className="flex items-center gap-1">
@@ -453,16 +453,14 @@ export default function TedarikciGecmisi() {
                                                                                     <td className="px-5 py-2.5 font-medium text-stone-300">
                                                                                         {item.materials?.name || 'Bilinmeyen'}
                                                                                     </td>
-                                                                                    <td className="px-5 py-2.5 text-center text-stone-400">
-                                                                                        ₺{formatCurrency(item.unit_price)}
+                                                                                    <td className="px-5 py-2.5 text-center text-stone-400">{formatCurrency(item.unit_price)}
                                                                                     </td>
                                                                                     <td className="px-5 py-2.5 text-center">
                                                                                         <span className="inline-block bg-stone-800 text-green-400 px-2 py-0.5 rounded text-xs font-bold min-w-[2rem]">
                                                                                             {item.quantity} {item.materials?.unit || ''}
                                                                                         </span>
                                                                                     </td>
-                                                                                    <td className="px-5 py-2.5 text-right font-medium text-white">
-                                                                                        ₺{formatCurrency((item.quantity * item.unit_price))}
+                                                                                    <td className="px-5 py-2.5 text-right font-medium text-white">{formatCurrency((item.quantity * item.unit_price))}
                                                                                     </td>
                                                                                 </tr>
                                                                             ))}

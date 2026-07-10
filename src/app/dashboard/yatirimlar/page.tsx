@@ -607,9 +607,9 @@ export default function YatirimlarPage() {
                     <div className="flex items-center gap-6 justify-between sm:justify-end w-full sm:w-auto pl-16 sm:pl-0">
                         <div className="text-left sm:text-right">
                             <p className="text-stone-400 text-xs font-bold mb-0.5">Güncel Değer</p>
-                            <p className="text-lg font-bold text-white">₺{formatCurrency(inv.currentValue)}</p>
+                            <p className="text-lg font-bold text-white">{formatCurrency(inv.currentValue)}</p>
                             <p className={`text-xs font-bold mt-0.5 ${inv.isProfit ? 'text-green-400' : 'text-red-400'}`}>
-                                {inv.isProfit ? 'Kâr: +' : 'Zarar: '}₺{formatCurrency(inv.profit)}
+                                {inv.isProfit ? 'Kâr: +' : 'Zarar: '}{formatCurrency(inv.profit)}
                             </p>
                         </div>
                         
@@ -673,7 +673,7 @@ export default function YatirimlarPage() {
                                                     {tx.notes || '-'}
                                                 </td>
                                                 <td className="px-5 py-3 text-right font-bold text-white whitespace-nowrap">
-                                                    {tx.transaction_type === 'value_update' ? '' : (tx.transaction_type === 'buy' ? '-' : '+')}₺{formatCurrency(tx.total_amount)}
+                                                    {tx.transaction_type === 'value_update' ? '' : (tx.transaction_type === 'buy' ? '-' : '+')}{formatCurrency(tx.total_amount)}
                                                 </td>
                                             </tr>
                                         ))
@@ -717,8 +717,7 @@ export default function YatirimlarPage() {
                     <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 relative overflow-hidden">
                         <div className="absolute -right-4 -top-4 text-7xl opacity-5">💰</div>
                         <p className="text-stone-400 text-sm mb-1 font-bold">Toplam Yatırım Maliyeti</p>
-                        <h2 className="text-3xl font-bold text-white mb-2">
-                            ₺{formatCurrency(totalCostValue)}
+                        <h2 className="text-3xl font-bold text-white mb-2">{formatCurrency(totalCostValue)}
                         </h2>
                         <p className="text-xs text-stone-500">Ödediğiniz toplam anapara</p>
                     </div>
@@ -726,8 +725,7 @@ export default function YatirimlarPage() {
                     <div className="bg-stone-900 border border-amber-500/30 rounded-2xl p-6 relative overflow-hidden shadow-[0_0_30px_rgba(245,158,11,0.05)]">
                         <div className="absolute -right-4 -top-4 text-7xl opacity-5">💎</div>
                         <p className="text-amber-500/80 text-sm mb-1 font-bold">Güncel Varlık Değeri</p>
-                        <h2 className="text-3xl font-bold text-amber-500 mb-2">
-                            ₺{formatCurrency(totalCurrentValue)}
+                        <h2 className="text-3xl font-bold text-amber-500 mb-2">{formatCurrency(totalCurrentValue)}
                         </h2>
                         <p className="text-xs text-amber-500/50">Canlı kurlar ve ekspertiz değerleri</p>
                     </div>
@@ -739,7 +737,7 @@ export default function YatirimlarPage() {
                                 Toplam Kâr / Zarar
                             </p>
                             <h2 className={`text-3xl font-bold mb-2 flex flex-wrap items-center gap-2 ${totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                {totalProfit >= 0 ? '+' : ''}₺{formatCurrency(totalProfit)}
+                                {totalProfit >= 0 ? '+' : ''}{formatCurrency(totalProfit)}
                                 <span className="text-lg bg-black/20 px-2 py-1 rounded-lg">
                                     {totalProfit >= 0 ? '+' : ''}{profitPercentage.toFixed(2)}%
                                 </span>
@@ -747,7 +745,7 @@ export default function YatirimlarPage() {
                         </div>
                         {totalRentIncome > 0 && (
                             <p className={`text-xs mt-2 ${totalProfit >= 0 ? 'text-green-500/70' : 'text-red-500/70'}`}>
-                                (Bu kâra ₺{formatCurrency(totalRentIncome)} toplam kira geliri dahildir)
+                                (Bu kâra{formatCurrency(totalRentIncome)} toplam kira geliri dahildir)
                             </p>
                         )}
                     </div>
@@ -811,10 +809,10 @@ export default function YatirimlarPage() {
                                         <div className="flex items-center gap-6 mt-3 sm:mt-0 text-sm pl-7 sm:pl-0">
                                             <div>
                                                 <span className="text-stone-500 mr-2 font-medium">Toplam Değer:</span>
-                                                <span className="font-bold text-white">₺{formatCurrency(groupTotalValue)}</span>
+                                                <span className="font-bold text-white">{formatCurrency(groupTotalValue)}</span>
                                             </div>
                                             <div className={`font-bold px-2 py-1 rounded-md ${isGroupProfit ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                                                {isGroupProfit ? 'Kâr: +' : 'Zarar: '}₺{formatCurrency(groupProfit)}
+                                                {isGroupProfit ? 'Kâr: +' : 'Zarar: '}{formatCurrency(groupProfit)}
                                             </div>
                                         </div>
                                     </summary>
@@ -933,8 +931,7 @@ export default function YatirimlarPage() {
 
                             <div className="bg-stone-950 p-4 rounded-xl border border-stone-800 flex justify-between items-center">
                                 <span className="text-stone-400 font-bold">Ödenecek Toplam Tutar:</span>
-                                <span className="text-xl font-bold text-red-400">
-                                    ₺{formatCurrency(((buyForm.asset_type === 'real_estate' ? 1 : (parseFloat(buyForm.quantity) || 0)) * (parseFloat(buyForm.price_per_unit) || 0)))}
+                                <span className="text-xl font-bold text-red-400">{formatCurrency(((buyForm.asset_type === 'real_estate' ? 1 : (parseFloat(buyForm.quantity) || 0)) * (parseFloat(buyForm.price_per_unit) || 0)))}
                                 </span>
                             </div>
 
@@ -948,7 +945,7 @@ export default function YatirimlarPage() {
                                 >
                                     <option value="" disabled>Hesap Seçin...</option>
                                     {accounts.map(acc => (
-                                        <option key={acc.id} value={acc.id}>{acc.name} (Bakiye: ₺{formatCurrency(acc.balance)})</option>
+                                        <option key={acc.id} value={acc.id}>{acc.name} (Bakiye:{formatCurrency(acc.balance)})</option>
                                     ))}
                                 </select>
                             </div>
@@ -1171,7 +1168,7 @@ export default function YatirimlarPage() {
                                 >
                                     <option value="" disabled>Hesap Seçin...</option>
                                     {accounts.map(acc => (
-                                        <option key={acc.id} value={acc.id}>{acc.name} (Bakiye: ₺{formatCurrency(acc.balance)})</option>
+                                        <option key={acc.id} value={acc.id}>{acc.name} (Bakiye:{formatCurrency(acc.balance)})</option>
                                     ))}
                                 </select>
                             </div>

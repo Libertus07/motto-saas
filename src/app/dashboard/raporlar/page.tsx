@@ -255,8 +255,7 @@ export default function Raporlar() {
                             </div>
                             <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
                                 <p className="text-stone-400 text-xs mb-1">Aylık Gider</p>
-                                <p className="text-2xl font-bold text-amber-400">
-                                    ₺{formatCurrency(monthlyExpenses)}
+                                <p className="text-2xl font-bold text-amber-400">{formatCurrency(monthlyExpenses)}
                                 </p>
                             </div>
                             <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
@@ -282,7 +281,7 @@ export default function Raporlar() {
                                                     <p className="font-medium text-sm">{p.name}</p>
                                                     <p className="text-stone-500 text-xs">{p.totalQuantity} adet satıldı</p>
                                                 </div>
-                                                <span className="text-blue-400 font-bold">₺{formatCurrency(p.totalRevenue)}</span>
+                                                <span className="text-blue-400 font-bold">{formatCurrency(p.totalRevenue)}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -301,7 +300,7 @@ export default function Raporlar() {
                                                     <p className="font-medium text-sm">{p.name}</p>
                                                     <p className="text-stone-500 text-xs">Marj: %{p.margin.toFixed(1)}</p>
                                                 </div>
-                                                <span className="text-green-400 font-bold">₺{formatCurrency(p.totalProfit)}</span>
+                                                <span className="text-green-400 font-bold">{formatCurrency(p.totalProfit)}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -351,8 +350,7 @@ export default function Raporlar() {
                                                         style={{ width: `${(amount / monthlyExpenses) * 100}%` }}
                                                     />
                                                 </div>
-                                                <span className="text-red-400 text-sm w-24 text-right">
-                                                    ₺{formatCurrency(amount)}
+                                                <span className="text-red-400 text-sm w-24 text-right">{formatCurrency(amount)}
                                                 </span>
                                                 <span className="text-stone-500 text-xs w-10 text-right">
                                                     %{((amount / monthlyExpenses) * 100).toFixed(0)}
