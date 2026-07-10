@@ -328,7 +328,7 @@ export default function Stok() {
         setMovementPage(1)
     }
 
-    const movementPageSize = 25
+    const movementDaysPerPage = 7
     const filteredMovementRows = useMemo(() => {
         return movements.filter(mov => {
             const materialName = mov.materials?.name?.toLowerCase() || ''
@@ -371,38 +371,57 @@ export default function Stok() {
         })
     }, [movements, movementSearchTerm, movementTypeFilter, movementDateFilter, movementStartDate, movementEndDate])
 
-    const totalMovementPages = Math.max(1, Math.ceil(filteredMovementRows.length / movementPageSize))
-    const safeMovementPage = Math.min(movementPage, totalMovementPages)
-    const paginatedMovements = useMemo(() => {
-        return filteredMovementRows.slice((safeMovementPage - 1) * movementPageSize, safeMovementPage * movementPageSize)
-    }, [filteredMovementRows, safeMovementPage])
-
     const groupedMovementRows = useMemo(() => {
-        const groups: Array<{ dateKey: string; items: Movement[] }> = []
+        const groups: Array<{ dateKey: string; dateLabel: string; items: Movement[] }> = []
+        const toLocalDateKey = (date: Date) => [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, '0'),
+            String(date.getDate()).padStart(2, '0')
+        ].join('-')
         const todayDateObj = new Date()
         const yesterday = new Date(todayDateObj)
         yesterday.setDate(yesterday.getDate() - 1)
+        const todayKey = toLocalDateKey(todayDateObj)
+        const yesterdayKey = toLocalDateKey(yesterday)
 
-        paginatedMovements.forEach((mov) => {
+        filteredMovementRows.forEach((mov) => {
             const date = new Date(mov.created_at)
-            let dateKey = formatDate(date)
-
-            if (date.toDateString() === todayDateObj.toDateString()) {
-                dateKey = 'Bugün'
-            } else if (date.toDateString() === yesterday.toDateString()) {
-                dateKey = 'Dün'
-            }
-
+            const dateKey = toLocalDateKey(date)
+            const dateLabel = dateKey === todayKey ? 'Bugün' : dateKey === yesterdayKey ? 'Dün' : formatDate(date)
             const existingGroup = groups.find((group) => group.dateKey === dateKey)
+
             if (existingGroup) {
                 existingGroup.items.push(mov)
             } else {
-                groups.push({ dateKey, items: [mov] })
+                groups.push({ dateKey, dateLabel, items: [mov] })
             }
         })
 
         return groups
-    }, [paginatedMovements])
+    }, [filteredMovementRows])
+
+    const totalMovementPages = Math.max(1, Math.ceil(groupedMovementRows.length / movementDaysPerPage))
+    const safeMovementPage = Math.min(movementPage, totalMovementPages)
+    const paginatedMovementGroups = useMemo(() => {
+        return groupedMovementRows.slice((safeMovementPage - 1) * movementDaysPerPage, safeMovementPage * movementDaysPerPage)
+    }, [groupedMovementRows, safeMovementPage])
+    const visibleMovementCount = paginatedMovementGroups.reduce((total, group) => total + group.items.length, 0)
+    const movementSummary = useMemo(() => {
+        const countByType = (type: string) => filteredMovementRows.filter(mov => mov.movement_type === type).length
+        const giris = countByType('giris')
+        const cikis = countByType('cikis')
+        const fire = countByType('fire')
+        const sayim = countByType('sayim')
+
+        return {
+            total: filteredMovementRows.length,
+            giris,
+            cikis,
+            fire,
+            sayim,
+            control: fire + sayim
+        }
+    }, [filteredMovementRows])
 
     const toggleMovementDate = (dateKey: string) => {
         setMovementCollapsedDates(prev => {
@@ -412,6 +431,22 @@ export default function Stok() {
             } else {
                 next.add(dateKey)
             }
+            return next
+        })
+    }
+
+    const expandAllMovementDates = () => {
+        setMovementCollapsedDates(prev => {
+            const next = new Set(prev)
+            paginatedMovementGroups.forEach(group => next.delete(group.dateKey))
+            return next
+        })
+    }
+
+    const collapseAllMovementDates = () => {
+        setMovementCollapsedDates(prev => {
+            const next = new Set(prev)
+            paginatedMovementGroups.forEach(group => next.add(group.dateKey))
             return next
         })
     }
@@ -837,54 +872,96 @@ export default function Stok() {
 
                         {/* Hareketler */}
                         {activeTab === 'hareket' && (
-                            <div className="space-y-4">
-                                <div className="bg-stone-900 border border-stone-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div className="space-y-5">
+                                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
                                     <div>
-                                        <h3 className="font-bold text-stone-200">Tüm Stok Hareketleri</h3>
-                                        <p className="text-stone-400 text-sm">Liste artık son 50 kayıtla sınırlı değil; filtreleme ve sayfalama ile tüm stok hareketlerini rahatça inceleyebilirsiniz.</p>
+                                        <p className="text-amber-400 text-xs font-bold uppercase tracking-[0.2em] mb-1">Operasyon Geçmişi</p>
+                                        <h2 className="text-xl font-bold text-white">Stok Hareketleri</h2>
+                                        <p className="text-stone-400 text-sm mt-1">Giriş, çıkış, fire ve sayım düzeltmelerini seçili dönem üzerinden izleyin.</p>
                                     </div>
-                                    <div className="flex flex-wrap gap-2 text-xs">
-                                        <span className="bg-stone-800 text-stone-300 px-3 py-1 rounded-full border border-stone-700">Toplam {movements.length} hareket</span>
-                                        <span className="bg-amber-900/30 text-amber-300 px-3 py-1 rounded-full border border-amber-500/20">Filtre sonucu {filteredMovementRows.length} kayıt</span>
-                                        <span className="bg-orange-900/30 text-orange-300 px-3 py-1 rounded-full border border-orange-500/20">{fireMovements.length} fire kaydı</span>
-                                        <span className="bg-blue-900/30 text-blue-300 px-3 py-1 rounded-full border border-blue-500/20">{sayimMovements.length} sayım düzeltmesi</span>
+                                    <div className="text-xs text-stone-500 bg-stone-900 border border-stone-800 rounded-lg px-3 py-2">
+                                        Kayıtlar gün bazında gruplanır · Sayfa başına {movementDaysPerPage} gün
                                     </div>
                                 </div>
 
-                                <div className="bg-stone-900 border border-stone-800 rounded-xl p-4 space-y-4">
-                                    <div className="grid grid-cols-1 xl:grid-cols-4 gap-3">
-                                        <div className="xl:col-span-2 relative">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">🔍</span>
-                                            <input
-                                                type="text"
-                                                placeholder="Hammadde adı veya not ara..."
-                                                value={movementSearchTerm}
-                                                onChange={(e) => handleMovementSearchChange(e.target.value)}
-                                                className="w-full bg-stone-800 border border-stone-700 rounded-lg pl-9 pr-4 py-2 text-white text-sm focus:outline-none focus:border-amber-400"
-                                            />
+                                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                                    <div className="bg-stone-900 border border-stone-800 rounded-xl p-4 min-h-28 flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-stone-500 text-xs font-bold uppercase tracking-wider">Toplam Hareket</p>
+                                            <p className="text-3xl font-black text-white mt-2">{movementSummary.total}</p>
+                                            <p className="text-stone-500 text-xs mt-1">{groupedMovementRows.length} farklı gün</p>
                                         </div>
-                                        <select
-                                            value={movementTypeFilter}
-                                            onChange={(e) => handleMovementTypeFilterChange(e.target.value as 'tumu' | 'giris' | 'cikis' | 'fire' | 'sayim')}
-                                            className="bg-stone-800 border border-stone-700 text-stone-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-amber-400"
-                                        >
-                                            <option value="tumu">Tüm Hareket Türleri</option>
-                                            <option value="giris">Sadece Giriş</option>
-                                            <option value="cikis">Sadece Çıkış</option>
-                                            <option value="fire">Sadece Fire</option>
-                                            <option value="sayim">Sadece Sayım</option>
-                                        </select>
-                                        <select
-                                            value={movementDateFilter}
-                                            onChange={(e) => handleMovementDateFilterChange(e.target.value as 'bugun' | 'bu_hafta' | 'bu_ay' | 'custom' | 'tumu')}
-                                            className="bg-stone-800 border border-stone-700 text-stone-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-amber-400"
-                                        >
-                                            <option value="bugun">Bugün</option>
-                                            <option value="bu_hafta">Son 7 Gün</option>
-                                            <option value="bu_ay">Bu Ay</option>
-                                            <option value="custom">Özel Tarih Aralığı</option>
-                                            <option value="tumu">Tüm Zamanlar</option>
-                                        </select>
+                                        <span className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-xl">📋</span>
+                                    </div>
+                                    <div className="bg-stone-900 border border-stone-800 rounded-xl p-4 min-h-28 flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-stone-500 text-xs font-bold uppercase tracking-wider">Stok Girişi</p>
+                                            <p className="text-3xl font-black text-green-400 mt-2">{movementSummary.giris}</p>
+                                            <p className="text-stone-500 text-xs mt-1">Seçili dönemde</p>
+                                        </div>
+                                        <span className="w-11 h-11 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center text-xl">📥</span>
+                                    </div>
+                                    <div className="bg-stone-900 border border-stone-800 rounded-xl p-4 min-h-28 flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-stone-500 text-xs font-bold uppercase tracking-wider">Stok Çıkışı</p>
+                                            <p className="text-3xl font-black text-red-400 mt-2">{movementSummary.cikis}</p>
+                                            <p className="text-stone-500 text-xs mt-1">Seçili dönemde</p>
+                                        </div>
+                                        <span className="w-11 h-11 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-xl">📤</span>
+                                    </div>
+                                    <div className="bg-stone-900 border border-stone-800 rounded-xl p-4 min-h-28 flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-stone-500 text-xs font-bold uppercase tracking-wider">Kontrol Hareketi</p>
+                                            <p className="text-3xl font-black text-blue-400 mt-2">{movementSummary.control}</p>
+                                            <p className="text-stone-500 text-xs mt-1">{movementSummary.fire} fire · {movementSummary.sayim} sayım</p>
+                                        </div>
+                                        <span className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-xl">🧭</span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-stone-900 border border-stone-800 rounded-xl p-4 space-y-4 shadow-sm shadow-black/20">
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+                                        <div className="lg:col-span-6">
+                                            <label className="text-stone-500 text-xs font-bold mb-1.5 block">ARAMA</label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">🔍</span>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Hammadde adı veya hareket notu..."
+                                                    value={movementSearchTerm}
+                                                    onChange={(e) => handleMovementSearchChange(e.target.value)}
+                                                    className="w-full h-11 bg-stone-800 border border-stone-700 rounded-lg pl-9 pr-4 text-white text-sm focus:outline-none focus:border-amber-400"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="lg:col-span-3">
+                                            <label className="text-stone-500 text-xs font-bold mb-1.5 block">HAREKET TÜRÜ</label>
+                                            <select
+                                                value={movementTypeFilter}
+                                                onChange={(e) => handleMovementTypeFilterChange(e.target.value as 'tumu' | 'giris' | 'cikis' | 'fire' | 'sayim')}
+                                                className="w-full h-11 bg-stone-800 border border-stone-700 text-stone-300 text-sm rounded-lg px-3 focus:outline-none focus:border-amber-400"
+                                            >
+                                                <option value="tumu">Tüm Hareketler</option>
+                                                <option value="giris">Stok Girişi</option>
+                                                <option value="cikis">Stok Çıkışı</option>
+                                                <option value="fire">Fire / Zayi</option>
+                                                <option value="sayim">Sayım Düzeltmesi</option>
+                                            </select>
+                                        </div>
+                                        <div className="lg:col-span-3">
+                                            <label className="text-stone-500 text-xs font-bold mb-1.5 block">TARİH ARALIĞI</label>
+                                            <select
+                                                value={movementDateFilter}
+                                                onChange={(e) => handleMovementDateFilterChange(e.target.value as 'bugun' | 'bu_hafta' | 'bu_ay' | 'custom' | 'tumu')}
+                                                className="w-full h-11 bg-stone-800 border border-stone-700 text-stone-300 text-sm rounded-lg px-3 focus:outline-none focus:border-amber-400"
+                                            >
+                                                <option value="bugun">Bugün</option>
+                                                <option value="bu_hafta">Son 7 Gün</option>
+                                                <option value="bu_ay">Bu Ay</option>
+                                                <option value="custom">Özel Tarih Aralığı</option>
+                                                <option value="tumu">Tüm Zamanlar</option>
+                                            </select>
+                                        </div>
                                     </div>
 
                                     {movementDateFilter === 'custom' && (
@@ -915,7 +992,7 @@ export default function Stok() {
                                             <p className="text-stone-400">
                                                 {filteredMovementRows.length === 0
                                                     ? 'Seçili kriterlerde hareket bulunamadı.'
-                                                    : `${filteredMovementRows.length} kayıt bulundu. Sayfa ${safeMovementPage} / ${totalMovementPages}`}
+                                                    : `${filteredMovementRows.length} hareket, ${groupedMovementRows.length} gün içinde bulundu.`}
                                             </p>
                                             {activeMovementFilters.length > 0 ? (
                                                 <div className="flex flex-wrap gap-2">
@@ -939,26 +1016,68 @@ export default function Stok() {
                                 </div>
 
                                 <div className="space-y-3">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1">
+                                        <div>
+                                            <h3 className="font-bold text-stone-200">Günlük Hareket Akışı</h3>
+                                            <p className="text-stone-500 text-xs mt-0.5">Bu sayfada {paginatedMovementGroups.length} gün ve {visibleMovementCount} hareket gösteriliyor.</p>
+                                        </div>
+                                        {paginatedMovementGroups.length > 0 && (
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={expandAllMovementDates}
+                                                    className="bg-stone-900 hover:bg-stone-800 text-stone-300 border border-stone-800 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                                                >
+                                                    Tümünü Aç
+                                                </button>
+                                                <button
+                                                    onClick={collapseAllMovementDates}
+                                                    className="bg-stone-900 hover:bg-stone-800 text-stone-300 border border-stone-800 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                                                >
+                                                    Tümünü Kapat
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
                                     {filteredMovementRows.length === 0 ? (
                                         <div className="bg-stone-900 rounded-xl border border-stone-800 p-8 text-center text-stone-500">
                                             Seçili filtrelere uygun hareket bulunamadı.
                                         </div>
                                     ) : (
-                                        groupedMovementRows.map(({ dateKey, items }) => {
+                                        paginatedMovementGroups.map(({ dateKey, dateLabel, items }) => {
                                             const isExpanded = !movementCollapsedDates.has(dateKey)
+                                            const daySummary = items.reduce((summary, mov) => {
+                                                if (mov.movement_type === 'giris') summary.giris += 1
+                                                if (mov.movement_type === 'cikis') summary.cikis += 1
+                                                if (mov.movement_type === 'fire') summary.fire += 1
+                                                if (mov.movement_type === 'sayim') summary.sayim += 1
+                                                return summary
+                                            }, { giris: 0, cikis: 0, fire: 0, sayim: 0 })
 
                                             return (
                                                 <div key={dateKey} className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
                                                     <button
                                                         onClick={() => toggleMovementDate(dateKey)}
-                                                        className="w-full flex items-center justify-between px-6 py-4 bg-stone-800/30 hover:bg-stone-800/50 transition-colors"
+                                                        className="w-full flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 px-5 py-4 bg-stone-800/30 hover:bg-stone-800/50 transition-colors text-left"
                                                     >
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="text-lg">{dateKey === 'Bugün' ? '📅' : dateKey === 'Dün' ? '⏱️' : '🗓️'}</span>
-                                                            <h3 className="font-bold text-stone-200">{dateKey}</h3>
-                                                            <span className="bg-stone-800 text-xs px-2 py-1 rounded-full text-stone-400 border border-stone-700">{items.length} hareket</span>
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <span className="w-10 h-10 shrink-0 rounded-xl bg-stone-800 border border-stone-700 flex items-center justify-center text-lg">
+                                                                {dateLabel === 'Bugün' ? '📅' : dateLabel === 'Dün' ? '⏱️' : '🗓️'}
+                                                            </span>
+                                                            <div>
+                                                                <h3 className="font-bold text-stone-100">{dateLabel}</h3>
+                                                                <p className="text-stone-500 text-xs mt-0.5">{items.length} stok hareketi</p>
+                                                            </div>
                                                         </div>
-                                                        <span className="text-stone-500 text-sm font-bold bg-stone-800 w-8 h-8 flex items-center justify-center rounded-lg">{isExpanded ? '▲' : '▼'}</span>
+                                                        <div className="flex items-center justify-between lg:justify-end gap-2 w-full lg:w-auto">
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {daySummary.giris > 0 && <span className="bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-1 rounded-md text-xs">+{daySummary.giris} giriş</span>}
+                                                                {daySummary.cikis > 0 && <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded-md text-xs">−{daySummary.cikis} çıkış</span>}
+                                                                {daySummary.fire > 0 && <span className="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-1 rounded-md text-xs">{daySummary.fire} fire</span>}
+                                                                {daySummary.sayim > 0 && <span className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-1 rounded-md text-xs">{daySummary.sayim} sayım</span>}
+                                                            </div>
+                                                            <span className="text-stone-400 text-sm font-bold bg-stone-800 border border-stone-700 w-9 h-9 shrink-0 flex items-center justify-center rounded-lg">{isExpanded ? '▲' : '▼'}</span>
+                                                        </div>
                                                     </button>
 
                                                     {isExpanded && (
@@ -966,38 +1085,52 @@ export default function Stok() {
                                                             <div className="overflow-x-auto w-full">
 <table className="w-full">
                                                                 <thead>
-                                                                    <tr className="border-b border-stone-800 bg-stone-800/20">
-                                                                        <th className="text-left px-4 py-3 text-stone-400 text-sm">Saat</th>
-                                                                        <th className="text-left px-4 py-3 text-stone-400 text-sm">Hammadde</th>
-                                                                        <th className="text-left px-4 py-3 text-stone-400 text-sm">Tür</th>
-                                                                        <th className="text-right px-4 py-3 text-stone-400 text-sm">Miktar</th>
-                                                                        <th className="text-left px-4 py-3 text-stone-400 text-sm">Not</th>
+                                                                    <tr className="border-b border-stone-800 bg-stone-950/30">
+                                                                        <th className="text-left px-5 py-3 text-stone-500 text-xs font-bold uppercase tracking-wider">Saat</th>
+                                                                        <th className="text-left px-5 py-3 text-stone-500 text-xs font-bold uppercase tracking-wider">Hammadde</th>
+                                                                        <th className="text-left px-5 py-3 text-stone-500 text-xs font-bold uppercase tracking-wider">Hareket</th>
+                                                                        <th className="text-right px-5 py-3 text-stone-500 text-xs font-bold uppercase tracking-wider">Miktar</th>
+                                                                        <th className="text-right px-5 py-3 text-stone-500 text-xs font-bold uppercase tracking-wider">Birim Fiyat</th>
+                                                                        <th className="text-left px-5 py-3 text-stone-500 text-xs font-bold uppercase tracking-wider">Açıklama</th>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
                                                                     {items.map(mov => {
                                                                         const typeConfig = {
-                                                                            giris: { label: 'Giriş', color: 'text-green-400' },
-                                                                            cikis: { label: 'Çıkış', color: 'text-red-400' },
-                                                                            fire: { label: 'Fire', color: 'text-orange-400' },
-                                                                            sayim: { label: 'Sayım', color: 'text-blue-400' }
-                                                                        }[mov.movement_type] || { label: mov.movement_type, color: 'text-stone-400' }
+                                                                            giris: { label: 'Giriş', icon: '📥', badge: 'bg-green-500/10 text-green-400 border-green-500/20', quantity: 'text-green-400', sign: '+' },
+                                                                            cikis: { label: 'Çıkış', icon: '📤', badge: 'bg-red-500/10 text-red-400 border-red-500/20', quantity: 'text-red-400', sign: '−' },
+                                                                            fire: { label: 'Fire', icon: '🔥', badge: 'bg-orange-500/10 text-orange-400 border-orange-500/20', quantity: 'text-orange-400', sign: '−' },
+                                                                            sayim: { label: 'Sayım', icon: '🔢', badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20', quantity: 'text-blue-400', sign: '±' }
+                                                                        }[mov.movement_type] || { label: mov.movement_type, icon: '•', badge: 'bg-stone-800 text-stone-400 border-stone-700', quantity: 'text-stone-300', sign: '' }
+                                                                        const quantity = Number(mov.quantity) || 0
+                                                                        const quantitySign = mov.movement_type === 'sayim'
+                                                                            ? quantity > 0 ? '+' : quantity < 0 ? '−' : ''
+                                                                            : typeConfig.sign
 
                                                                         return (
-                                                                            <tr key={mov.id} className="border-b border-stone-800 hover:bg-stone-800 transition-colors">
-                                                                                <td className="px-4 py-3 text-stone-400 text-sm whitespace-nowrap">
+                                                                            <tr key={mov.id} className="border-b border-stone-800/80 hover:bg-stone-800/60 transition-colors">
+                                                                                <td className="px-5 py-4 text-stone-400 text-sm font-mono whitespace-nowrap">
                                                                                     {new Date(mov.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                                                                                 </td>
-                                                                                <td className="px-4 py-3 font-medium">
-                                                                                    {mov.materials?.name}
+                                                                                <td className="px-5 py-4 min-w-52">
+                                                                                    <p className="font-medium text-stone-100">{mov.materials?.name || 'Bilinmeyen hammadde'}</p>
+                                                                                    {!mov.materials && <p className="text-red-400 text-xs mt-1">Hammadde bağlantısı bulunamadı</p>}
                                                                                 </td>
-                                                                                <td className={`px-4 py-3 text-sm font-bold ${typeConfig.color}`}>
-                                                                                    {typeConfig.label}
+                                                                                <td className="px-5 py-4">
+                                                                                    <span className={`inline-flex items-center gap-1.5 border px-2.5 py-1 rounded-lg text-xs font-bold ${typeConfig.badge}`}>
+                                                                                        <span>{typeConfig.icon}</span>
+                                                                                        {typeConfig.label}
+                                                                                    </span>
                                                                                 </td>
-                                                                                <td className="px-4 py-3 text-right">
-                                                                                    {mov.quantity} {mov.materials?.unit}
+                                                                                <td className={`px-5 py-4 text-right font-black whitespace-nowrap ${typeConfig.quantity}`}>
+                                                                                    {quantitySign}{Math.abs(quantity)} {mov.materials?.unit || ''}
                                                                                 </td>
-                                                                                <td className="px-4 py-3 text-stone-400 text-sm">{mov.note}</td>
+                                                                                <td className="px-5 py-4 text-right text-stone-300 whitespace-nowrap">
+                                                                                    {mov.unit_price ? formatCurrency(mov.unit_price) : '—'}
+                                                                                </td>
+                                                                                <td className="px-5 py-4 text-stone-400 text-sm min-w-56">
+                                                                                    {mov.note || <span className="text-stone-600">Açıklama girilmemiş</span>}
+                                                                                </td>
                                                                             </tr>
                                                                         )
                                                                     })}
@@ -1014,7 +1147,7 @@ export default function Stok() {
                                     {filteredMovementRows.length > 0 && (
                                         <div className="bg-stone-900 rounded-xl border border-stone-800 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                             <div className="text-sm text-stone-400">
-                                                {((safeMovementPage - 1) * movementPageSize) + 1} - {Math.min(safeMovementPage * movementPageSize, filteredMovementRows.length)} / {filteredMovementRows.length} kayıt gösteriliyor
+                                                {((safeMovementPage - 1) * movementDaysPerPage) + 1} - {Math.min(safeMovementPage * movementDaysPerPage, groupedMovementRows.length)} / {groupedMovementRows.length} gün · {visibleMovementCount} hareket
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <button
