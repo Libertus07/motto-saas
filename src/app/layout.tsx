@@ -18,6 +18,7 @@ import { NotificationProvider } from "@/components/NotificationProvider";
 export const metadata: Metadata = {
   title: "Motto SaaS - Restoran Zekası",
   description: "Restoran ve Kafe Yönetim Sistemi",
+  manifest: "/manifest.json",
 };
 
 export const viewport: Viewport = {
