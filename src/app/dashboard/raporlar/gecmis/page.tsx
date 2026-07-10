@@ -196,7 +196,7 @@ export default function GecmisRaporlar() {
         }
 
         const confirmed = await showConfirm(
-            `Emin misiniz?\n\n${formatDate(group.date)} tarihli bu rapor silindiğinde:\n- Satışlar silinecek.\n- Düşülen hammadde stokları geri eklenecek.\n\nBu işlem geri alınamaz!`,
+            `Emin misiniz?\n\n${formatDate(group.date)} tarihli bu rapor silindiğinde:\n- O güne ait tüm Satışlar ve Giderler silinecek.\n- Satılan ürünlerin hammadde stokları depoya geri eklenecek.\n- Z-Raporuyla kasaya işlenen finans hareketleri (gelir/gider) geri alınarak bakiyeler düzeltilecek.\n\nBu işlem geri alınamaz!`,
             'Z-Raporunu Sil 🗑'
         )
         if (!confirmed) return
