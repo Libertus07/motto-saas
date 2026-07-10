@@ -19,8 +19,8 @@ DECLARE
     v_transaction_id uuid;
 BEGIN
     -- 1. Ödeme kaydını ekle (supplier_transactions)
-    INSERT INTO supplier_transactions (supplier_id, transaction_date, amount, transaction_type, note)
-    VALUES (p_supplier_id, CURRENT_DATE, p_amount, 'payment', COALESCE(p_note, 'Manuel Ödeme'))
+    INSERT INTO supplier_transactions (supplier_id, user_id, transaction_date, amount, transaction_type, note)
+    VALUES (p_supplier_id, auth.uid(), CURRENT_DATE, p_amount, 'payment', COALESCE(p_note, 'Manuel Ödeme'))
     RETURNING id INTO v_transaction_id;
 
     -- 2. Tedarikçi bakiyesini güncelle (borçtan düş)
