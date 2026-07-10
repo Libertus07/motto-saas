@@ -245,206 +245,46 @@ export default function FisYukle() {
         const selectedItems = parsedItems.filter(i => i.selected)
         const batchId = crypto.randomUUID()
 
-        let globalSupplierId: string | null = null;
-        const auditDetails: string[] = []
-
-        // 1. Tedarikçi Kayıt ve Borç (Cari) İşlemleri
-        if (parsedSupplier) {
-            const { data: existingSuppliers } = await supabase.from('suppliers').select('*').ilike('name', parsedSupplier.name).limit(1)
-            
-            if (existingSuppliers && existingSuppliers.length > 0) {
-                globalSupplierId = existingSuppliers[0].id
-                
-                // Mevcut tedarikçinin bilgileri (telefon, adres vb.) eksikse ve faturada varsa onları tamamla!
-                const updates: any = {};
-                if (!existingSuppliers[0].phone && parsedSupplier.phone) updates.phone = parsedSupplier.phone;
-                if (!existingSuppliers[0].iban && parsedSupplier.iban) updates.iban = parsedSupplier.iban;
-                if (!existingSuppliers[0].address && parsedSupplier.address) updates.address = parsedSupplier.address;
-                
-                if (Object.keys(updates).length > 0) {
-                    await supabase.from('suppliers').update(updates).eq('id', globalSupplierId);
-                }
-            } else {
-                const { data: newSup, error: insertError } = await supabase.from('suppliers').insert({
-                    name: parsedSupplier.name,
-                    phone: parsedSupplier.phone || null,
-                    iban: parsedSupplier.iban || null,
-                    address: parsedSupplier.address || null,
-                    user_id: user?.id
-                }).select().single()
-                
-                if (insertError) {
-                    devError("Yeni tedarikçi eklenirken hata oluştu:", insertError)
-                }
-                
-                if (newSup) globalSupplierId = newSup.id
-            }
-
-            if (globalSupplierId) {
-                const totalInvoice = parsedSupplier.totalAmount
-                const paid = parsedSupplier.paidAmount
-                
-                // Fatura borcunu ekle
-                const { error: txErr1 } = await supabase.from('supplier_transactions').insert({
-                    batch_id: batchId,
-                    supplier_id: globalSupplierId,
-                    transaction_date: parsedSupplier.date,
-                    amount: totalInvoice,
-                    transaction_type: 'invoice',
-                    note: 'Sistemden Fiş Yükleme (Otomatik Borç)',
-                    user_id: user?.id
-                })
-                if (txErr1) devError("Fatura borcu eklenemedi:", txErr1)
-
-                // Ödenen kısmı payment olarak ekle
-                if (paid > 0) {
-                    const { error: txErr2 } = await supabase.from('supplier_transactions').insert({
-                        batch_id: batchId,
-                        supplier_id: globalSupplierId,
-                        transaction_date: parsedSupplier.date,
-                        amount: paid,
-                        transaction_type: 'payment',
-                        note: 'Fiş Yükleme Anında Ödeme',
-                        user_id: user?.id
-                    })
-                    if (txErr2) devError("Fatura ödemesi eklenemedi:", txErr2)
-                }
-
-                const netDebtIncrease = totalInvoice - paid
-                if (netDebtIncrease !== 0) {
-                    const { data: currentSup } = await supabase.from('suppliers').select('total_debt').eq('id', globalSupplierId).single()
-                    const oldTotal = parseFloat(currentSup?.total_debt || 0)
-                    const newTotal = oldTotal + netDebtIncrease
-                    await supabase.from('suppliers').update({ total_debt: newTotal }).eq('id', globalSupplierId)
-                    logActivity('Tedarikçi', 'GUNCELLEME', `${parsedSupplier.name} cari hesabı güncellendi (Yapay Zeka Fiş Yükleme).`, { detay: `Bakiye: ₺${oldTotal.toFixed(2)} -> ₺${newTotal.toFixed(2)}` })
-                }
-            }
-        }
-
-        // Helper function to ensure safe numbers for DB
         const parseNum = (val: any) => {
             if (typeof val === 'number') return val;
             if (!val) return 0;
             return parseFloat(val.toString().replace(/,/g, '.')) || 0;
         }
 
-        // 2. Hammadde ve Fiyat Güncelleme İşlemleri
-        for (const item of selectedItems) {
-            let actualMaterialId = item.matchedMaterialId;
-            const safeUnitPrice = parseNum(item.unitPrice);
-            const safeQuantity = parseNum(item.quantity);
-
-            if (item.matchedMaterialId) {
-                const existing = materials.find(m => m.id === item.matchedMaterialId)
-                const currentStock = existing?.stock_quantity || 0
-                const oldPrice = existing?.price_per_unit || 0
-
-                // Mevcut hammaddeyi güncelle
-                const updatePayload: any = {
-                    price_per_unit: safeUnitPrice,
-                    stock_quantity: currentStock + safeQuantity
-                }
-                
-                if (oldPrice !== safeUnitPrice) auditDetails.push(`${existing?.name}: Fiyat ${oldPrice}->${safeUnitPrice}₺`)
-                auditDetails.push(`${existing?.name}: Stok ${currentStock}->${currentStock + safeQuantity}`)
-                
-                // Eğer yeni kategorisi varsa veya boş olanı dolduruyorsak güncelleyelim
-                if (item.category && item.category.trim() !== '') {
-                    updatePayload.category = item.category.trim()
-                }
-
-                await supabase
-                    .from('materials')
-                    .update(updatePayload)
-                    .eq('id', item.matchedMaterialId)
-
-                // Fiyat değiştiyse geçmişe kaydet
-                if (oldPrice !== safeUnitPrice) {
-                    await supabase.from('material_price_history').insert({
-                        material_id: item.matchedMaterialId,
-                        old_price: oldPrice,
-                        new_price: safeUnitPrice,
-                        source: 'receipt_upload'
-                    })
-                }
-            } else {
-                // Önce bu isimde bir hammadde veritabanında (veya bu döngüde) oluşmuş mu diye tekrar kontrol et
-                const { data: checkData } = await supabase.from('materials').select('id, stock_quantity, price_per_unit').eq('name', item.name).single()
-                
-                if (checkData) {
-                    actualMaterialId = checkData.id;
-                    const updatePayload: any = {
-                        price_per_unit: safeUnitPrice,
-                        stock_quantity: (checkData.stock_quantity || 0) + safeQuantity
-                    }
-                    if (checkData.price_per_unit !== safeUnitPrice) auditDetails.push(`${item.name}: Fiyat ${checkData.price_per_unit}->${safeUnitPrice}₺`)
-                    auditDetails.push(`${item.name}: Stok ${(checkData.stock_quantity || 0)}->${(checkData.stock_quantity || 0) + safeQuantity}`)
-
-                    if (item.category && item.category.trim() !== '') updatePayload.category = item.category.trim();
-                    
-                    await supabase.from('materials').update(updatePayload).eq('id', checkData.id)
-                    
-                    if (checkData.price_per_unit !== safeUnitPrice) {
-                        await supabase.from('material_price_history').insert({
-                            material_id: checkData.id,
-                            old_price: checkData.price_per_unit,
-                            new_price: safeUnitPrice,
-                            source: 'receipt_upload'
-                        })
-                    }
-                } else {
-                    // Gerçekten yepyeni hammadde ekle
-                    const insertPayload = {
-                        name: item.name || 'İsimsiz Ürün',
-                        category: item.category || 'Diğer',
-                        unit: item.unit || 'Adet',
-                        price_per_unit: safeUnitPrice,
-                        stock_quantity: safeQuantity,
-                        user_id: user?.id
-                    };
-                    auditDetails.push(`YENİ ${insertPayload.name}: Fiyat ${safeUnitPrice}₺, Stok ${safeQuantity}`)
-                    
-                    const { data, error: insertError } = await supabase.from('materials').insert(insertPayload).select()
-
-                    if (data && data.length > 0) {
-                        actualMaterialId = data[0].id;
-                        // İlk fiyatını geçmişe kaydet
-                        await supabase.from('material_price_history').insert({
-                            material_id: actualMaterialId,
-                            old_price: 0,
-                            new_price: safeUnitPrice,
-                            source: 'receipt_upload'
-                        })
-                    } else if (insertError) {
-                        devError("Hammadde eklenirken hata:", insertError.message || JSON.stringify(insertError), "Payload:", insertPayload);
-                    }
-                }
-            }
-
-            // Stok hareketi (Giriş) olarak kaydet
-            if (actualMaterialId) {
-                const currentSupplierId = globalSupplierId;
-
-                const { error: smError } = await supabase.from('stock_movements').insert({
-                    batch_id: batchId,
-                    material_id: actualMaterialId,
-                    supplier_id: currentSupplierId,
-                    movement_type: 'giris',
-                    quantity: safeQuantity,
-                    unit_price: safeUnitPrice,
-                    note: `Yapay Zeka Fiş Yükleme${parsedSupplier ? ` (${parsedSupplier.name})` : ''}`,
-                    document_url: image || null,
-                    user_id: user?.id
-                })
-                
-                if (smError) {
-                    devError('Stok hareketi eklenirken hata:', smError)
-                }
-            }
+        const payload = {
+            user_id: user?.id,
+            batch_id: batchId,
+            image_url: image || null,
+            supplier: parsedSupplier ? {
+                name: parsedSupplier.name,
+                phone: parsedSupplier.phone || null,
+                iban: parsedSupplier.iban || null,
+                address: parsedSupplier.address || null,
+                date: parsedSupplier.date,
+                totalAmount: parsedSupplier.totalAmount,
+                paidAmount: parsedSupplier.paidAmount
+            } : null,
+            items: selectedItems.map(item => ({
+                matchedMaterialId: item.matchedMaterialId || null,
+                name: item.name || 'İsimsiz Ürün',
+                category: item.category || 'Diğer',
+                unit: item.unit || 'Adet',
+                quantity: parseNum(item.quantity),
+                unitPrice: parseNum(item.unitPrice)
+            }))
         }
 
-        const addedItemsStr = selectedItems.map(item => `${item.name} (${item.quantity} ${item.unit})`).join(', ')
-        logActivity('Stok', 'EKLEME', `Yapay zeka ile fiş okunarak ${selectedItems.length} kalem ürün/stok sisteme eklendi.`, { batchId, detay: auditDetails.join(' | ') })
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('process_receipt_upload', { payload })
+
+        if (rpcError) {
+            devError("Fiş yükleme atomic işlem hatası:", rpcError)
+            setError("Kayıt sırasında kritik bir hata oluştu. İşlem geri alındı: " + rpcError.message)
+            setLoading(false)
+            return
+        }
+
+        const auditDetailsText = rpcResult?.audit_details || '';
+        logActivity('Stok', 'EKLEME', `Yapay zeka ile fiş okunarak ${selectedItems.length} kalem ürün/stok sisteme eklendi.`, { batchId, detay: auditDetailsText })
         setStep('done')
         setLoading(false)
     }

@@ -1,0 +1,320 @@
+Summary,Issue Type,Priority,Story Points,Description,Labels,Epic Name,Epic Link
+"Güvenlik ve Veri İzolasyonu",Epic,Highest,,"Epic kapsamı: tenant modeli, veri sahipliği ve RLS politikalarının güvenli hale getirilmesi.","import-jira,epic,security","Güvenlik ve Veri İzolasyonu",
+"Atomic İşlemler ve Veri Tutarlılığı",Epic,Highest,,"Epic kapsamı: çok adımlı yazımların atomik hale getirilmesi ve rollback güvenilirliğinin artırılması.","import-jira,epic,data-integrity","Atomic İşlemler ve Veri Tutarlılığı",
+"Finansal Model Tutarlılığı",Epic,Highest,,"Epic kapsamı: gider, hesap hareketleri, fiyat motoru ve finans modellerinin aynı iş kuralına bağlanması.","import-jira,epic,finance","Finansal Model Tutarlılığı",
+"Audit Log ve İzlenebilirlik",Epic,High,,"Epic kapsamı: kritik veritabanı yazımlarında audit log kapsamının tamamlanması ve logger altyapısının iyileştirilmesi.","import-jira,epic,audit","Audit Log ve İzlenebilirlik",
+"Kod Kalitesi ve Stabilizasyon",Epic,High,,"Epic kapsamı: lint baseline, typing, mutation ve erişilebilirlik sorunlarının azaltılması.","import-jira,epic,quality","Kod Kalitesi ve Stabilizasyon",
+"Domain Refactor ve Modülerleşme",Epic,Medium,,"Epic kapsamı: büyük sayfaların servis ve hook katmanına bölünmesi ve domain servislerinin oluşturulması.","import-jira,epic,architecture","Domain Refactor ve Modülerleşme",
+"Dokümantasyon ve Operasyonel Olgunluk",Epic,Medium,,"Epic kapsamı: README, migration standardı ve minimal test katmanının oluşturulması.","import-jira,epic,operations","Dokümantasyon ve Operasyonel Olgunluk",
+"[SEC-101] Tenant modelini netleştir ve veri sahipliğini tanımla",Story,Highest,3,"Sistemin tek işletmeli mi multi-tenant mı olduğunu netleştir; veri sahipliği modelini tanımla.
+
+Affected Areas:
+- rls_policy.sql
+- tüm ana tablolar
+
+Dependencies:
+- Yok
+
+Acceptance Criteria:
+- Sistemin tenancy modeli yazılı olarak netleşir
+- Tenant alanı gereken tablolar listelenir
+- RLS tasarımı için temel hazır olur","import-jira,security,sec-101",,"Güvenlik ve Veri İzolasyonu"
+"[SEC-102] Supabase RLS politikalarını tenant bazlı yeniden tasarla",Story,Highest,8,"Mevcut authenticated bazlı politikaları tenant bazlı güvenli hale getir.
+
+Affected Areas:
+- rls_policy.sql
+- materials
+- products
+- sales
+- expenses
+- accounts
+- account_movements
+- suppliers
+- supplier_transactions
+- stock_movements
+- investments
+- investment_transactions
+- activity_logs
+- settings
+
+Dependencies:
+- SEC-101
+
+Acceptance Criteria:
+- Kullanıcı yalnızca kendi tenant verisini okuyup yazabilir
+- Cross-tenant erişim engellenir
+- İki kullanıcıyla doğrulanır","import-jira,security,sec-102",,"Güvenlik ve Veri İzolasyonu"
+"[DATA-201] Fiş yükleme akışını atomic server-side işleme taşı",Story,Highest,13,"Fiş yükleme sırasında supplier, stock, material ve cari yazımlarını tek atomik akışa taşı.
+
+Affected Areas:
+- src/app/dashboard/hammaddeler/fis-yukle/page.tsx
+
+Dependencies:
+- SEC-102 (önerilir)
+
+Acceptance Criteria:
+- Bir adım hata verirse hiçbir kalıcı yazım oluşmaz
+- Stok ve cari tutarlı kalır
+- Kullanıcı anlamlı hata görür","import-jira,data-integrity,data-201",,"Atomic İşlemler ve Veri Tutarlılığı"
+"[DATA-202] Z-raporu silme akışını transaction-safe hale getir",Story,High,5,"Z-raporu silme sırasında rollback adımlarını güvenli ve atomik hale getir.
+
+Affected Areas:
+- src/app/api/delete-z-report/route.ts
+
+Dependencies:
+- Yok
+
+Acceptance Criteria:
+- Stok, satış, gider ve hesap hareketleri tutarlı rollback olur
+- Yarım silme olmaz
+- Tekrar silme kontrollü yönetilir","import-jira,data-integrity,data-202",,"Atomic İşlemler ve Veri Tutarlılığı"
+"[DATA-203] Tedarikçi fişi silme akışını transaction-safe hale getir",Story,High,5,"Fiş silme sırasında stok ve cari geri alma adımlarını güvenli hale getir.
+
+Affected Areas:
+- src/app/api/delete-receipt/route.ts
+
+Dependencies:
+- Yok
+
+Acceptance Criteria:
+- Batch bazlı silmede stok ve tedarikçi bakiyesi tutarlı kalır
+- Tüm alt adımlar hata kontrollü olur","import-jira,data-integrity,data-203",,"Atomic İşlemler ve Veri Tutarlılığı"
+"[DATA-204] Tedarikçi ödeme akışını atomic hale getir",Story,High,8,"Tedarikçi ödeme ve silme akışlarında cari ve finans hareketlerini tek güvenli akışa al.
+
+Affected Areas:
+- src/app/dashboard/tedarikciler/page.tsx
+
+Dependencies:
+- DATA-203 (faydalı)
+
+Acceptance Criteria:
+- Ödeme ekleme ve silme sonrası supplier_transactions, suppliers, account_movements ve accounts aynı gerçeği gösterir","import-jira,data-integrity,data-204",,"Atomic İşlemler ve Veri Tutarlılığı"
+"[DATA-205] Yatırım alım ve silme akışlarını atomic hale getir",Story,High,8,"Yatırım alımı ve geçmiş silme akışlarında finans ve yatırım kayıtlarını tek güvenli modele geçir.
+
+Affected Areas:
+- src/app/dashboard/yatirimlar/page.tsx
+- src/app/dashboard/raporlar/yatirim-gecmisi/page.tsx
+
+Dependencies:
+- Yok
+
+Acceptance Criteria:
+- Yatırım alımı tek işlem gibi çalışır
+- Hesap bakiyesi ve yatırım geçmişi ayrışmaz
+- Çoklu hareketler doğru ele alınır","import-jira,data-integrity,data-205",,"Atomic İşlemler ve Veri Tutarlılığı"
+"[DATA-206] Stok giriş çıkış ve sayım akışlarını güvenli hale getir",Story,High,8,"Stok hareketleri ile stok miktarı güncellemelerini güvenli ve kurallı hale getir.
+
+Affected Areas:
+- src/app/dashboard/stok/page.tsx
+
+Dependencies:
+- Yok
+
+Acceptance Criteria:
+- Negatif stok davranışı netleşir
+- Hareket geçmişi ve stok miktarı tutarlı olur
+- Sayım düzeltmesi izlenebilir hale gelir","import-jira,data-integrity,data-206",,"Atomic İşlemler ve Veri Tutarlılığı"
+"[FIN-301] Gider kayıtlarını hesap hareketleriyle entegre et",Story,Highest,8,"Expenses kayıtlarını accounts ve account_movements modeliyle hizala.
+
+Affected Areas:
+- src/app/dashboard/giderler/page.tsx
+- src/app/dashboard/finans/page.tsx
+- src/app/dashboard/kasa/sayim/page.tsx
+
+Dependencies:
+- DATA-204 ile birlikte planlanabilir
+
+Acceptance Criteria:
+- Gider eklendiğinde ilgili hesap hareketi oluşur
+- Silinince bakiye geri alınır
+- Finans ve gider ekranı aynı veriyi gösterir","import-jira,finance,fin-301",,"Finansal Model Tutarlılığı"
+"[FIN-302] Gider period değerlerini standardize et",Story,High,3,"Daily, Günlük, tek_seferlik, monthly, yearly gibi değerleri tek enum setine indir.
+
+Affected Areas:
+- src/app/dashboard/giderler/page.tsx
+- src/app/dashboard/raporlar/page.tsx
+- src/app/dashboard/fiyat-motoru/page.tsx
+
+Dependencies:
+- FIN-301
+
+Acceptance Criteria:
+- Tüm modüller aynı period değerlerini kullanır
+- Rapor ve fiyat motoru aynı normalizasyon mantığına geçer","import-jira,finance,fin-302",,"Finansal Model Tutarlılığı"
+"[FIN-303] Fiyat motorundaki hesaplama ve ayar mantığını hizala",Story,High,5,"Fiyat motorunda targetMargin ve günlük gider hesabını tek doğruluk kaynağına bağla; ekran açılışındaki write side-effect’leri kaldır.
+
+Affected Areas:
+- src/app/dashboard/fiyat-motoru/page.tsx
+
+Dependencies:
+- FIN-302
+
+Acceptance Criteria:
+- Hesap ve gösterim aynı ayarlardan beslenir
+- Ekran açılması otomatik DB write üretmez
+- Günlük gider hesabı tek formüle bağlanır","import-jira,finance,fin-303",,"Finansal Model Tutarlılığı"
+"[AUD-401] Kritik write akışlarında eksik audit logları tamamla",Story,High,8,"Kritik insert update delete akışlarında eksik logActivity çağrılarını tamamla.
+
+Affected Areas:
+- hammaddeler/fis-yukle
+- stok
+- urunler
+- yari-mamuller
+- tedarikciler
+- fiyat-motoru
+- delete-z-report
+- delete-receipt
+
+Dependencies:
+- DATA-201
+- DATA-202
+- DATA-203
+- DATA-204
+- DATA-205
+- DATA-206
+
+Acceptance Criteria:
+- Kritik write işlemlerinin tamamı loglanır
+- Loglar işlemle eşlenebilir ve izlenebilir olur","import-jira,audit,aud-401",,"Audit Log ve İzlenebilirlik"
+"[AUD-402] logActivity altyapısını sadeleştir ve tip güvenli hale getir",Story,High,3,"Logger içinde any kullanımını ve dış IP servisi bağımlılığını azalt.
+
+Affected Areas:
+- src/lib/logger.ts
+
+Dependencies:
+- Yok
+
+Acceptance Criteria:
+- Any kaldırılır
+- IP toplama opsiyonel veya daha güvenli hale gelir
+- Log çağrısı gereksiz ağ bağımlılığı oluşturmaz","import-jira,audit,aud-402",,"Audit Log ve İzlenebilirlik"
+"[QUAL-501] Uygulama kodu için lint baseline oluştur",Story,High,8,"App kodundaki kritik lint error’ları azalt ve yönetilebilir baseline oluştur.
+
+Affected Areas:
+- src/app/dashboard/raporlar/z-raporu/page.tsx
+- src/app/dashboard/yatirimlar/page.tsx
+- src/lib/logger.ts
+- src/components/NotificationProvider.tsx
+
+Dependencies:
+- Yok
+
+Acceptance Criteria:
+- Kritik lint error sayısı ciddi şekilde düşer
+- Yeni kod aynı seviyede hata üretmez
+- Lint raporu yönetilebilir olur","import-jira,quality,qual-501",,"Kod Kalitesi ve Stabilizasyon"
+"[QUAL-502] scripts klasörü için ayrı lint stratejisi belirle",Task,Medium,3,"Scripts klasöründeki CommonJS dosyaları için ayrı lint yaklaşımı belirle.
+
+Affected Areas:
+- scripts/**
+
+Dependencies:
+- Yok
+
+Acceptance Criteria:
+- Scripts kaynaklı gereksiz lint kırılmaları önlenir
+- Ignore, override veya ESM kararı netleşir","import-jira,quality,qual-502",,"Kod Kalitesi ve Stabilizasyon"
+"[QUAL-503] Z-Raporu ekranındaki mutation ve typing sorunlarını temizle",Story,High,5,"Parsed veri mutation, any kullanımı ve render sonrası değişim risklerini kaldır.
+
+Affected Areas:
+- src/app/dashboard/raporlar/z-raporu/page.tsx
+
+Dependencies:
+- QUAL-501
+
+Acceptance Criteria:
+- ParsedData doğrudan mutate edilmez
+- Kritik diagnostics hataları kapanır
+- Approve akışı daha okunur hale gelir","import-jira,quality,qual-503",,"Kod Kalitesi ve Stabilizasyon"
+"[QUAL-504] Notification provider typing ve erişilebilirlik iyileştirmesi yap",Task,Medium,2,"Notification provider typing, focus ve temel erişilebilirlik davranışlarını iyileştir.
+
+Affected Areas:
+- src/components/NotificationProvider.tsx
+
+Dependencies:
+- Yok
+
+Acceptance Criteria:
+- Resolve tipi güvenli hale gelir
+- Temel accessibility davranışları iyileşir
+- Queue davranışı değerlendirilir","import-jira,quality,qual-504",,"Kod Kalitesi ve Stabilizasyon"
+"[ARCH-601] Yatırım domain modelini sadeleştir",Story,High,8,"Yatırımlar için pozisyon bazlı ve fiş bazlı mantığı tek modele indir.
+
+Affected Areas:
+- src/app/dashboard/yatirimlar/page.tsx
+- src/app/dashboard/raporlar/yatirim-fisi/page.tsx
+- src/app/dashboard/raporlar/yatirim-gecmisi/page.tsx
+
+Dependencies:
+- DATA-205
+
+Acceptance Criteria:
+- Yatırım modeli tek iş kuralına oturur
+- Belge geçmişi overwrite olmaz
+- Geçmiş silme çoklu hareketleri doğru yönetir","import-jira,architecture,arch-601",,"Domain Refactor ve Modülerleşme"
+"[ARCH-602] Büyük dashboard sayfalarını servis ve hook katmanına böl",Story,Medium,13,"Büyük page dosyalarındaki veri erişimi, iş kuralı ve UI kodlarını ayır.
+
+Affected Areas:
+- hammaddeler/page.tsx
+- hammaddeler/fis-yukle/page.tsx
+- tedarikciler/page.tsx
+- yatirimlar/page.tsx
+- urunler/page.tsx
+
+Dependencies:
+- P0 ve P1 işleri tamamlandıktan sonra önerilir
+
+Acceptance Criteria:
+- Dosya karmaşıklığı azalır
+- Tekrar eden mantıklar ortaklaşır
+- Bakım kolaylaşır","import-jira,architecture,arch-602",,"Domain Refactor ve Modülerleşme"
+"[ARCH-603] Stok ve finans için ortak domain servisleri oluştur",Story,Medium,8,"Finance, inventory, suppliers ve investments için ortak servis katmanı oluştur.
+
+Affected Areas:
+- services/finance
+- services/inventory
+- services/suppliers
+- services/investments
+
+Dependencies:
+- ARCH-602
+
+Acceptance Criteria:
+- Aynı iş kuralı farklı ekranlarda tekrar yazılmaz
+- Hata yönetimi standartlaşır
+- Test kolaylaşır","import-jira,architecture,arch-603",,"Domain Refactor ve Modülerleşme"
+"[DOC-701] README dosyasını proje gerçekliğine göre yeniden yaz",Task,Medium,2,"README içine gerçek kurulum, env, modül, build ve deploy bilgisini ekle.
+
+Affected Areas:
+- README.md
+
+Dependencies:
+- Yok
+
+Acceptance Criteria:
+- README proje amacını, kurulum adımlarını, env değişkenlerini ve çalışma akışını açıklar","import-jira,operations,doc-701",,"Dokümantasyon ve Operasyonel Olgunluk"
+"[OPS-702] SQL migration standardı oluştur",Story,Medium,3,"Dağınık SQL dosyaları için tek migration naming ve uygulama standardı belirle.
+
+Affected Areas:
+- kök sql dosyaları
+- scripts/sql/**
+
+Dependencies:
+- SEC-102 sonrası daha sağlıklı olur
+
+Acceptance Criteria:
+- Migration naming standardı oluşur
+- Legacy ve aktif SQL dosyaları sınıflandırılır","import-jira,operations,ops-702",,"Dokümantasyon ve Operasyonel Olgunluk"
+"[TEST-703] Kritik domain akışları için minimal test katmanı ekle",Story,Medium,8,"En kritik stok, gider, yatırım ve rollback iş kuralları için otomatik testler ekle.
+
+Affected Areas:
+- test altyapısı ve ilgili domain modülleri
+
+Dependencies:
+- DATA-201
+- FIN-301
+- DATA-205
+
+Acceptance Criteria:
+- Kritik iş kuralları otomatik doğrulanır
+- Regresyon riski düşer","import-jira,operations,test-703",,"Dokümantasyon ve Operasyonel Olgunluk"
