@@ -373,7 +373,10 @@ export default function Stok() {
 
     const totalMovementPages = Math.max(1, Math.ceil(filteredMovementRows.length / movementPageSize))
     const safeMovementPage = Math.min(movementPage, totalMovementPages)
-    const paginatedMovements = filteredMovementRows.slice((safeMovementPage - 1) * movementPageSize, safeMovementPage * movementPageSize)
+    const paginatedMovements = useMemo(() => {
+        return filteredMovementRows.slice((safeMovementPage - 1) * movementPageSize, safeMovementPage * movementPageSize)
+    }, [filteredMovementRows, safeMovementPage])
+
     const groupedMovementRows = useMemo(() => {
         const groups: Array<{ dateKey: string; items: Movement[] }> = []
         const todayDateObj = new Date()
@@ -402,17 +405,19 @@ export default function Stok() {
     }, [paginatedMovements])
 
     useEffect(() => {
-        if (groupedMovementRows.length === 0) {
-            setMovementExpandedDates([])
-            return
-        }
+        const nextExpandedDates = groupedMovementRows.length === 0
+            ? []
+            : (() => {
+                const visibleDateKeys = groupedMovementRows.map(group => group.dateKey)
+                const preserved = movementExpandedDates.filter(dateKey => visibleDateKeys.includes(dateKey))
+                return preserved.length > 0 ? preserved : [visibleDateKeys[0]]
+            })()
 
-        const visibleDateKeys = groupedMovementRows.map(group => group.dateKey)
-        setMovementExpandedDates(prev => {
-            const preserved = prev.filter(dateKey => visibleDateKeys.includes(dateKey))
-            return preserved.length > 0 ? preserved : [visibleDateKeys[0]]
-        })
-    }, [groupedMovementRows])
+        const isSame = nextExpandedDates.length === movementExpandedDates.length && nextExpandedDates.every((dateKey, index) => dateKey === movementExpandedDates[index])
+        if (!isSame) {
+            setMovementExpandedDates(nextExpandedDates)
+        }
+    }, [groupedMovementRows, movementExpandedDates])
 
     const toggleMovementDate = (dateKey: string) => {
         setMovementExpandedDates(prev => prev.includes(dateKey) ? prev.filter(d => d !== dateKey) : [...prev, dateKey])
