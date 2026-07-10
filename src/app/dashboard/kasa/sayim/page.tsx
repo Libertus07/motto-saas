@@ -149,6 +149,7 @@ export default function KasaSayimPage() {
             if (variance < 0) status = 'SHORTAGE'
 
             const payload = {
+                id: existingReconciliation ? existingReconciliation.id : null,
                 date,
                 counted_cash: Number(countedCash) || 0,
                 counted_credit_card: Number(countedCreditCard) || 0,
@@ -160,109 +161,15 @@ export default function KasaSayimPage() {
                 credit_card_variance: isMovementFound ? creditVariance : 0,
                 meal_card_variance: 0,
                 status,
-                notes: `Toplam Satış: ${expectedSales} TL, Toplam Gider: ${expectedExpenses} TL`
+                notes: `Toplam Satış: ${expectedSales} TL, Toplam Gider: ${expectedExpenses} TL`,
+                is_movement_found: isMovementFound
             }
 
-            let recId = null;
+            // ATOMIC İŞLEM: Tüm silme, ekleme ve hesap güncellemeleri PostgreSQL'de tek seferde yapılır
+            const { data: rpcResult, error: rpcError } = await supabase.rpc('process_cash_reconciliation', { payload })
 
-            if (existingReconciliation) {
-                const { data, error: updateError } = await supabase
-                    .from('cash_reconciliations')
-                    .update(payload)
-                    .eq('id', existingReconciliation.id)
-                    .select()
-                    .single()
-                if (updateError) throw updateError
-                recId = data.id;
-
-                // Eski düzeltme fişlerini bul, bakiyeyi geri al ve sil
-                const { data: oldMovs } = await supabase.from('account_movements')
-                    .select('*')
-                    .eq('source_type', 'reconciliation')
-                    .eq('source_id', recId)
-                
-                if (oldMovs && oldMovs.length > 0) {
-                    for (const oldM of oldMovs) {
-                        const { data: currAcc } = await supabase.from('accounts').select('balance').eq('id', oldM.account_id).single()
-                        if (currAcc) {
-                            const reversedBalance = oldM.movement_type === 'giris'
-                                ? Number(currAcc.balance) - Number(oldM.amount)
-                                : Number(currAcc.balance) + Number(oldM.amount)
-                            await supabase.from('accounts').update({ balance: reversedBalance }).eq('id', oldM.account_id)
-                        }
-                    }
-                    await supabase.from('account_movements').delete().eq('source_type', 'reconciliation').eq('source_id', recId)
-                }
-
-            } else {
-                const { data, error: insertError } = await supabase
-                    .from('cash_reconciliations')
-                    .insert([payload])
-                    .select()
-                    .single()
-                if (insertError) throw insertError
-                recId = data.id;
-            }
-
-            // --- FİNANS HESAPLARI DÜZELTME FİŞİ OLUŞTURMA ---
-            const { data: accounts } = await supabase.from('accounts').select('id, type');
-            const cashAccount = accounts?.find(a => a.type === 'cash');
-            const bankAccount = accounts?.find(a => a.type === 'bank');
-            
-            const accountMovements = []
-            
-            if (isMovementFound) {
-                // POS (Banka) Düzeltmesi
-                if (bankAccount && creditVariance !== 0) {
-                    accountMovements.push({
-                        account_id: bankAccount.id,
-                        movement_type: creditVariance > 0 ? 'giris' : 'cikis',
-                        amount: Math.abs(creditVariance),
-                        description: creditVariance > 0 ? `${date} POS Sayım Fazlası` : `${date} POS Sayım Açığı`,
-                        source_type: 'reconciliation',
-                        source_id: recId
-                    })
-                }
-                
-                // Kasa (Nakit) Düzeltmesi
-                if (cashAccount && cashVariance !== 0) {
-                    accountMovements.push({
-                        account_id: cashAccount.id,
-                        movement_type: cashVariance > 0 ? 'giris' : 'cikis',
-                        amount: Math.abs(cashVariance),
-                        description: cashVariance > 0 ? `${date} Nakit Sayım Fazlası` : `${date} Nakit Sayım Açığı`,
-                        source_type: 'reconciliation',
-                        source_id: recId
-                    })
-                }
-            } else {
-                // Genel Düzeltme (Sadece Nakit Kabul Edilir)
-                if (cashAccount && variance !== 0) {
-                    accountMovements.push({
-                        account_id: cashAccount.id,
-                        movement_type: variance > 0 ? 'giris' : 'cikis',
-                        amount: Math.abs(variance),
-                        description: variance > 0 ? `${date} Kasa Sayım Fazlası (Genel)` : `${date} Kasa Sayım Açığı (Genel)`,
-                        source_type: 'reconciliation',
-                        source_id: recId
-                    })
-                }
-            }
-
-            if (accountMovements.length > 0) {
-                const { error: movInsError } = await supabase.from('account_movements').insert(accountMovements)
-                if (movInsError) throw movInsError
-
-                // Yeni bakiyeleri manuel güncelle
-                for (const m of accountMovements) {
-                    const { data: currAcc } = await supabase.from('accounts').select('balance').eq('id', m.account_id).single()
-                    if (currAcc) {
-                        const newBalance = m.movement_type === 'giris' 
-                            ? Number(currAcc.balance) + Number(m.amount) 
-                            : Number(currAcc.balance) - Number(m.amount)
-                        await supabase.from('accounts').update({ balance: newBalance }).eq('id', m.account_id)
-                    }
-                }
+            if (rpcError) {
+                throw new Error(rpcError.message || 'Kasa sayım onayı (RPC) sırasında bir hata oluştu.')
             }
 
             let details = '';
