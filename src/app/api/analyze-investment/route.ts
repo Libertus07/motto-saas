@@ -24,9 +24,15 @@ function isSafeImageUrl(url: string): boolean {
 
 export async function POST(req: Request) {
     try {
-        const { user } = await requireUser();
+        const { user, supabase } = await requireUser();
         if (!user) {
             return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 });
+        }
+
+        // AI Kota Kontrolü (SEC-104)
+        const { data: allowed } = await supabase.rpc('check_ai_quota');
+        if (!allowed) {
+            return NextResponse.json({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }, { status: 429 });
         }
 
         const { image, fileText } = await req.json();
