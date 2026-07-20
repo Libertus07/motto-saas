@@ -478,78 +478,90 @@ export default function FisYukle() {
                                 <h3 className="font-bold text-amber-400 mb-4 flex items-center gap-2">
                                     <span className="text-xl">🏢</span> Tedarikçi ve Cari (Borç) Bilgileri
                                 </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <div className="md:col-span-2 lg:col-span-4 grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-stone-800 pb-4 mb-2">
-                                        <div>
-                                            <label className="text-stone-500 text-xs mb-1 block">Tedarikçi Adı (Seç veya Yeni Yaz)</label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-stone-800/80 pb-5 mb-5">
+                                    <div>
+                                        <label className="text-stone-400 text-xs font-semibold mb-2 block uppercase tracking-wider">Tedarikçi Adı (Seç veya Yeni Yaz)</label>
+                                        <input
+                                            list="supplier-options"
+                                            type="text"
+                                            value={parsedSupplier.name}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                const matchedSup = suppliers.find(s => s.name.trim().toLowerCase() === val.trim().toLowerCase());
+                                                setParsedSupplier({
+                                                    ...parsedSupplier, 
+                                                    name: val,
+                                                    id: matchedSup?.id
+                                                });
+                                            }}
+                                            className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500 transition-colors font-medium"
+                                        />
+                                        <datalist id="supplier-options">
+                                            {suppliers.map(sup => (
+                                                <option key={sup.id} value={sup.name} />
+                                            ))}
+                                        </datalist>
+                                    </div>
+                                    <div>
+                                        <label className="text-stone-400 text-xs font-semibold mb-2 block uppercase tracking-wider">Fatura Tarihi</label>
+                                        <input
+                                            type="date"
+                                            value={parsedSupplier.date}
+                                            onChange={e => setParsedSupplier({...parsedSupplier, date: e.target.value})}
+                                            className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-500 transition-colors font-medium [color-scheme:dark]"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                    {/* Card 1: Önceki Bakiye */}
+                                    <div className="bg-stone-950 rounded-xl p-4 border border-stone-800 flex flex-col justify-center">
+                                        <span className="text-stone-500 text-xs font-semibold mb-1 uppercase tracking-wider">Önceki Bakiye (Borç)</span>
+                                        <span className="text-stone-400 font-medium text-xl">{formatCurrency(supplierDebt)}</span>
+                                    </div>
+                                    
+                                    {/* Card 2: Yeni Fatura Tutarı */}
+                                    <div className="bg-stone-950 rounded-xl p-4 border border-stone-800 focus-within:border-red-500/50 transition-colors flex flex-col justify-center">
+                                        <span className="text-stone-500 text-xs font-semibold mb-1 uppercase tracking-wider">Yeni Fatura Tutarı (+)</span>
+                                        <div className="flex items-center">
+                                            <span className="text-stone-500 font-medium mr-1">₺</span>
                                             <input
-                                                list="supplier-options"
-                                                type="text"
-                                                value={parsedSupplier.name}
-                                                onChange={e => {
-                                                    const val = e.target.value;
-                                                    const matchedSup = suppliers.find(s => s.name.trim().toLowerCase() === val.trim().toLowerCase());
-                                                    setParsedSupplier({
-                                                        ...parsedSupplier, 
-                                                        name: val,
-                                                        id: matchedSup?.id
-                                                    });
-                                                }}
-                                                className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400"
-                                            />
-                                            <datalist id="supplier-options">
-                                                {suppliers.map(sup => (
-                                                    <option key={sup.id} value={sup.name} />
-                                                ))}
-                                            </datalist>
-                                        </div>
-                                        <div>
-                                            <label className="text-stone-500 text-xs mb-1 block">Fatura Tarihi</label>
-                                            <input
-                                                type="date"
-                                                value={parsedSupplier.date}
-                                                onChange={e => setParsedSupplier({...parsedSupplier, date: e.target.value})}
-                                                className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400"
+                                                type="number"
+                                                value={parsedSupplier.totalAmount}
+                                                onChange={e => setParsedSupplier({...parsedSupplier, totalAmount: parseFloat(e.target.value) || 0})}
+                                                className="w-full bg-transparent text-red-400 font-bold focus:outline-none text-xl"
                                             />
                                         </div>
+                                    </div>
+                                    
+                                    {/* Card 3: Genel Toplam Borç */}
+                                    <div className="bg-stone-950 rounded-xl p-4 border border-stone-800 flex flex-col justify-center relative group">
+                                        <span className="text-stone-500 text-xs font-semibold mb-1 uppercase tracking-wider">Genel Toplam Borç (=)</span>
+                                        <span className="text-white font-bold text-xl">{formatCurrency((supplierDebt + parsedSupplier.totalAmount))}</span>
+                                        {parsedSupplier.statedDebt != null && (
+                                            <div className="absolute top-[110%] left-0 w-full min-w-[200px] bg-blue-950/95 border border-blue-500/50 rounded-xl p-3 text-xs text-blue-200 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 backdrop-blur-md">
+                                                📄 Faturada yazan güncel bakiye:<br/>
+                                                <strong className="text-sm text-blue-100 mt-1 block">{formatCurrency(parsedSupplier.statedDebt)}</strong>
+                                                <span className="text-[10px] text-blue-400/60 mt-1 block leading-tight">(Sistemdeki bakiye ile kıyaslayabilirsiniz)</span>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    <div className="flex flex-col justify-end">
-                                        <label className="text-stone-500 text-xs mb-1 block">Önceki Bakiye (Borç)</label>
-                                        <div className="w-full h-11 flex items-center bg-stone-900 border border-stone-800 rounded-lg px-3 text-stone-400 font-medium">{formatCurrency(supplierDebt)}
+                                    {/* Card 4: Yapılan Ödeme */}
+                                    <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/30 focus-within:border-amber-500/60 transition-colors flex flex-col justify-center">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-amber-500/80 text-xs font-semibold uppercase tracking-wider">Şimdi Yapılan Ödeme (-)</span>
+                                            <span className="text-[9px] text-amber-500/50 uppercase tracking-wider px-1.5 py-0.5 bg-amber-500/10 rounded hidden xl:block">Sıfırsa borca yazılır</span>
                                         </div>
-                                    </div>
-                                    <div className="flex flex-col justify-end">
-                                        <label className="text-stone-500 text-xs mb-1 block">Yeni Fatura Tutarı (+)</label>
-                                        <input
-                                            type="number"
-                                            value={parsedSupplier.totalAmount}
-                                            onChange={e => setParsedSupplier({...parsedSupplier, totalAmount: parseFloat(e.target.value) || 0})}
-                                            className="w-full h-11 bg-stone-800 border border-stone-700 rounded-lg px-3 text-red-400 font-bold focus:outline-none focus:border-red-400 text-lg"
-                                        />
-                                    </div>
-                                    <div className="flex flex-col justify-end">
-                                        <label className="text-stone-500 text-xs mb-1 block">Genel Toplam Borç (=)</label>
-                                        <div className="w-full h-11 flex items-center bg-stone-900 border border-stone-800 rounded-lg px-3 text-white font-bold text-lg relative group">{formatCurrency((supplierDebt + parsedSupplier.totalAmount))}
-                                            {parsedSupplier.statedDebt != null && (
-                                                <div className="absolute top-full left-0 mt-2 w-full bg-blue-950/80 border border-blue-500 rounded p-2 text-xs text-blue-200 shadow-xl z-10">
-                                                    📄 Faturada yazan güncel bakiye: <strong>{formatCurrency(parsedSupplier.statedDebt)}</strong>
-                                                    <br/>(Sistemdeki bakiye ile kıyaslayabilirsiniz)
-                                                </div>
-                                            )}
+                                        <div className="flex items-center">
+                                            <span className="text-amber-500/50 font-medium mr-1">₺</span>
+                                            <input
+                                                type="number"
+                                                value={parsedSupplier.paidAmount}
+                                                onChange={e => setParsedSupplier({...parsedSupplier, paidAmount: parseFloat(e.target.value) || 0})}
+                                                className="w-full bg-transparent text-green-400 font-bold focus:outline-none text-xl"
+                                            />
                                         </div>
-                                    </div>
-                                    <div className="flex flex-col justify-end">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <label className="text-stone-500 text-xs block">Şimdi Yapılan Ödeme (-)</label>
-                                            <span className="text-[10px] text-stone-500" title="Ödeme girilmezse tamamı borç yazılır">Sıfırsa borca yazılır</span>
-                                        </div>
-                                        <input
-                                            type="number"
-                                            value={parsedSupplier.paidAmount}
-                                            onChange={e => setParsedSupplier({...parsedSupplier, paidAmount: parseFloat(e.target.value) || 0})}
-                                            className="w-full h-11 bg-stone-800 border border-amber-500 rounded-lg px-3 text-green-400 font-bold focus:outline-none focus:border-amber-400 text-lg"
-                                        />
                                     </div>
                                 </div>
                             </div>
