@@ -90,7 +90,7 @@ export default function TedarikciGecmisi() {
                     name,
                     unit
                 ),
-                suppliers (
+                suppliers!stock_movements_supplier_id_fkey (
                     name
                 )
             `)
