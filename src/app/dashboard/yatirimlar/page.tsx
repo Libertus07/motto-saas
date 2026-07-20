@@ -36,37 +36,59 @@ export default function YatirimlarPage() {
         const file = e.target.files?.[0]
         if (!file) return
 
+        if (file.size > 3 * 1024 * 1024) {
+            alert('Seçilen dosya çok büyük. Lütfen 3 MB altı bir dosya seçin veya kırparak tekrar deneyin.')
+            return
+        }
+
         setIsAnalyzing(true)
         try {
-            const formData = new FormData()
-            formData.append('file', file)
+            const reader = new FileReader()
+            reader.onloadend = async () => {
+                const base64Image = reader.result as string
 
-            const response = await fetch('/api/ai/analyze-receipt', {
-                method: 'POST',
-                body: formData
-            })
+                try {
+                    const response = await fetch('/api/analyze-investment', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            image: base64Image,
+                            fileType: file.type === 'application/pdf' ? 'pdf' : 'image'
+                        })
+                    })
 
-            const result = await response.json()
+                    const data = await response.json()
 
-            if (!result.success) throw new Error(result.error)
+                    if (data.error) throw new Error(data.error)
 
-            const data = result.data
-            ui.setBuyForm(prev => ({
-                ...prev,
-                asset_type: data.type === 'USD' ? 'usd' : data.type === 'EUR' ? 'eur' : data.type === 'GOLD' ? 'gold' : 'gold',
-                quantity: data.amount?.toString() || prev.quantity,
-                price_per_unit: data.rate?.toString() || prev.price_per_unit,
-                notes: `AI: ${data.notes || ''}`
-            }))
-
-            await showAlert('Fiş başarıyla okundu ve form dolduruldu.', 'success')
-
-        } catch (error: any) {
-            devError('Fiş okuma hatası', error)
-            await showAlert('Yapay zeka fişi okurken bir hata oluştu: ' + error.message, 'error')
-        } finally {
+                    ui.setBuyForm(prev => ({
+                        ...prev,
+                        asset_type: data.asset_type || 'gold',
+                        quantity: data.quantity?.toString() || prev.quantity,
+                        price_per_unit: data.price_per_unit?.toString() || prev.price_per_unit,
+                        notes: `AI: ${data.notes || ''}`
+                    }))
+                    
+                    if (data.purchase_date) {
+                        ui.setBuyForm(prev => ({...prev, purchase_date: data.purchase_date}))
+                    }
+                    
+                    await showAlert('Fiş başarıyla okundu ve form dolduruldu.', 'success')
+                } catch (err: any) {
+                    console.error(err)
+                    let errorMsg = err.message;
+                    if (errorMsg === 'The string did not match the expected pattern.') {
+                        errorMsg = 'Tarayıcı kaynaklı bir hata oluştu. Yüklediğiniz fotoğrafın formatı (HEIC vb.) desteklenmiyor olabilir.';
+                    }
+                    await showAlert(errorMsg || 'Yapay zeka fişi okuyamadı.', 'error')
+                } finally {
+                    setIsAnalyzing(false)
+                }
+            }
+            reader.readAsDataURL(file)
+        } catch (err: any) {
             setIsAnalyzing(false)
-            if (e.target) e.target.value = ''
+            await showAlert(err.message || 'Dosya okunamadı.', 'error')
         }
     }
 
