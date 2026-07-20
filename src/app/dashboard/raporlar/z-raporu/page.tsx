@@ -65,6 +65,14 @@ export default function ZRaporuYukle() {
         const file = e.target.files?.[0]
         if (!file) return
         
+        // Vercel 4.5MB request body limit => ~3.3MB file size max.
+        // We set a 3MB safe limit.
+        if (file.size > 3 * 1024 * 1024) {
+            showAlert('Seçtiğiniz belge çok büyük (Max 3MB). Sunucu limitlerine takılmamak için lütfen dosya boyutunu küçültün veya ekran görüntüsü (fotoğraf) kırparak yükleyin.', 'warning');
+            e.target.value = '';
+            return;
+        }
+
         setSelectedFile(file)
 
         const fileExt = file.name.split('.').pop()?.toLowerCase()
