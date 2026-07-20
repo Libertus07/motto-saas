@@ -77,6 +77,10 @@ yarn dev
 
 Tarayıcınızda [http://localhost:3000](http://localhost:3000) adresine giderek uygulamayı görebilirsiniz.
 
+### 5. Hata Ayıklama (Debug) Scriptleri
+
+Eğer veritabanı veya yetkilendirme (RLS) hatalarını doğrudan terminalden hızlıca test etmek isterseniz, `scripts/debug/` klasörü altındaki `.mjs` uzantılı tek seferlik test dosyalarını kullanabilirsiniz (Örn: `node scripts/debug/check_auth.mjs`).
+
 ---
 
 ## 🔒 Güvenlik (RLS ve Tenant İzolasyonu)

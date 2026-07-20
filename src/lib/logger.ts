@@ -1,5 +1,8 @@
-import { createClient } from './supabase'
-import { devLog, devError } from '@/lib/debug';
+"use server"
+
+import { createServerSupabase } from './supabase-server'
+import { devError } from '@/lib/debug';
+import { headers } from 'next/headers'
 
 export type LogAction = 'EKLEME' | 'SILME' | 'GUNCELLEME'
 
@@ -10,25 +13,23 @@ export async function logActivity(
     details?: any
 ) {
     try {
-        const supabase = createClient()
+        const supabase = await createServerSupabase()
         const { data: { user } } = await supabase.auth.getUser()
 
-        let browserInfo = 'Bilinmeyen Cihaz'
-        if (typeof window !== 'undefined') {
-            browserInfo = window.navigator.userAgent
-        }
+        const headersList = await headers();
+        const ipAddress = headersList.get('x-forwarded-for') || 'Bilinmeyen IP'
+        const browserInfo = headersList.get('user-agent') || 'Bilinmeyen Cihaz'
 
-        let ipAddress = 'Bilinmeyen IP'
+        // Sadece serileştirilebilir verileri tutarak güvenli hale getirelim
+        let safeDetails = {};
         try {
-            const res = await fetch('https://api.ipify.org?format=json')
-            const data = await res.json()
-            ipAddress = data.ip
+            if (details) safeDetails = JSON.parse(JSON.stringify(details));
         } catch (e) {
-            devError("IP alinmadi")
+            safeDetails = { error: 'Detaylar dönüştürülemedi' };
         }
 
         const enrichedDetails = {
-            ...(details || {}),
+            ...safeDetails,
             _meta: {
                 ip: ipAddress,
                 userAgent: browserInfo
