@@ -310,12 +310,12 @@ export default function FisYukle() {
                             <h2 className="font-bold text-lg mb-2">Belge Yükleyin (Görsel, PDF, XML, JSON)</h2>
                             <p className="text-stone-400 text-sm mb-6">Fiş görseli, PDF fatura, XML e-fatura veya JSON fiyat listesi yükleyebilirsiniz. Yapay zeka tüm formatları otomatik okuyacak.</p>
 
-                            <label className="block w-full border-2 border-dashed border-stone-700 hover:border-amber-400 rounded-xl p-8 text-center cursor-pointer transition-colors relative">
+                            <label className="block w-full border-2 border-dashed border-stone-700 hover:border-amber-400 rounded-xl p-8 text-center cursor-pointer transition-colors relative overflow-hidden">
                                 <input
                                     type="file"
                                     accept="image/*,application/pdf,text/xml,.xml,application/json,.json,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                                     onChange={handleImageUpload}
-                                    className="hidden"
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 />
                                 {image && fileType === 'image' && (
                                     <img src={image} alt="Fiş" className="max-h-96 mx-auto rounded-lg object-contain" />

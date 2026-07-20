@@ -504,12 +504,12 @@ export default function ZRaporuYukle() {
                                 Z Raporu görseli, PDF, XML veya JSON formatında satış raporunuzu yükleyebilirsiniz. Yapay zeka satışları okuyacak ve stokları düşecek.
                             </p>
                             
-                            <label className="block w-full border-2 border-dashed border-stone-700 hover:border-amber-400 rounded-xl p-8 text-center cursor-pointer transition-colors relative bg-stone-900/50">
+                            <label className="block w-full border-2 border-dashed border-stone-700 hover:border-amber-400 rounded-xl p-8 text-center cursor-pointer transition-colors relative bg-stone-900/50 overflow-hidden">
                                 <input
                                     type="file"
                                     accept="image/*,application/pdf,text/xml,.xml,application/json,.json,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                                     onChange={handleImageUpload}
-                                    className="hidden"
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 />
                                 <div className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-lg transition-colors inline-block">
                                     Belge Seç / Çek

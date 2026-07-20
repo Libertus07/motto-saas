@@ -177,12 +177,12 @@ export default function YatirimFisiYukle() {
                                 Altın alım fişi, Döviz bürosu makbuzu veya Gayrimenkul dekontunu yükleyin. Yapay zeka yatırım bilgilerini okuyup portföyünüze otomatik ekler.
                             </p>
                             
-                            <label className="block w-full border-2 border-dashed border-stone-700 hover:border-purple-400 rounded-xl p-8 text-center cursor-pointer transition-colors relative bg-stone-900/50">
+                            <label className="block w-full border-2 border-dashed border-stone-700 hover:border-purple-400 rounded-xl p-8 text-center cursor-pointer transition-colors relative bg-stone-900/50 overflow-hidden">
                                 <input
                                     type="file"
                                     accept="image/*,application/pdf"
                                     onChange={handleImageUpload}
-                                    className="hidden"
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 />
                                 <div className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-6 py-3 rounded-lg transition-colors inline-block">
                                     Belge Seç / Çek

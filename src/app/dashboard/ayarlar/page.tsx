@@ -513,9 +513,9 @@ function GenelTab({ s, set, onSave, saving }: { s: Settings; set: (k: keyof Sett
             )}
           </div>
           <div className="flex-1">
-            <label className="bg-stone-800 hover:bg-stone-700 text-white font-medium px-4 py-2 rounded-lg cursor-pointer transition-colors text-sm border border-stone-700 inline-block mb-2">
+            <label className="bg-stone-800 hover:bg-stone-700 text-white font-medium px-4 py-2 rounded-lg cursor-pointer transition-colors text-sm border border-stone-700 inline-block mb-2 relative overflow-hidden">
               {s.business_logo ? 'Logoyu Değiştir' : 'Logo Yükle'}
-              <input type="file" accept="image/png, image/jpeg, image/jpg, image/svg+xml" onChange={handleLogoUpload} disabled={uploadingLogo} className="hidden" />
+              <input type="file" accept="image/png, image/jpeg, image/jpg, image/svg+xml" onChange={handleLogoUpload} disabled={uploadingLogo} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
             </label>
             <p className="text-stone-500 text-xs">PNG, JPG veya SVG. Kare veya yatay format önerilir.</p>
           </div>
