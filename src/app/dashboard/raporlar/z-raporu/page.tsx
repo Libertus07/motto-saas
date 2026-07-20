@@ -196,7 +196,13 @@ export default function ZRaporuYukle() {
 
             setParsedData({ ...data, items: mappedItems })
         } catch (error: any) {
-            await showAlert(error.message, 'error')
+            let errorMsg = error.message;
+            if (errorMsg === 'The string did not match the expected pattern.') {
+                errorMsg = 'Tarayıcı kaynaklı bir hata oluştu. Yüklediğiniz fotoğrafın formatı (HEIC vb.) veya boyutu desteklenmiyor olabilir. Lütfen ekran görüntüsü alıp veya kırparak tekrar deneyin.';
+            } else if (errorMsg.includes('Failed to fetch')) {
+                errorMsg = 'Sunucuya bağlanılamadı. Fotoğraf boyutu çok büyük olabilir (Vercel 4.5MB limiti). Lütfen fotoğrafı küçültüp tekrar deneyin.';
+            }
+            await showAlert(errorMsg, 'error')
         } finally {
             setAnalyzing(false)
         }
