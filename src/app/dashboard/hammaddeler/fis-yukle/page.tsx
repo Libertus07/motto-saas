@@ -138,8 +138,7 @@ export default function FisYukle() {
                 body: JSON.stringify({
                     image: image,
                     fileText: fileText,
-                    fileType: fileType,
-                    existingIngredients: existingMaterials?.map(i => i.name) || []
+                    fileType: fileType
                 })
             })
 

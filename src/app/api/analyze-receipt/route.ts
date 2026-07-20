@@ -35,7 +35,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }, { status: 429 });
         }
 
-        const { image, fileText, fileType, existingIngredients } = await req.json();
+        const { image, fileText, fileType } = await req.json();
 
         if (!image && !fileText) {
             return NextResponse.json({ error: 'Dosya verisi eksik.' }, { status: 400 });
@@ -81,12 +81,9 @@ export async function POST(req: Request) {
 
         const prompt = `Lütfen bu belgeyi (fiş, fatura, e-fatura XML veya fiyat listesi JSON) analiz et ve içerisindeki ürün kalemlerini DİKKATLİCE çıkar.
 
-Aşağıdaki mevcut hammaddelerimle eşleşenleri "BİREBİR AYNI İSİMLE", eşleşmeyenleri ise belgedeki ismiyle çıkar:
-Mevcut hammaddeler: ${existingIngredients.join(', ')}
-
 ÖNEMLİ KURAL 1 (TİTİZLİK VE EKSİKSİZLİK): Belgedeki ürün kalemlerini satır satır son derece titiz bir şekilde analiz et. HİÇBİR gerçek ürünü atlama (eksik ürün bırakma) ve belgede YER ALMAYAN hiçbir ürünü uydurma (fazla ürün ekleme).
 ÖNEMLİ KURAL 2 (İSTENMEYEN KALEMLER): KDV, Ara Toplam, Genel Toplam, İndirim, Yuvarlama, Nakit, Kredi Kartı, Para Üstü, Tutar, Matrah gibi toplam ve ödeme satırlarını KESİNLİKLE ürün (items) olarak EKLEME. Yalnızca fiziksel mal/hizmet kalemlerini ekle.
-ÖNEMLİ KURAL 3 (İSİM TEMİZLİĞİ): Ürün isimlerinin sonundaki veya içindeki gereksiz noktalama işaretlerini (özellikle nokta, virgül, yıldız), KDV oranlarını (örn: %1, %10) ve fazla boşlukları temizle. (Örn: "ALGIDA CILEK 5L.. %1" yerine "ALGIDA CILEK 5L" yaz).
+ÖNEMLİ KURAL 3 (İSİM TEMİZLİĞİ VE BİREBİRLİK): Ürün isimlerinin sonundaki veya içindeki gereksiz noktalama işaretlerini (özellikle nokta, virgül, yıldız), KDV oranlarını (örn: %1, %10) temizle. Ancak bunun dışında ürün ismini belgede yazdığı haliyle BİREBİR AYNI ŞEKİLDE çıkar. Kendi kelimelerini ekleme.
 ÖNEMLİ KURAL 4 (BİRİM VE MİKTAR DÖNÜŞÜMÜ): Belgedeki miktar Kg, Gram, Litre, Ml, Adet olarak açıkça belirtilmişse BUNU KESİNLİKLE DEĞİŞTİRME. Fişte miktar olarak ne yazıyorsa (örn: 20 Kg) birebir aynı Miktar (20) ve Birimi (Kg) kullan. Asla 1000 ile çarpıp Gram'a çevirmeye kalkma! SADECE ürünün isminde "5L", "10 Kg" gibi dev paket bilgisi varsa VE fişteki miktar "1 Adet/Koli" yazıyorsa; o zaman paketin içindeki net miktarı bul (Örn: 1 Adet 5L sıvı -> quantity: 5000, unit: "Ml"). Bunun dışındaki tüm durumlarda belgedeki birimi koru.
 ÖNEMLİ KURAL 5 (FİYAT VE KDV DAHİL MATEMATİK): Ürünlerin faturasında "KDV Hariç" (Mal/Hizmet Tutarı) yazıyorsa ve KDV ayrıca hesaplanıyorsa, o ürünün KDV'sini KESİNLİKLE üzerine EKLEYEREK (KDV Dahil) "totalPrice" değerini yaz. Eğer satırda zaten "Vergiler Dahil" veya "KDV Dahil" yazıyorsa onu kullan. Sonuç olarak totalPrice KESİNLİKLE KDV DAHİL SATIŞ FİYATI olmalıdır. Birim fiyatı (unitPrice) ise KDV dahil toplam tutarı (totalPrice) miktara (quantity) bölerek küsuratlı şekilde (asla yuvarlamadan) bul. quantity * unitPrice = totalPrice matematiği kuruşu kuruşuna tutmalıdır.
 ÖNEMLİ KURAL 6 (BEDELSİZ PROMOSYONLAR VE İADELER): Fiyatı 0.00 olan (bedelsiz/promosyon) kalemleri listeye fiyatı 0 olarak DAHİL ET. ANCAK, eksi (-) değerli olan veya satırda/yanında kalemle "İADE" (return) yazan veya iptal edilmiş ürünleri KESİNLİKLE LİSTEYE EKLEME. İade ürünlerini tamamen yok say ve atla.
