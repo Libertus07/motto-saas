@@ -86,12 +86,12 @@ Bu bir YATIRIM işlemidir. Senden beklediğim şey, belgenin içinden aşağıda
 - purchase_date: Belgenin üzerindeki işlem tarihi (YYYY-MM-DD formatında). Yoksa null dön.
 - notes: Bu işleme dair önemli notlar. Eğer tapu ise Ada, Parsel, İl, İlçe vb. bilgileri yaz. Değilse "Kuyumcu fişi", "Döviz dekontu" vb. gibi kısa ve güzel bir özet çıkar.
 
-Yanıtı SADECE aşağıdaki formatta saf JSON olarak dön (markdown kullanma):
+Yanıtı SADECE aşağıdaki formatta saf JSON olarak dön (markdown kullanma). Açıklamaları json içine yazma:
 {
     "asset_type": "gold",
-    "quantity": sayı,
-    "price_per_unit": sayı,
-    "purchase_date": "YYYY-MM-DD" veya null,
+    "quantity": 0,
+    "price_per_unit": 0,
+    "purchase_date": null,
     "notes": "Belge hakkında önemli özet bilgi"
 }`;
 

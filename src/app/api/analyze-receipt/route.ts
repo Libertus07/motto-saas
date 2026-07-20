@@ -91,24 +91,24 @@ export async function POST(req: Request) {
 ÖNEMLİ KURAL 8 (GERÇEK / GÜNCEL GENEL TOPLAM VE BAKİYE): Faturada iade/iptal edilen ürünler varsa, bu ürünlerin tutarları ana faturadan (matbu tutardan) DÜŞÜLMELİDİR. Eğer faturanın üzerine el yazısıyla güncel/net bir toplam (örn: "Güncel 13.128") yazılmışsa, "total_amount" alanına KESİNLİKLE bu elle yazılmış güncel rakamı yaz (elle yazılmamışsa iade edilen kalemleri basılı toplam tutardan çıkarıp yaz).
 Aynı şekilde, eğer faturada matbu olarak yazılmış bir "Sonraki Bakiye" veya "Toplam Borç" (supplier_stated_debt) varsa ve iade/iptal kalemleri faturadan elle düşüldüyse; matbu bakiyeyi direkt KOPYALAMA. Matbu "Sonraki Bakiye" içinden iade edilen ürünlerin tutarını matematiksel olarak çıkartarak (veya Önceki Bakiye + Güncel Net Tutar formülüyle) DOĞRU (giden iadenin düşülmüş olduğu) GÜNCEL SONRAKİ BAKİYEYİ bularak "supplier_stated_debt" alanına yaz.
 
-Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (\`\`\`json vb) veya düz metin ekleme:
+Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (```json vb) veya düz metin ekleme. Açıklama metinlerini asla json içine dahil etme:
 {
   "supplier_name": "Faturayı kesen firma/tedarikçi adı (okunmuyorsa veya fişse 'Bilinmeyen Tedarikçi' yaz)",
   "supplier_phone": "Fatura/fiş üzerindeki telefon numarası (yoksa null)",
   "supplier_iban": "Fatura üzerindeki IBAN numarası (yoksa null)",
   "supplier_address": "Fatura/fiş üzerindeki adres bilgisi (yoksa null)",
-  "supplier_stated_debt": faturada_yazan_eski_bakiye_veya_toplam_hesap_bakiyesi_sayı_olarak_varsa, (yoksa null),
+  "supplier_stated_debt": null,
   "invoice_date": "YYYY-MM-DD",
-  "total_amount": genel_toplam_tutar_sayi_olarak,
+  "total_amount": 0,
   "items": [
     {
       "name": "ürün adı",
       "category": "Tahmini ürün kategorisi (örn: Süt Ürünleri, Sebze/Meyve, Temizlik, İçecek vb.)",
-      "quantity": miktar_sadece_rakam_olarak,
+      "quantity": 0,
       "unit": "Faturada Miktarın yanında yazan birim. KESİNLİKLE uydurma veya tahmin etme! Satırda 'ADET' yazıyorsa 'Adet', 'KG' yazıyorsa 'Kg', 'KUTU' veya 'KOLİ' yazıyorsa mutlaka 'Kutu' veya 'Koli' yaz. Eğer birim yoksa 'Adet' yaz, asla kafana göre 'Gram' yazma.",
       "boxMultiplier": "Eğer ürün Kutu, Koli veya Paket ise ve fişte içinde kaç adet olduğu yazıyorsa (örn: '1 Koli 24 Adet', '1x24'), bu sayıyı sadece rakam olarak buraya yaz. Eğer yazmıyorsa veya emin değilsen null bırak.",
-      "totalPrice": toplam_tutar_sadece_rakam_olarak,
-      "unitPrice": birim_fiyat_sadece_rakam_olarak
+      "totalPrice": 0,
+      "unitPrice": 0
     }
   ]
 }`;
