@@ -131,7 +131,29 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (\`\`
         const result = await model.generateContent(contentParts);
         const responseText = result.response.text();
         
-        const jsonStr = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        // Yanıtın başındaki/sonundaki olası markdown bloklarını temizle
+        let jsonStr = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+        // JSON formatındaki yaygın hataları (örn: sondaki virgüller) düzeltmek için
+        jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
+
+        // Sadece JSON kısmını ayıklama (bazen JSON öncesi/sonrası açıklamalar olabilir)
+        const firstBrace = jsonStr.indexOf('{');
+        const lastBrace = jsonStr.lastIndexOf('}');
+        const firstBracket = jsonStr.indexOf('[');
+        const lastBracket = jsonStr.lastIndexOf(']');
+        
+        const firstObj = firstBrace !== -1 ? firstBrace : Infinity;
+        const firstArr = firstBracket !== -1 ? firstBracket : Infinity;
+        const lastObj = lastBrace !== -1 ? lastBrace : -1;
+        const lastArr = lastBracket !== -1 ? lastBracket : -1;
+
+        if (firstObj < firstArr && lastObj > lastArr) {
+             jsonStr = jsonStr.substring(firstObj, lastObj + 1);
+        } else if (firstArr < firstObj && lastArr > lastObj) {
+             jsonStr = jsonStr.substring(firstArr, lastArr + 1);
+        }
+
         const parsed = JSON.parse(jsonStr);
 
         return NextResponse.json(parsed);
