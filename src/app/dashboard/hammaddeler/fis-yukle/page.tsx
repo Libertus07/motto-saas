@@ -35,6 +35,7 @@ export default function FisYukle() {
     const [image, setImage] = useState<string | null>(null)
     const [fileText, setFileText] = useState<string | null>(null)
     const [fileType, setFileType] = useState<'image' | 'pdf' | 'xml' | 'json' | null>(null)
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [loading, setLoading] = useState(false)
     const [parsedItems, setParsedItems] = useState<ParsedItem[]>([])
     const [parsedSupplier, setParsedSupplier] = useState<{ id?: string, name: string, phone?: string, iban?: string, address?: string, date: string, totalAmount: number, paidAmount: number, statedDebt: number | null } | null>(null)
@@ -72,6 +73,8 @@ export default function FisYukle() {
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
+
+        setSelectedFile(file)
 
         // Vercel 4.5MB request body limit => ~3.3MB file size max.
         // We set a 3MB safe limit.
@@ -220,6 +223,7 @@ export default function FisYukle() {
             selected: true,
             isNew: true
         }])
+        setSelectedFile(null)
         setStep('review')
         setLoading(false)
     }
@@ -288,6 +292,21 @@ export default function FisYukle() {
         const selectedItems = parsedItems.filter(i => i.selected)
         const batchId = crypto.randomUUID()
 
+        let uploadedUrl = null;
+        if (selectedFile) {
+            const fileExt = selectedFile.name.split('.').pop();
+            const fileName = `receipt-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('motto_assets')
+                .upload(fileName, selectedFile);
+            if (!uploadError && uploadData) {
+                const { data: urlData } = supabase.storage.from('motto_assets').getPublicUrl(fileName);
+                uploadedUrl = urlData.publicUrl;
+            } else if (uploadError) {
+                console.error("Storage upload error:", uploadError);
+            }
+        }
+
         const parseNum = (val: any) => {
             if (typeof val === 'number') return val;
             if (!val) return 0;
@@ -297,7 +316,7 @@ export default function FisYukle() {
         const payload = {
             user_id: user?.id,
             batch_id: batchId,
-            image_url: image || null,
+            image_url: uploadedUrl,
             supplier: parsedSupplier ? {
                 id: parsedSupplier.id || null,
                 name: parsedSupplier.name,
@@ -448,7 +467,12 @@ export default function FisYukle() {
                 )}
 
                 {step === 'review' && (
-                    <div className="space-y-4">
+                    <div className="space-y-6">
+                        {error && (
+                            <div className="bg-red-900/30 border border-red-500 rounded-xl p-4 text-red-400 mb-6">
+                                {error}
+                            </div>
+                        )}
                         {parsedSupplier && (
                             <div className="bg-stone-900 border border-amber-500/50 rounded-xl p-5 mb-6">
                                 <h3 className="font-bold text-amber-400 mb-4 flex items-center gap-2">
@@ -712,7 +736,7 @@ export default function FisYukle() {
                                 {loading ? 'Kaydediliyor...' : `✓ ${parsedItems.filter(i => i.selected).length} Kalemi Uygula`}
                             </button>
                             <button
-                                onClick={() => { setStep('upload'); setImage(null); setFileText(null); setFileType(null); setParsedItems([]) }}
+                                onClick={() => { setStep('upload'); setImage(null); setFileText(null); setFileType(null); setSelectedFile(null); setParsedItems([]) }}
                                 className="bg-stone-800 hover:bg-stone-700 text-white px-6 py-3 rounded-xl transition-colors"
                             >
                                 İptal
@@ -735,7 +759,7 @@ export default function FisYukle() {
                                 Hammaddelere Git
                             </button>
                             <button
-                                onClick={() => { setStep('upload'); setImage(null); setParsedItems([]) }}
+                                onClick={() => { setStep('upload'); setImage(null); setSelectedFile(null); setParsedItems([]) }}
                                 className="bg-stone-800 hover:bg-stone-700 text-white px-6 py-3 rounded-xl transition-colors"
                             >
                                 Yeni Fiş Yükle

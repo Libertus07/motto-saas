@@ -46,3 +46,7 @@ scripts/debug/*.js
 CLAUDE.md
 graphify-out/
 query_graph.py
+
+# MCP Crash Workaround
+*.csv
+public/*.svg

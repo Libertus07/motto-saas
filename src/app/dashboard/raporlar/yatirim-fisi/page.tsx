@@ -28,6 +28,7 @@ export default function YatirimFisiYukle() {
     const [imageUrl, setImageUrl] = useState<string | null>(null)
     const [fileText, setFileText] = useState<string | null>(null)
     const [fileType, setFileType] = useState<'image' | 'pdf' | null>(null)
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [loading, setLoading] = useState(false)
     const [analyzing, setAnalyzing] = useState(false)
     const { showAlert, showConfirm } = useNotification()
@@ -53,6 +54,15 @@ export default function YatirimFisiYukle() {
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
+
+        setSelectedFile(file)
+
+        // Vercel 4.5MB request body limit => ~3.3MB file size max.
+        if (file.size > 3 * 1024 * 1024) {
+            showAlert('Seçtiğiniz belge çok büyük (Max 3MB). Sunucu limitlerine takılmamak için lütfen dosya boyutunu küçültün.', 'warning');
+            e.target.value = '';
+            return;
+        }
 
         const fileExt = file.name.split('.').pop()?.toLowerCase()
         if (file.type === 'application/pdf') {
@@ -118,6 +128,7 @@ export default function YatirimFisiYukle() {
             purchase_date: new Date().toISOString().split('T')[0],
             notes: 'Manuel Giriş'
         })
+        setSelectedFile(null)
     }
 
     const handleApprove = async () => {
@@ -159,6 +170,21 @@ export default function YatirimFisiYukle() {
             }
             // --- ÇİFT KAYIT KONTROLÜ BİTİŞ ---
 
+            let uploadedUrl = null;
+            if (selectedFile) {
+                const fileExt = selectedFile.name.split('.').pop();
+                const fileName = `investment-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('motto_assets')
+                    .upload(fileName, selectedFile);
+                if (!uploadError && uploadData) {
+                    const { data: urlData } = supabase.storage.from('motto_assets').getPublicUrl(fileName);
+                    uploadedUrl = urlData.publicUrl;
+                } else if (uploadError) {
+                    console.error("Storage upload error:", uploadError);
+                }
+            }
+
             const { error: rpcError } = await supabase.rpc('buy_investment_transaction', {
                 p_asset_type: parsedData.asset_type,
                 p_name: investmentName,
@@ -167,7 +193,7 @@ export default function YatirimFisiYukle() {
                 p_account_id: selectedAccount,
                 p_notes: parsedData.notes || null,
                 p_purchase_date: parsedData.purchase_date,
-                p_document_url: imageUrl || null
+                p_document_url: uploadedUrl
             })
 
             if (rpcError) throw rpcError
@@ -370,7 +396,7 @@ export default function YatirimFisiYukle() {
                                 {loading ? 'Kaydediliyor...' : 'Onayla ve Portföye Ekle 🚀'}
                             </button>
                             <button
-                                onClick={() => { setParsedData(null); setImageUrl(null); setFileText(null); setFileType(null); }}
+                                onClick={() => { setParsedData(null); setImageUrl(null); setFileText(null); setFileType(null); setSelectedFile(null); }}
                                 disabled={loading}
                                 className="bg-stone-800 hover:bg-stone-700 text-white font-bold px-8 py-4 rounded-xl transition-colors disabled:opacity-50"
                             >
