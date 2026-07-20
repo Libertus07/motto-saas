@@ -34,7 +34,11 @@ BEGIN
     v_items := payload->'items';
 
     IF v_sup_data IS NOT NULL THEN
-        SELECT id INTO v_supplier_id FROM suppliers WHERE name ILIKE (v_sup_data->>'name') LIMIT 1;
+        IF (v_sup_data->>'id') IS NOT NULL AND (v_sup_data->>'id') <> '' THEN
+            v_supplier_id := (v_sup_data->>'id')::uuid;
+        ELSE
+            SELECT id INTO v_supplier_id FROM suppliers WHERE TRIM(name) ILIKE TRIM(v_sup_data->>'name') LIMIT 1;
+        END IF;
         
         IF v_supplier_id IS NOT NULL THEN
             UPDATE suppliers 

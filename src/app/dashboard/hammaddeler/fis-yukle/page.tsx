@@ -37,7 +37,7 @@ export default function FisYukle() {
     const [fileType, setFileType] = useState<'image' | 'pdf' | 'xml' | 'json' | null>(null)
     const [loading, setLoading] = useState(false)
     const [parsedItems, setParsedItems] = useState<ParsedItem[]>([])
-    const [parsedSupplier, setParsedSupplier] = useState<{ name: string, phone?: string, iban?: string, address?: string, date: string, totalAmount: number, paidAmount: number, statedDebt: number | null } | null>(null)
+    const [parsedSupplier, setParsedSupplier] = useState<{ id?: string, name: string, phone?: string, iban?: string, address?: string, date: string, totalAmount: number, paidAmount: number, statedDebt: number | null } | null>(null)
     const [supplierDebt, setSupplierDebt] = useState<number>(0)
     const [materials, setMaterials] = useState<Material[]>([])
     const [suppliers, setSuppliers] = useState<{id: string, name: string}[]>([])
@@ -201,6 +201,7 @@ export default function FisYukle() {
         setSuppliers(existingSuppliers || [])
         
         setParsedSupplier({
+            id: undefined,
             name: '',
             phone: '',
             iban: '',
@@ -266,6 +267,7 @@ export default function FisYukle() {
             batch_id: batchId,
             image_url: image || null,
             supplier: parsedSupplier ? {
+                id: parsedSupplier.id || null,
                 name: parsedSupplier.name,
                 phone: parsedSupplier.phone || null,
                 iban: parsedSupplier.iban || null,
@@ -428,7 +430,15 @@ export default function FisYukle() {
                                                 list="supplier-options"
                                                 type="text"
                                                 value={parsedSupplier.name}
-                                                onChange={e => setParsedSupplier({...parsedSupplier, name: e.target.value})}
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    const matchedSup = suppliers.find(s => s.name.trim().toLowerCase() === val.trim().toLowerCase());
+                                                    setParsedSupplier({
+                                                        ...parsedSupplier, 
+                                                        name: val,
+                                                        id: matchedSup?.id
+                                                    });
+                                                }}
                                                 className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400"
                                             />
                                             <datalist id="supplier-options">
