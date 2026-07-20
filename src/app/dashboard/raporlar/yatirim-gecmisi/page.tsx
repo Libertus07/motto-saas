@@ -59,7 +59,8 @@ export default function YatirimGecmisi() {
             .order('transaction_date', { ascending: false })
 
         if (error) {
-            devError('Yatırım işlemleri çekilirken hata:', error)
+            console.error("Supabase Error Details:", error);
+            devError('Yatırım işlemleri çekilirken hata:', error?.message, error?.details, error?.hint)
             setLoading(false)
             return
         }

@@ -99,7 +99,8 @@ export default function TedarikciGecmisi() {
             .order('created_at', { ascending: false })
 
         if (error) {
-            devError('Fişler çekilirken hata:', error)
+            console.error("Supabase Error Details:", error);
+            devError('Fişler çekilirken hata:', error?.message, error?.details, error?.hint)
             setLoading(false)
             return
         }
