@@ -28,7 +28,10 @@ export async function POST(req: Request) {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-2.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
 
         const materialsContext = materials?.map((m: any) => `- ${m.id} | ${m.name} | ${m.unit} | ₺${m.price_per_unit}`).join('\n') || 'Yok';
         const subRecipesContext = subRecipes?.map((s: any) => `- ${s.id} | ${s.name} | Porsiyon Maliyeti: ₺${(s.total_cost / (s.yield_quantity || 1)).toFixed(2)}`).join('\n') || 'Yok';
