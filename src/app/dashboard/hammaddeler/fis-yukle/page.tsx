@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { devLog, devError } from '@/lib/debug';
 import { formatCurrency } from "@/lib/format";
+import { useNotification } from '@/components/NotificationProvider'
 
 type ParsedItem = {
     name: string
@@ -42,6 +43,7 @@ export default function FisYukle() {
     const [suppliers, setSuppliers] = useState<{id: string, name: string}[]>([])
     const [step, setStep] = useState<'upload' | 'review' | 'done'>('upload')
     const [error, setError] = useState('')
+    const { showAlert } = useNotification()
     const supabase = createClient()
     const router = useRouter()
 
