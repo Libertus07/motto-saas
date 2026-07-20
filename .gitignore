@@ -40,3 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 scripts/debug/*.js
+
+# AI Tools
+.claude/
+CLAUDE.md
+graphify-out/
+query_graph.py

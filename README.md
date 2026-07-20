@@ -1,40 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Motto SaaS - Restoran & Kafe Yönetim Sistemi
 
-## Getting Started
+Motto SaaS, kafeler ve restoranlar için geliştirilmiş, maliyet hesaplaması, stok yönetimi, yapay zeka destekli fatura okuma ve kasa takibini bir araya getiren modern bir bulut POS (Point of Sale) ve ERP sistemidir.
 
-First, run the development server:
+Bu proje, veri gizliliği (tenant izolasyonu), anlık maliyet (food cost) hesaplamaları ve otomatik reçetelendirme yetenekleri ile işletmelerin "ne kadar kar ediyorum?" sorusuna anlık ve kesin yanıt vermeyi amaçlar.
+
+## 🚀 Öne Çıkan Özellikler
+
+- **AI Destekli Fiş/Fatura Okuma:** Google Gemini entegrasyonu sayesinde yüklenen fatura fotoğraflarından ürün, miktar, birim fiyat ve KDV bilgisi otomatik okunur. Zeki eşleştirme algoritması sayesinde mevcut stok isimleri ile eşleştirilir.
+- **Fiyat Motoru:** Ürün reçeteleri (hammadde ve alt reçeteler) üzerinden canlı food cost hesaplar. Ciro ağırlıklı genel gider dağıtımı ile **net kâr** oranını ve önerilen satış fiyatını sunar.
+- **Gelişmiş Kasa & Finans:** Z-Raporu entegrasyonu, nakit ve POS kasa ayırımı, tedarikçi cari hesapları ve masraf fişleri modülleriyle uçtan uca finans takibi sağlar.
+- **Güçlü Mimari:** Next.js 14 App Router, Supabase (Postgres, RLS), Tailwind CSS ve Recharts kullanılarak inşa edilmiştir.
+
+---
+
+## 🛠️ Modüller ve Çalışma Akışı
+
+Sistemin temel modülleri `src/app/dashboard/` altında yer almaktadır:
+
+1. **Stok & Hammadde (`/stok`, `/hammaddeler`):** En temel birimlerdir. Fiş yüklendiğinde (`/hammaddeler/fis-yukle`) otomatik olarak stok miktarı artar ve tedarikçinin cari hesabına borç yazılır.
+2. **Yarı Mamuller (`/yari-mamuller`):** Hammaddelerden üretilen, kendi içerisinde "Fire Oranı" ve "Porsiyon" maliyeti barındıran alt reçetelerdir (Örn: Pizza Hamuru).
+3. **Ürünler (`/urunler`):** Müşteriye satılan nihai ürünlerdir. Hammadde ve yarı mamuller kullanılarak reçeteleri oluşturulur, otomatik maliyet hesaplanır.
+4. **Tedarikçiler (`/tedarikciler`):** Fatura kesilen kurumlar. Cari hesap takibi ve ödeme geçmişi bu modül altından izlenir.
+5. **Kasa & Finans (`/kasa`, `/finans`, `/giderler`):** Z-Raporları üzerinden günlük satış adetleri girildiğinde kasa bakiyesi (Nakit/Kredi Kartı) güncellenir. Yapılan giderler kasadan otomatik düşülür.
+6. **Fiyat Motoru (`/fiyat-motoru`):** Ürünlerin satıldığı adetler üzerinden aylık sabit/değişken gider dağılımı yaparak, her ürün için BCG matrisi ve başa baş noktası analizi sunar.
+7. **Raporlar (`/raporlar`):** Geçmişe dönük Z-Raporları, yatırımlar ve kasa sayımları raporlanır.
+
+---
+
+## ⚙️ Kurulum Adımları
+
+Projeyi kendi bilgisayarınızda çalıştırmak için aşağıdaki adımları izleyin.
+
+### 1. Gereksinimler
+- Node.js (v18.17 veya üzeri)
+- Supabase Hesabı (Veritabanı ve Auth için)
+- Google Gemini API Anahtarı (Yapay Zeka modülleri için)
+
+### 2. Bağımlılıkları Yükleyin
+
+Proje dizinine terminalden gidin ve paketleri yükleyin:
+
+```bash
+npm install
+# veya
+yarn install
+```
+
+### 3. Ortam Değişkenlerini (Env) Ayarlayın
+
+Projenin kök dizininde `.env.local` adında bir dosya oluşturun ve aşağıdaki şablonu kendi bilgilerinizle doldurun:
+
+```env
+# --- SUPABASE BAĞLANTILARI ---
+# Supabase Dashboard -> Settings -> API kısmından alınır.
+NEXT_PUBLIC_SUPABASE_URL=https://[YOUR_PROJECT_ID].supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=[YOUR_ANON_KEY]
+
+# Service Role Key, API rotalarındaki (server-side) admin yetkili işlemler için gereklidir.
+SUPABASE_SERVICE_ROLE_KEY=[YOUR_SERVICE_ROLE_KEY]
+
+# Doğrudan veritabanı bağlantısı için (Prisma, migration vb. işlemlerde gerekebilir)
+DATABASE_URL=postgresql://postgres:[YOUR_PASSWORD]@db.[YOUR_PROJECT_ID].supabase.co:5432/postgres
+
+# --- GOOGLE GEMINI AI ---
+# Google AI Studio üzerinden alınır. Fatura okuma ve AI Kategori işlemleri için zorunludur.
+GEMINI_API_KEY=[YOUR_GEMINI_KEY]
+```
+
+### 4. Geliştirme Sunucusunu Başlatın
 
 ```bash
 npm run dev
-# or
+# veya
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Tarayıcınızda [http://localhost:3000](http://localhost:3000) adresine giderek uygulamayı görebilirsiniz.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🔒 Güvenlik (RLS ve Tenant İzolasyonu)
 
-## Security Decisions
+Bu bir SaaS projesi olduğu için Supabase tarafında **Row Level Security (RLS)** kullanılarak Tenant bazlı izolasyon sağlanmaktadır. Ek güvenlik kararları ve mimari tasarımlar için [SEC-101 — Tenant Modeli ve Veri Sahipliği](docs/security/SEC-101-tenant-model.md) dokümanını okuyabilirsiniz.
 
-- [SEC-101 — Tenant Modeli ve Veri Sahipliği](docs/security/SEC-101-tenant-model.md)
+*(Not: Tüm veritabanı "insert, update, delete" işlemleri Next.js sunucusunda veya Supabase rpc (fonksiyon) üzerinden `logActivity` çağrılarak loglanmaktadır.)*
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🚀 Build ve Deploy (Vercel)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Projeyi canlıya almak (Production) için Vercel platformu önerilir.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. GitHub deponuzu Vercel'e bağlayın.
+2. Vercel proje ayarlarından **Environment Variables** bölümüne gidin.
+3. `.env.local` dosyanızdaki tüm değerleri Vercel üzerine ekleyin.
+4. **Deploy** butonuna tıklayın. Vercel otomatik olarak `npm run build` ve `npm start` komutlarını çalıştıracaktır.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+> **Uyarı:** `SUPABASE_SERVICE_ROLE_KEY` değerinin asla `NEXT_PUBLIC_` ön eki ile başlamadığından emin olun, aksi halde admin yetkileriniz istemci tarafında sızabilir!

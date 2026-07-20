@@ -3,7 +3,12 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { logActivity } from '@/lib/logger'
 import { formatCurrency } from "@/lib/format";
+import {
+  ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis
+} from 'recharts';
 
 type Product = {
   id: string
@@ -50,7 +55,7 @@ export default function FiyatMotoru() {
     targetMargin: 60,
     taxRate: 10,
   })
-  const [activeTab, setActiveTab] = useState<'sales' | 'results'>('sales')
+  const [activeTab, setActiveTab] = useState<'sales' | 'results' | 'reports'>('sales')
   const [targetMargin, setTargetMargin] = useState(35)
   const supabase = createClient()
   const router = useRouter()
@@ -149,6 +154,7 @@ export default function FiyatMotoru() {
       await Promise.all(updates.map(p => 
         supabase.from('products').update({ calculated_cost: p.calculated_cost }).eq('id', p.id)
       ))
+      logActivity('Fiyat Motoru', 'GUNCELLEME', `${updates.length} ürünün hesaplanan maliyeti güncellendi.`)
     }
 
     setProducts(productsWithCost)
@@ -251,6 +257,26 @@ export default function FiyatMotoru() {
     t + (e.period === 'yearly' ? e.amount / 12 : e.amount), 0)
   const dailyExpenses = monthlyExpenses / 30
 
+  // --- Görsel Raporlar için Veri Hazırlığı ---
+  const chartData = calculations.map(c => ({
+    name: c.product.name,
+    sales: productSales[c.product.id]?.dailySales || 0,
+    dailyProfit: Number(c.dailyProfit.toFixed(0)),
+    currentMargin: Number(c.currentMargin.toFixed(1))
+  })).sort((a, b) => b.dailyProfit - a.dailyProfit);
+
+  const totalRawCost = calculations.reduce((t, c) => {
+    const sales = productSales[c.product.id]?.dailySales || 0
+    return t + (c.rawCost * sales)
+  }, 0)
+
+  const pieData = [
+    { name: 'Hammadde (COGS)', value: Number(totalRawCost.toFixed(0)), color: '#f59e0b' },
+    { name: 'Genel Giderler', value: Number(dailyExpenses.toFixed(0)), color: '#ef4444' },
+    { name: 'Net Kâr', value: totalDailyProfit > 0 ? Number(totalDailyProfit.toFixed(0)) : 0, color: '#10b981' }
+  ].filter(d => d.value > 0);
+  // ------------------------------------------
+
   const getMarginColor = (margin: number) => {
     if (margin >= targetMargin + 20) return 'text-green-400'
     if (margin >= targetMargin) return 'text-yellow-400'
@@ -339,6 +365,12 @@ export default function FiyatMotoru() {
           >
             2. Fiyat Analizi
           </button>
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === 'reports' ? 'bg-amber-500 text-stone-950' : 'bg-stone-800 text-stone-400 hover:text-white'}`}
+          >
+            3. Görsel Raporlar
+          </button>
         </div>
 
         {loading ? (
@@ -415,7 +447,7 @@ export default function FiyatMotoru() {
 </div>
           </div>
 
-        ) : (
+        ) : activeTab === 'results' ? (
 
           /* Fiyat Analizi */
           <div className="bg-stone-900 rounded-xl border border-stone-800 overflow-x-auto">
@@ -463,6 +495,97 @@ export default function FiyatMotoru() {
               </tbody>
             </table>
           </div>
+
+        ) : (
+
+          /* Görsel Raporlar */
+          <div className="flex flex-col gap-6">
+            {/* Nakit Katkı Grafiği */}
+            <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
+              <h3 className="font-bold text-amber-400 mb-2">💰 Satış Karması ve Nakit Katkısı (Contribution Margin)</h3>
+              <p className="text-stone-400 text-sm mb-6">Hangi ürünlerin kâr marjı yüksek, hangileri kasaya en çok sıcak parayı bırakıyor?</p>
+              <div className="h-80 w-full text-xs">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={chartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                    <CartesianGrid stroke="#292524" strokeDasharray="3 3" />
+                    <XAxis dataKey="name" stroke="#a8a29e" angle={-45} textAnchor="end" height={60} />
+                    <YAxis yAxisId="left" stroke="#10b981" orientation="left" />
+                    <YAxis yAxisId="right" stroke="#3b82f6" orientation="right" />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1c1917', borderColor: '#292524', color: '#fff' }}
+                      itemStyle={{ color: '#fff' }}
+                    />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="dailyProfit" name="Günlük Net Kâr (TL)" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="currentMargin" name="Kâr Marjı (%)" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Maliyet Dağılımı (Pie Chart) */}
+              <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
+                <h3 className="font-bold text-amber-400 mb-2">🍕 Maliyet Dağılımı (Prime Cost vs Overhead)</h3>
+                <p className="text-stone-400 text-sm mb-6">Elde ettiğiniz cironun ne kadarı hammaddeye, ne kadarı sabit giderlere, ne kadarı kâra gidiyor?</p>
+                <div className="h-64 w-full text-xs">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={5}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1c1917', borderColor: '#292524', color: '#fff' }}
+                        formatter={(value: any) => formatCurrency(Number(value) || 0)}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* BCG Matrisi */}
+              <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
+                <h3 className="font-bold text-amber-400 mb-2">⭐ Yıldızlar ve Köpekler (BCG Matrisi)</h3>
+                <p className="text-stone-400 text-sm mb-6">Sağ üst köşe: Çok satan, çok kâr ettiren (Yıldız). Sol alt: Az satan, az kâr ettiren (Köpek).</p>
+                <div className="h-64 w-full text-xs">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                      <CartesianGrid stroke="#292524" strokeDasharray="3 3" />
+                      <XAxis type="number" dataKey="sales" name="Satış Adedi" stroke="#a8a29e" />
+                      <YAxis type="number" dataKey="currentMargin" name="Kâr Marjı (%)" stroke="#a8a29e" />
+                      <ZAxis type="number" range={[100, 100]} />
+                      <Tooltip 
+                        cursor={{ strokeDasharray: '3 3' }}
+                        contentStyle={{ backgroundColor: '#1c1917', borderColor: '#292524', color: '#fff' }}
+                        formatter={(value: any, name: any) => [
+                          name === 'Satış Adedi' ? `${value} adet` : `%${value}`,
+                          name
+                        ]}
+                        labelFormatter={() => ''}
+                      />
+                      <Scatter name="Ürünler" data={chartData} fill="#f59e0b">
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.currentMargin > settings.targetMargin ? '#10b981' : '#ef4444'} />
+                        ))}
+                      </Scatter>
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </div>
+
         )}
       </main>
     </div>

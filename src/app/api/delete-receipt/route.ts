@@ -20,6 +20,20 @@ export async function POST(req: Request) {
         
         if (rpcError) throw rpcError
 
+        const userAgent = req.headers.get('user-agent') || 'Bilinmeyen Cihaz'
+        const ipAddress = req.headers.get('x-forwarded-for') || 'Bilinmeyen IP'
+        
+        await supabase.from('activity_logs').insert({
+            module: 'Fişler',
+            action_type: 'SILME',
+            description: 'Tedarikçi fişi silindi ve stok/cari işlemler geri alındı.',
+            user_id: user.id,
+            details: {
+                batch_id,
+                _meta: { ip: ipAddress, userAgent }
+            }
+        })
+
         return NextResponse.json({ success: true })
     } catch (error: unknown) {
         devError('Delete Receipt Error:', error)
