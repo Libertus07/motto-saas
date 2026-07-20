@@ -30,7 +30,7 @@ export default function YatirimFisiYukle() {
     const [fileType, setFileType] = useState<'image' | 'pdf' | null>(null)
     const [loading, setLoading] = useState(false)
     const [analyzing, setAnalyzing] = useState(false)
-    const { showAlert } = useNotification()
+    const { showAlert, showConfirm } = useNotification()
     
     const [parsedData, setParsedData] = useState<ParsedInvestment | null>(null)
     const [accounts, setAccounts] = useState<Account[]>([])
@@ -129,6 +129,35 @@ export default function YatirimFisiYukle() {
             if (!acc) throw new Error("Hesap bulunamadı")
 
             const investmentName = parsedData.name || `${parsedData.quantity} Birim ${parsedData.asset_type.toUpperCase()}`
+
+            // --- ÇİFT KAYIT KONTROLÜ BAŞLANGIÇ ---
+            const { data: dupData } = await supabase
+                .from('investment_transactions')
+                .select('id')
+                .eq('transaction_date', parsedData.purchase_date)
+                .eq('total_amount', parsedData.total_amount)
+                .eq('transaction_type', 'buy')
+                .limit(1)
+
+            if (dupData && dupData.length > 0) {
+                const confirmed = await showConfirm(
+                    `Bu tarihe (${parsedData.purchase_date}) ait ve bu tutarda (₺${parsedData.total_amount}) bir yatırım işlemi zaten eklenmiş görünüyor.\n\nÖnceki kaydı (kasa dahil) silip bu yeni fiş bilgileriyle güncellemek istiyor musunuz?`,
+                    'warning'
+                )
+                if (!confirmed) {
+                    setLoading(false)
+                    return // İptal edildi
+                }
+                
+                // Kullanıcı onayladı, eski Yatırımı sil (Rollback)
+                const { error: delError } = await supabase.rpc('delete_investment_transaction', { p_transaction_id: dupData[0].id })
+                if (delError) {
+                    await showAlert("Eski Yatırım fişi silinirken hata oluştu: " + delError.message, 'error')
+                    setLoading(false)
+                    return
+                }
+            }
+            // --- ÇİFT KAYIT KONTROLÜ BİTİŞ ---
 
             const { error: rpcError } = await supabase.rpc('buy_investment_transaction', {
                 p_asset_type: parsedData.asset_type,

@@ -94,8 +94,8 @@ export default function TedarikciGecmisi() {
                     name
                 )
             `)
-            .ilike('note', 'Yapay Zeka Fiş Yükleme%')
-            .eq('movement_type', 'giris')
+            .or('note.ilike.Yapay Zeka Fiş Yükleme%,note.ilike.Yapay zeka ile fiş okuma%')
+            .in('movement_type', ['giris', 'IN'])
             .order('created_at', { ascending: false })
 
         if (error) {

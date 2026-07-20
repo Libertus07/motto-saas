@@ -43,7 +43,7 @@ export default function FisYukle() {
     const [suppliers, setSuppliers] = useState<{id: string, name: string}[]>([])
     const [step, setStep] = useState<'upload' | 'review' | 'done'>('upload')
     const [error, setError] = useState('')
-    const { showAlert } = useNotification()
+    const { showAlert, showConfirm } = useNotification()
     const supabase = createClient()
     const router = useRouter()
 
@@ -251,6 +251,39 @@ export default function FisYukle() {
 
     const applyChanges = async () => {
         setLoading(true)
+        
+        // --- ÇİFT KAYIT KONTROLÜ BAŞLANGIÇ ---
+        if (parsedSupplier && parsedSupplier.id && parsedSupplier.date && parsedSupplier.totalAmount) {
+            const { data: dupData } = await supabase
+                .from('supplier_transactions')
+                .select('batch_id, id')
+                .eq('supplier_id', parsedSupplier.id)
+                .eq('transaction_date', parsedSupplier.date)
+                .eq('amount', parsedSupplier.totalAmount)
+                .eq('transaction_type', 'invoice')
+                .limit(1)
+
+            if (dupData && dupData.length > 0 && dupData[0].batch_id) {
+                const confirmed = await showConfirm(
+                    'Bu tedarikçiye ait, bu tarih ve tutarda bir fiş daha önce yüklenmiş görünüyor.\n\nÖnceki kaydı silip bu yeni yüklediğiniz bilgilerle (eksik/fazlaları düzelterek) güncellemek istiyor musunuz?',
+                    'warning'
+                )
+                if (!confirmed) {
+                    setLoading(false)
+                    return // İptal edildi
+                }
+                
+                // Kullanıcı onayladı, eski fişi sil (Rollback)
+                const { error: delError } = await supabase.rpc('delete_receipt_transaction', { p_batch_id: dupData[0].batch_id })
+                if (delError) {
+                    setError("Eski fiş silinirken hata oluştu: " + delError.message)
+                    setLoading(false)
+                    return
+                }
+            }
+        }
+        // --- ÇİFT KAYIT KONTROLÜ BİTİŞ ---
+
         const { data: { user } } = await supabase.auth.getUser()
         const selectedItems = parsedItems.filter(i => i.selected)
         const batchId = crypto.randomUUID()

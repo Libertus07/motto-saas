@@ -28,7 +28,7 @@ type ParsedExpenseItem = {
 }
 
 export default function ZRaporuYukle() {
-    const { showAlert } = useNotification()
+    const { showAlert, showConfirm } = useNotification()
     const [imageUrl, setImageUrl] = useState<string | null>(null)
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [fileText, setFileText] = useState<string | null>(null)
@@ -303,8 +303,37 @@ export default function ZRaporuYukle() {
 
         try {
             const reportDate = parsedData.date || new Date().toISOString().split('T')[0]
-            const batchId = crypto.randomUUID()
             const { data: { user } } = await supabase.auth.getUser()
+
+            // --- ÇİFT KAYIT KONTROLÜ BAŞLANGIÇ ---
+            const { data: dupData } = await supabase
+                .from('sales')
+                .select('batch_id')
+                .eq('sale_date', reportDate)
+                .not('batch_id', 'is', null)
+                .limit(1)
+
+            if (dupData && dupData.length > 0 && dupData[0].batch_id) {
+                const confirmed = await showConfirm(
+                    `Bu tarihe (${reportDate}) ait bir Z-Raporu zaten yüklenmiş görünüyor.\n\nÖnceki kaydı silip bu yeni raporla (eksik/fazlaları düzelterek) güncellemek istiyor musunuz?`,
+                    'warning'
+                )
+                if (!confirmed) {
+                    setLoading(false)
+                    return // İptal edildi
+                }
+                
+                // Kullanıcı onayladı, eski Z-Raporunu sil (Rollback)
+                const { error: delError } = await supabase.rpc('delete_z_report_transaction', { p_batch_id: dupData[0].batch_id, p_user_id: user?.id })
+                if (delError) {
+                    await showAlert("Eski Z-Raporu silinirken hata oluştu: " + delError.message, 'error')
+                    setLoading(false)
+                    return
+                }
+            }
+            // --- ÇİFT KAYIT KONTROLÜ BİTİŞ ---
+
+            const batchId = crypto.randomUUID()
 
             let uploadedUrl = null;
             if (selectedFile) {
