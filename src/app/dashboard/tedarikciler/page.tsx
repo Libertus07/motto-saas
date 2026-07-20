@@ -109,7 +109,7 @@ export default function Tedarikciler() {
                 .order('created_at', { ascending: false }),
             supabase
                 .from('stock_movements')
-                .select('id, created_at, quantity, unit_price, batch_id, materials(name, unit)')
+                .select('id, created_at, quantity, unit_price, batch_id, materials!stock_movements_material_id_fkey(name, unit)')
                 .eq('supplier_id', supplier.id)
                 .order('created_at', { ascending: false })
         ])

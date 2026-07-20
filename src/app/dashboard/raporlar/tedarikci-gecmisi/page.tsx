@@ -86,7 +86,7 @@ export default function TedarikciGecmisi() {
                 created_at,
                 batch_id,
                 note,
-                materials (
+                materials!stock_movements_material_id_fkey (
                     name,
                     unit
                 ),
