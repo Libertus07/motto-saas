@@ -57,12 +57,12 @@ BEGIN
             ) RETURNING id INTO v_supplier_id;
         END IF;
 
-        INSERT INTO supplier_transactions (batch_id, supplier_id, transaction_date, amount, transaction_type, note, user_id)
-        VALUES (v_batch_id, v_supplier_id, (v_sup_data->>'date')::date, (v_sup_data->>'totalAmount')::numeric, 'invoice', 'Sistemden Fiş Yükleme (Otomatik Borç)', v_user_id);
+        INSERT INTO supplier_transactions (id, batch_id, supplier_id, transaction_date, amount, transaction_type, note, user_id)
+        VALUES (gen_random_uuid(), v_batch_id, v_supplier_id, (v_sup_data->>'date')::date, (v_sup_data->>'totalAmount')::numeric, 'invoice', 'Sistemden Fiş Yükleme (Otomatik Borç)', v_user_id);
 
         IF (v_sup_data->>'paidAmount')::numeric > 0 THEN
-            INSERT INTO supplier_transactions (batch_id, supplier_id, transaction_date, amount, transaction_type, note, user_id)
-            VALUES (v_batch_id, v_supplier_id, (v_sup_data->>'date')::date, (v_sup_data->>'paidAmount')::numeric, 'payment', 'Fiş Yükleme Anında Ödeme', v_user_id);
+            INSERT INTO supplier_transactions (id, batch_id, supplier_id, transaction_date, amount, transaction_type, note, user_id)
+            VALUES (gen_random_uuid(), v_batch_id, v_supplier_id, (v_sup_data->>'date')::date, (v_sup_data->>'paidAmount')::numeric, 'payment', 'Fiş Yükleme Anında Ödeme', v_user_id);
         END IF;
 
         v_net_debt := (v_sup_data->>'totalAmount')::numeric - (v_sup_data->>'paidAmount')::numeric;
@@ -132,8 +132,9 @@ BEGIN
         END IF;
 
         IF v_mat_id IS NOT NULL THEN
-            INSERT INTO stock_movements (batch_id, material_id, supplier_id, movement_type, quantity, unit_price, note, document_url, user_id)
+            INSERT INTO stock_movements (id, batch_id, material_id, supplier_id, movement_type, quantity, unit_price, note, document_url, user_id)
             VALUES (
+                gen_random_uuid(),
                 v_batch_id,
                 v_mat_id,
                 v_supplier_id,
