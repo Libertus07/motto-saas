@@ -10,6 +10,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 });
         }
 
+        // AI Kota Kontrolü (SEC-104)
+        const { data: allowed } = await supabase.rpc('check_ai_quota');
+        if (!allowed) {
+            return NextResponse.json({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }, { status: 429 });
+        }
+
         const { productName, materials, subRecipes, option } = await req.json();
 
         if (!productName) {
@@ -22,7 +28,10 @@ export async function POST(req: Request) {
         }
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-2.5-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
 
         const materialsContext = materials?.map((m: any) => `- ${m.id} | ${m.name} | ${m.unit} | ₺${m.price_per_unit}`).join('\n') || 'Yok';
         const subRecipesContext = subRecipes?.map((s: any) => `- ${s.id} | ${s.name} | Porsiyon Maliyeti: ₺${(s.total_cost / (s.yield_quantity || 1)).toFixed(2)}`).join('\n') || 'Yok';
