@@ -281,26 +281,13 @@ export default function YatirimlarPage() {
             const selectedAcc = accounts.find(a => a.id === rentForm.account_id)
             if (!selectedAcc) throw new Error('Hesap bulunamadı.')
 
-            await supabase.from('account_movements').insert({
-                account_id: rentForm.account_id,
-                movement_type: 'giris',
-                amount: amount,
-                description: `Gayrimenkul Kira Geliri Tahsilatı`,
-                source_type: 'investment_rent'
+            const { data, error } = await supabase.rpc('process_investment_rent', {
+                p_investment_id: selectedInvestment.id,
+                p_account_id: rentForm.account_id,
+                p_amount: amount
             })
 
-            await supabase.from('accounts').update({
-                balance: selectedAcc.balance + amount
-            }).eq('id', rentForm.account_id)
-
-            await supabase.from('investment_transactions').insert({
-                investment_id: selectedInvestment.id,
-                transaction_type: 'rent' as InvestmentTransaction['transaction_type'],
-                quantity: 1,
-                price_per_unit: amount,
-                total_amount: amount,
-                account_id: rentForm.account_id
-            })
+            if (error) throw new Error(error.message)
 
             await logActivity('Yatırımlar', 'EKLEME', `Kira Tahsilatı: ${selectedInvestment.name}`, {
                 detay: `Kira Bedeli (₺${amount}) | Tahsil Edilen Hesap (${selectedAcc.name})`
