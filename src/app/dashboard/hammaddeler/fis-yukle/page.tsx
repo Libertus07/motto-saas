@@ -448,23 +448,23 @@ export default function FisYukle() {
                                         </div>
                                     </div>
 
-                                    <div>
+                                    <div className="flex flex-col justify-end">
                                         <label className="text-stone-500 text-xs mb-1 block">Önceki Bakiye (Borç)</label>
-                                        <div className="w-full bg-stone-900 border border-stone-800 rounded-lg px-3 py-2 text-stone-400 font-medium">{formatCurrency(supplierDebt)}
+                                        <div className="w-full h-11 flex items-center bg-stone-900 border border-stone-800 rounded-lg px-3 text-stone-400 font-medium">{formatCurrency(supplierDebt)}
                                         </div>
                                     </div>
-                                    <div>
+                                    <div className="flex flex-col justify-end">
                                         <label className="text-stone-500 text-xs mb-1 block">Yeni Fatura Tutarı (+)</label>
                                         <input
                                             type="number"
                                             value={parsedSupplier.totalAmount}
                                             onChange={e => setParsedSupplier({...parsedSupplier, totalAmount: parseFloat(e.target.value) || 0})}
-                                            className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-red-400 focus:outline-none focus:border-red-400"
+                                            className="w-full h-11 bg-stone-800 border border-stone-700 rounded-lg px-3 text-red-400 font-bold focus:outline-none focus:border-red-400 text-lg"
                                         />
                                     </div>
-                                    <div>
+                                    <div className="flex flex-col justify-end">
                                         <label className="text-stone-500 text-xs mb-1 block">Genel Toplam Borç (=)</label>
-                                        <div className="w-full bg-stone-900 border border-stone-800 rounded-lg px-3 py-2 text-white font-bold text-lg relative group">{formatCurrency((supplierDebt + parsedSupplier.totalAmount))}
+                                        <div className="w-full h-11 flex items-center bg-stone-900 border border-stone-800 rounded-lg px-3 text-white font-bold text-lg relative group">{formatCurrency((supplierDebt + parsedSupplier.totalAmount))}
                                             {parsedSupplier.statedDebt != null && (
                                                 <div className="absolute top-full left-0 mt-2 w-full bg-blue-950/80 border border-blue-500 rounded p-2 text-xs text-blue-200 shadow-xl z-10">
                                                     📄 Faturada yazan güncel bakiye: <strong>{formatCurrency(parsedSupplier.statedDebt)}</strong>
@@ -473,15 +473,17 @@ export default function FisYukle() {
                                             )}
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="text-stone-500 text-xs mb-1 block">Şimdi Yapılan Ödeme (-)</label>
+                                    <div className="flex flex-col justify-end">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="text-stone-500 text-xs block">Şimdi Yapılan Ödeme (-)</label>
+                                            <span className="text-[10px] text-stone-500" title="Ödeme girilmezse tamamı borç yazılır">Sıfırsa borca yazılır</span>
+                                        </div>
                                         <input
                                             type="number"
                                             value={parsedSupplier.paidAmount}
                                             onChange={e => setParsedSupplier({...parsedSupplier, paidAmount: parseFloat(e.target.value) || 0})}
-                                            className="w-full bg-stone-800 border border-amber-500 rounded-lg px-3 py-2 text-green-400 font-bold focus:outline-none focus:border-green-400 text-lg"
+                                            className="w-full h-11 bg-stone-800 border border-amber-500 rounded-lg px-3 text-green-400 font-bold focus:outline-none focus:border-amber-400 text-lg"
                                         />
-                                        <p className="text-xs text-stone-500 mt-1">Sıfırsa tamamen borca eklenir.</p>
                                     </div>
                                 </div>
                             </div>
@@ -499,12 +501,12 @@ export default function FisYukle() {
                                 key={index}
                                 className={`bg-stone-900 border rounded-xl p-4 transition-colors ${item.selected ? 'border-amber-400' : 'border-stone-800 opacity-50'}`}
                             >
-                                <div className="flex items-start gap-3">
+                                <div className="flex items-center gap-3 pt-2">
                                     <input
                                         type="checkbox"
                                         checked={item.selected}
                                         onChange={() => toggleItem(index)}
-                                        className="mt-1 w-4 h-4 accent-amber-400"
+                                        className="w-5 h-5 accent-amber-400 cursor-pointer"
                                     />
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2 mb-3">
@@ -538,15 +540,15 @@ export default function FisYukle() {
                                                 setParsedItems(updated);
                                             }} className="text-red-400 hover:text-red-300 ml-2">✕</button>
                                         </div>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                            <div>
-                                                <label className="text-stone-500 text-xs mb-1 block">Kategori</label>
+                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                            <div className="flex flex-col justify-end">
+                                                <label className="text-stone-500 text-xs mb-1 block truncate">Kategori</label>
                                                 <input
                                                     list="category-options"
                                                     value={item.category || ''}
                                                     onChange={e => updateItem(index, 'category', e.target.value)}
                                                     placeholder="Seç/Yaz"
-                                                    className="w-full bg-stone-800 border border-stone-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400"
+                                                    className="w-full h-9 bg-stone-800 border border-stone-700 rounded px-2 text-sm text-white focus:outline-none focus:border-amber-400"
                                                 />
                                                 <datalist id="category-options">
                                                     <option value="Süt Ürünleri" />
@@ -559,35 +561,41 @@ export default function FisYukle() {
                                                     <option value="Ambalaj" />
                                                 </datalist>
                                             </div>
-                                            <div>
-                                                <label className="text-stone-500 text-xs mb-1 block">Miktar</label>
+                                            <div className="flex flex-col justify-end">
+                                                <label className="text-stone-500 text-xs mb-1 block truncate">Miktar</label>
                                                 <input
                                                     type="number"
                                                     value={Number.isNaN(item.quantity) ? '' : item.quantity}
                                                     onChange={e => updateItem(index, 'quantity', parseFloat(e.target.value))}
-                                                    className="w-full bg-stone-800 border border-stone-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400"
+                                                    className="w-full h-9 bg-stone-800 border border-stone-700 rounded px-2 text-sm text-white font-medium focus:outline-none focus:border-amber-400"
                                                 />
                                             </div>
-                                            <div>
-                                                <label className="text-stone-500 text-xs mb-1 block">Birim</label>
+                                            <div className="flex flex-col justify-end">
+                                                <label className="text-stone-500 text-xs mb-1 block truncate">Birim</label>
                                                 <select
                                                     value={item.unit}
                                                     onChange={e => updateItem(index, 'unit', e.target.value)}
-                                                    className="w-full bg-stone-800 border border-stone-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400"
+                                                    className="w-full h-9 bg-stone-800 border border-stone-700 rounded px-2 text-sm text-white focus:outline-none focus:border-amber-400"
                                                 >
                                                     {['Gram', 'Kg', 'Ml', 'Litre', 'Adet', 'Paket', 'Kutu', 'Koli'].map(u =>
                                                         <option key={u} value={u}>{u}</option>
                                                     )}
                                                 </select>
                                             </div>
-                                            <div>
-                                                <label className="text-stone-500 text-xs mb-1 block">Birim Fiyat (₺)</label>
+                                            <div className="flex flex-col justify-end">
+                                                <label className="text-stone-500 text-xs mb-1 block truncate">Birim Fiyat (₺)</label>
                                                 <input
                                                     type="number"
                                                     value={Number.isNaN(item.unitPrice) ? '' : item.unitPrice}
                                                     onChange={e => updateItem(index, 'unitPrice', parseFloat(e.target.value))}
-                                                    className="w-full bg-stone-800 border border-stone-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-amber-400"
+                                                    className="w-full h-9 bg-stone-800 border border-stone-700 rounded px-2 text-sm text-white font-medium focus:outline-none focus:border-amber-400"
                                                 />
+                                            </div>
+                                            <div className="col-span-2 md:col-span-1 flex flex-col justify-end">
+                                                <label className="text-stone-500 text-xs mb-1 block truncate">Toplam Tutar</label>
+                                                <div className="w-full h-9 flex items-center bg-stone-900 border border-stone-800 rounded px-2 text-sm font-bold text-amber-400 overflow-hidden text-ellipsis whitespace-nowrap">
+                                                    {formatCurrency((Number.isNaN(item.quantity) ? 0 : item.quantity) * (Number.isNaN(item.unitPrice) ? 0 : item.unitPrice))}
+                                                </div>
                                             </div>
                                         </div>
                                         
