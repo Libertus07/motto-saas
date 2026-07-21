@@ -139,21 +139,28 @@ export default function Giderler() {
     logActivity('Giderler', 'SILME', `Bir gider kaydı sistemden silindi.`, { expenseId: id })
   }
 
-  // Aylık toplam hesapla (İndirim ve iadeler muhasebeseldir, fiziksel gider toplamına dahil edilmez)
-  const monthlyTotal = expenses.reduce((total, exp) => {
+  // Son 30 gün hesaplamaları (Gerçek Nakit Çıkışı)
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+  const recentExpenses = expenses.filter(exp => {
+    const d = new Date(exp.expense_date)
+    return d >= thirtyDaysAgo
+  })
+
+  // Son 30 gün içinde cepten çıkan toplam fiziksel nakit
+  const monthlyTotal = recentExpenses.reduce((total, exp) => {
     if (exp.category === 'indirim-ikram' || exp.category === 'iade') return total;
-    if (exp.period === 'monthly') return total + exp.amount
-    if (exp.period === 'yearly') return total + exp.amount / 12
-    return total
+    return total + exp.amount; // period ne olursa olsun, kasadan çıktıysa topla
   }, 0)
 
-  // Kategori bazlı toplam
+  // Kategori bazlı toplam (Son 30 gün)
   const byCategory = categories.map(cat => ({
     label: cat.label,
     value: cat.value,
-    total: expenses
+    total: recentExpenses
       .filter(e => e.category === cat.value)
-      .reduce((sum, e) => sum + (e.period === 'yearly' ? e.amount / 12 : e.amount), 0)
+      .reduce((sum, e) => sum + e.amount, 0)
   })).filter(c => c.total > 0)
 
   return (
@@ -178,11 +185,11 @@ export default function Giderler() {
         {/* Özet Kartlar */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
-            <p className="text-stone-400 text-sm mb-1">Aylık Toplam Gider</p>
+            <p className="text-stone-400 text-sm mb-1">Son 30 Günlük Gider (Nakit Çıkışı)</p>
             <p className="text-3xl font-bold text-amber-400">{formatCurrency(monthlyTotal)}</p>
           </div>
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
-            <p className="text-stone-400 text-sm mb-1">Günlük Gider</p>
+            <p className="text-stone-400 text-sm mb-1">Günlük Ortalama Gider</p>
             <p className="text-3xl font-bold text-white">{formatCurrency((monthlyTotal / 30))}</p>
           </div>
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
@@ -194,7 +201,7 @@ export default function Giderler() {
         {/* Kategori Dağılımı */}
         {byCategory.length > 0 && (
           <div className="bg-stone-900 border border-stone-800 rounded-xl p-5 mb-6">
-            <h3 className="font-bold mb-4 text-stone-300">Kategori Dağılımı (Aylık)</h3>
+            <h3 className="font-bold mb-4 text-stone-300">Kategori Dağılımı (Son 30 Gün)</h3>
             <div className="space-y-2">
               {byCategory.sort((a, b) => b.total - a.total).map(cat => (
                 <div key={cat.value} className="flex items-center gap-3">
