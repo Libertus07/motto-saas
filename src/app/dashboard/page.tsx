@@ -38,7 +38,7 @@ export default function Dashboard() {
       const { data, error } = await supabase.rpc('get_dashboard_stats', { days_ago: 30 })
       
       if (error) {
-        devError('RPC Hatası:', error)
+        devError('RPC Hatası detayları:', error.message, error.details, error.hint)
         throw error
       }
 
