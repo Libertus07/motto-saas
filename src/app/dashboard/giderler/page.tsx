@@ -174,10 +174,10 @@ export default function Giderler() {
   const chartColors = ['bg-amber-400', 'bg-emerald-400', 'bg-blue-400', 'bg-rose-400', 'bg-purple-400', 'bg-cyan-400']
 
   return (
-    <div className="flex min-h-screen bg-stone-950 text-white">
+    <div className="flex flex-col-reverse xl:flex-row min-h-screen bg-stone-950 text-white">
       
       {/* Sol ve Orta Kısım: Ana İçerik */}
-      <div className="flex-1 p-8 overflow-y-auto">
+      <div className="flex-1 p-4 md:p-8 overflow-y-auto">
         <header className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-black text-amber-400 tracking-tight flex items-center gap-3">
@@ -340,7 +340,7 @@ export default function Giderler() {
       </div>
 
       {/* Sağ Kısım: Sabit "Hızlı Gider Ekle" Paneli */}
-      <div className="w-96 bg-stone-950/80 backdrop-blur-2xl border-l border-stone-800 p-8 flex flex-col h-screen sticky top-0 overflow-y-auto shadow-2xl z-10">
+      <div className="w-full xl:w-96 bg-stone-950/80 backdrop-blur-2xl xl:border-l border-b xl:border-b-0 border-stone-800 p-6 md:p-8 flex flex-col xl:h-screen xl:sticky top-0 overflow-y-auto shadow-2xl z-10">
         <div className="flex items-center gap-3 mb-8 pb-6 border-b border-stone-800">
           <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 text-xl border border-amber-500/20">
             {editingId ? '✏️' : '⚡'}
