@@ -362,19 +362,68 @@ export default function KasaSayimPage() {
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                <div className="flex justify-between items-center p-4 bg-stone-950 rounded-xl border border-stone-800">
-                                    <span className="text-stone-400">Günün Toplam Satışı (Z-Raporu)</span>
-                                    <span className="font-bold text-emerald-400">+ {formatCurrency(expectedSales)}</span>
-                                </div>
-                                <div className="flex justify-between items-center p-4 bg-stone-950 rounded-xl border border-stone-800">
-                                    <span className="text-stone-400">Günün Kasa Giderleri</span>
-                                    <span className="font-bold text-rose-400">- {formatCurrency(expectedExpenses)}</span>
-                                </div>
+                                {/* Z-Raporu Detayları */}
+                                {isMovementFound ? (
+                                    <>
+                                        <div className="flex justify-between items-center p-3 bg-stone-950/50 rounded-lg border border-stone-800/50">
+                                            <span className="text-stone-400 text-sm">Z-Raporu Nakit</span>
+                                            <span className="font-bold text-stone-300">{formatCurrency(expectedCashRaw)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center p-3 bg-stone-950/50 rounded-lg border border-stone-800/50">
+                                            <span className="text-stone-400 text-sm">Z-Raporu POS (Kart)</span>
+                                            <span className="font-bold text-stone-300">{formatCurrency(expectedCreditRaw)}</span>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex justify-between items-center p-3 bg-stone-950/50 rounded-lg border border-stone-800/50">
+                                        <span className="text-stone-400 text-sm">Günün Toplam Satışı</span>
+                                        <span className="font-bold text-stone-300">{formatCurrency(expectedSales)}</span>
+                                    </div>
+                                )}
+                                
+                                {/* Kasa Giderleri */}
+                                {expectedExpenses > 0 && (
+                                    <div className="flex justify-between items-center p-3 bg-rose-950/20 rounded-lg border border-rose-900/30">
+                                        <span className="text-rose-400/80 text-sm">Kasadan Çıkan (Giderler)</span>
+                                        <span className="font-bold text-rose-400">- {formatCurrency(expectedExpenses)}</span>
+                                    </div>
+                                )}
+
+                                {/* Varsa Düzeltmeler (Kasiyer Hatası) */}
+                                {(adjCash !== 0 || adjCredit !== 0) && (
+                                    <div className="flex flex-col gap-2 p-3 bg-amber-950/20 rounded-lg border border-amber-900/30">
+                                        <span className="text-amber-500/80 text-xs font-bold uppercase tracking-wider mb-1">Düzeltme Etkisi</span>
+                                        {adjCash !== 0 && (
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-amber-400/80 text-sm">Nakit Beklentisine</span>
+                                                <span className="font-bold text-amber-400">{adjCash > 0 ? '+' : ''}{formatCurrency(adjCash)}</span>
+                                            </div>
+                                        )}
+                                        {adjCredit !== 0 && (
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-amber-400/80 text-sm">POS Beklentisine</span>
+                                                <span className="font-bold text-amber-400">{adjCredit > 0 ? '+' : ''}{formatCurrency(adjCredit)}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 
                                 <div className="pt-4 border-t border-stone-800 mt-6">
+                                    {isMovementFound && (
+                                        <>
+                                            <div className="flex justify-between items-center text-stone-400 mb-2">
+                                                <span className="text-sm">Beklenen Net Nakit:</span>
+                                                <span className="font-medium">{formatCurrency(expectedNetCash)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-stone-400 mb-4">
+                                                <span className="text-sm">Beklenen Net POS:</span>
+                                                <span className="font-medium">{formatCurrency(expectedNetCredit)}</span>
+                                            </div>
+                                        </>
+                                    )}
                                     <div className="flex justify-between items-center">
                                         <span className="font-medium text-stone-300">Kasada Olması Gereken:</span>
-                                        <span className="text-3xl font-bold text-white">{formatCurrency(expectedTotal)}</span>
+                                        <span className="text-3xl font-bold text-white">{formatCurrency(expectedTotalAdjusted)}</span>
                                     </div>
                                 </div>
                             </div>
