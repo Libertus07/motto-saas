@@ -139,8 +139,9 @@ export default function Giderler() {
     logActivity('Giderler', 'SILME', `Bir gider kaydı sistemden silindi.`, { expenseId: id })
   }
 
-  // Aylık toplam hesapla
+  // Aylık toplam hesapla (İndirim ve iadeler muhasebeseldir, fiziksel gider toplamına dahil edilmez)
   const monthlyTotal = expenses.reduce((total, exp) => {
+    if (exp.category === 'indirim-ikram' || exp.category === 'iade') return total;
     if (exp.period === 'monthly') return total + exp.amount
     if (exp.period === 'yearly') return total + exp.amount / 12
     return total
