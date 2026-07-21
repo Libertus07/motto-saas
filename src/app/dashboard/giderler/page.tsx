@@ -20,6 +20,7 @@ export default function Giderler() {
   const { showConfirm, showAlert } = useNotification()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [customCategory, setCustomCategory] = useState('')
   const [form, setForm] = useState({
@@ -76,6 +77,7 @@ export default function Giderler() {
     })
     setCustomCategory('')
     setEditingId(null)
+    setShowForm(false)
   }
 
   const handleSubmit = async () => {
@@ -126,8 +128,7 @@ export default function Giderler() {
       expense_date: expense.expense_date
     })
     setEditingId(expense.id)
-    // Sidebar her zaman açık olduğu için sadece state'i set etmek yeterli
-    // Scroll to top of sidebar optionally, but we assume it's visible.
+    setShowForm(true)
   }
 
   const handleDelete = async (id: string) => {
@@ -176,15 +177,22 @@ export default function Giderler() {
   return (
     <div className="flex flex-col-reverse xl:flex-row min-h-screen bg-stone-950 text-white">
       
-      {/* Sol ve Orta Kısım: Ana İçerik */}
+      {/* Ana İçerik */}
       <div className="flex-1 p-4 md:p-8 overflow-y-auto">
-        <header className="flex items-center justify-between mb-8">
+        <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-black text-amber-400 tracking-tight flex items-center gap-3">
               <span className="text-4xl">💸</span> Giderler & Maliyet Kokpiti
             </h1>
             <p className="text-stone-400 mt-1">İşletmenizin finansal çıkışlarını ve masraf dağılımını analiz edin.</p>
           </div>
+          <button
+            onClick={() => { resetForm(); setShowForm(true) }}
+            className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-black px-6 py-3 rounded-2xl shadow-[0_0_20px_rgba(245,158,11,0.2)] hover:shadow-[0_0_30px_rgba(245,158,11,0.4)] hover:-translate-y-1 transition-all flex items-center gap-2"
+          >
+            <span className="text-xl">⚡</span>
+            Yeni Gider Ekle
+          </button>
         </header>
 
         {/* 1. Bento Grid: Özet Kartları */}
@@ -339,106 +347,116 @@ export default function Giderler() {
         </div>
       </div>
 
-      {/* Sağ Kısım: Sabit "Hızlı Gider Ekle" Paneli */}
-      <div className="w-full xl:w-96 bg-stone-950/80 backdrop-blur-2xl xl:border-l border-b xl:border-b-0 border-stone-800 p-6 md:p-8 flex flex-col xl:h-screen xl:sticky top-0 overflow-y-auto shadow-2xl z-10">
-        <div className="flex items-center gap-3 mb-8 pb-6 border-b border-stone-800">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 text-xl border border-amber-500/20">
-            {editingId ? '✏️' : '⚡'}
-          </div>
-          <h2 className="text-xl font-bold text-white">
-            {editingId ? 'Gideri Düzenle' : 'Hızlı Gider Ekle'}
-          </h2>
-        </div>
-
-        <div className="flex flex-col gap-5 flex-1">
-          <div>
-            <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Ne Gideri? (Adı)</label>
-            <input
-              value={form.name}
-              onChange={e => setForm({ ...form, name: e.target.value })}
-              className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors placeholder-stone-700"
-              placeholder="Örn: Kasap Alışverişi"
-            />
-          </div>
-
-          <div>
-            <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Kategori</label>
-            <select
-              value={form.category}
-              onChange={e => setForm({ ...form, category: e.target.value })}
-              className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors mb-2 cursor-pointer"
-            >
-              {categories.map(c => <option key={c.value} value={c.value}>{getCategoryIcon(c.value)} {c.label}</option>)}
-              <option value="custom" className="text-amber-500 font-bold">+ Yeni Kategori Ekle</option>
-            </select>
-            {form.category === 'custom' && (
-              <input
-                value={customCategory}
-                onChange={e => setCustomCategory(e.target.value)}
-                className="w-full bg-stone-900 border border-amber-500/50 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors mt-2"
-                placeholder="Kategori Adı..."
-                autoFocus
-              />
-            )}
-          </div>
-
-          <div>
-            <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Tutar (TL)</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 font-bold">₺</span>
-              <input
-                type="number"
-                value={form.amount}
-                onChange={e => setForm({ ...form, amount: e.target.value })}
-                className="w-full bg-stone-900 border border-stone-800 rounded-xl py-3 pl-10 pr-4 text-white font-bold text-lg focus:outline-none focus:border-amber-500 transition-colors placeholder-stone-700"
-                placeholder="0.00"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Periyot</label>
-              <select
-                value={form.period}
-                onChange={e => setForm({ ...form, period: e.target.value })}
-                className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors cursor-pointer"
-              >
-                <option value="daily">Tek Seferlik / Günlük</option>
-                <option value="monthly">Aylık Düzenli</option>
-                <option value="yearly">Yıllık Düzenli</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Tarih</label>
-              <input
-                type="date"
-                value={form.expense_date}
-                onChange={e => setForm({ ...form, expense_date: e.target.value })}
-                className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-8 pt-6 border-t border-stone-800 flex flex-col gap-3">
-          <button
-            onClick={handleSubmit}
-            className="w-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-lg py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.2)] hover:shadow-[0_0_30px_rgba(245,158,11,0.4)] hover:-translate-y-1"
-          >
-            {editingId ? 'GÜNCELLE' : 'GİDERİ KAYDET'}
-          </button>
-          
-          {editingId && (
-            <button
+      {/* Sağ Kısım: Modal "Hızlı Gider Ekle" Paneli */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/80 backdrop-blur-sm transition-opacity">
+          <div className="bg-gradient-to-br from-stone-900 to-stone-950 border border-stone-800 rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl relative animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+            
+            {/* Kapatma Butonu */}
+            <button 
               onClick={resetForm}
-              className="w-full bg-stone-800 hover:bg-stone-700 text-white font-bold py-3 rounded-xl transition-colors"
+              className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center rounded-full bg-stone-800 hover:bg-rose-500/20 hover:text-rose-400 text-stone-400 transition-colors"
             >
-              İptal Et
+              ✕
             </button>
-          )}
+
+            <div className="flex items-center gap-3 mb-8 pb-6 border-b border-stone-800">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 text-xl border border-amber-500/20">
+                {editingId ? '✏️' : '⚡'}
+              </div>
+              <h2 className="text-xl font-bold text-white">
+                {editingId ? 'Gideri Düzenle' : 'Hızlı Gider Ekle'}
+              </h2>
+            </div>
+
+            <div className="flex flex-col gap-5 flex-1">
+              <div>
+                <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Ne Gideri? (Adı)</label>
+                <input
+                  value={form.name}
+                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors placeholder-stone-700"
+                  placeholder="Örn: Kasap Alışverişi"
+                />
+              </div>
+
+              <div>
+                <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Kategori</label>
+                <select
+                  value={form.category}
+                  onChange={e => setForm({ ...form, category: e.target.value })}
+                  className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors mb-2 cursor-pointer"
+                >
+                  {categories.map(c => <option key={c.value} value={c.value}>{getCategoryIcon(c.value)} {c.label}</option>)}
+                  <option value="custom" className="text-amber-500 font-bold">+ Yeni Kategori Ekle</option>
+                </select>
+                {form.category === 'custom' && (
+                  <input
+                    value={customCategory}
+                    onChange={e => setCustomCategory(e.target.value)}
+                    className="w-full bg-stone-900 border border-amber-500/50 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors mt-2"
+                    placeholder="Kategori Adı..."
+                    autoFocus
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Tutar (TL)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 font-bold">₺</span>
+                  <input
+                    type="number"
+                    value={form.amount}
+                    onChange={e => setForm({ ...form, amount: e.target.value })}
+                    className="w-full bg-stone-900 border border-stone-800 rounded-xl py-3 pl-10 pr-4 text-white font-bold text-lg focus:outline-none focus:border-amber-500 transition-colors placeholder-stone-700"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Periyot</label>
+                  <select
+                    value={form.period}
+                    onChange={e => setForm({ ...form, period: e.target.value })}
+                    className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors cursor-pointer"
+                  >
+                    <option value="daily">Tek Seferlik / Günlük</option>
+                    <option value="monthly">Aylık Düzenli</option>
+                    <option value="yearly">Yıllık Düzenli</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Tarih</label>
+                  <input
+                    type="date"
+                    value={form.expense_date}
+                    onChange={e => setForm({ ...form, expense_date: e.target.value })}
+                    className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-stone-800 flex gap-4">
+              <button
+                onClick={resetForm}
+                className="flex-1 bg-stone-800 hover:bg-stone-700 text-white font-bold py-4 rounded-xl transition-colors"
+              >
+                İptal Et
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="flex-1 bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-lg py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.2)] hover:shadow-[0_0_30px_rgba(245,158,11,0.4)]"
+              >
+                {editingId ? 'GÜNCELLE' : 'KAYDET'}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
