@@ -20,7 +20,6 @@ export default function Giderler() {
   const { showConfirm, showAlert } = useNotification()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [customCategory, setCustomCategory] = useState('')
   const [form, setForm] = useState({
@@ -77,7 +76,6 @@ export default function Giderler() {
     })
     setCustomCategory('')
     setEditingId(null)
-    setShowForm(false)
   }
 
   const handleSubmit = async () => {
@@ -128,7 +126,8 @@ export default function Giderler() {
       expense_date: expense.expense_date
     })
     setEditingId(expense.id)
-    setShowForm(true)
+    // Sidebar her zaman açık olduğu için sadece state'i set etmek yeterli
+    // Scroll to top of sidebar optionally, but we assume it's visible.
   }
 
   const handleDelete = async (id: string) => {
@@ -163,194 +162,283 @@ export default function Giderler() {
       .reduce((sum, e) => sum + e.amount, 0)
   })).filter(c => c.total > 0)
 
+  // İkon haritası (Görsel algıyı hızlandırmak için)
+  const categoryIcons: Record<string, string> = {
+    kira: '🏢', personel: '👥', elektrik: '⚡', su: '💧', dogalgaz: '🔥',
+    internet: '🌐', muhasebe: '📊', sigorta: '🛡️', pazarlama: '📢', diger: '📦'
+  }
+
+  const getCategoryIcon = (cat: string) => categoryIcons[cat] || '🏷️'
+  
+  // Dağılım çubuğu için renkler
+  const chartColors = ['bg-amber-400', 'bg-emerald-400', 'bg-blue-400', 'bg-rose-400', 'bg-purple-400', 'bg-cyan-400']
+
   return (
-    <div className="min-h-full bg-stone-950 text-white">
+    <div className="flex min-h-screen bg-stone-950 text-white">
+      
+      {/* Sol ve Orta Kısım: Ana İçerik */}
+      <div className="flex-1 p-8 overflow-y-auto">
+        <header className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-black text-amber-400 tracking-tight flex items-center gap-3">
+              <span className="text-4xl">💸</span> Giderler & Maliyet Kokpiti
+            </h1>
+            <p className="text-stone-400 mt-1">İşletmenizin finansal çıkışlarını ve masraf dağılımını analiz edin.</p>
+          </div>
+        </header>
 
-      {/* Header */}
-      <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">💰</span>
-          <h1 className="font-bold text-amber-400">Giderler</h1>
+        {/* 1. Bento Grid: Özet Kartları */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="bg-gradient-to-br from-stone-900 to-stone-950 border border-stone-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform" />
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 text-xl border border-amber-500/20">
+                📉
+              </div>
+              <div>
+                <p className="text-stone-400 text-sm font-medium">Son 30 Gün (Nakit Çıkışı)</p>
+                <h3 className="text-3xl font-black text-white tracking-tight">{formatCurrency(monthlyTotal)}</h3>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-stone-900 to-stone-950 border border-stone-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform" />
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 text-xl border border-emerald-500/20">
+                📅
+              </div>
+              <div>
+                <p className="text-stone-400 text-sm font-medium">Günlük Ortalama Gider</p>
+                <h3 className="text-3xl font-black text-white tracking-tight">{formatCurrency((monthlyTotal / 30))}</h3>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-stone-900 to-stone-950 border border-stone-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform" />
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 text-xl border border-blue-500/20">
+                ⏱️
+              </div>
+              <div>
+                <p className="text-stone-400 text-sm font-medium">Saatlik Gider (12 Saat)</p>
+                <h3 className="text-3xl font-black text-white tracking-tight">{formatCurrency((monthlyTotal / 30 / 12))}</h3>
+              </div>
+            </div>
+          </div>
         </div>
-        <button
-          onClick={() => { resetForm(); setShowForm(true) }}
-          className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-4 py-2 rounded-lg text-sm transition-colors"
-        >
-          + Yeni Gider
-        </button>
-      </header>
 
-      <main className="p-6">
-
-        {/* Özet Kartlar */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
-            <p className="text-stone-400 text-sm mb-1">Son 30 Günlük Gider (Nakit Çıkışı)</p>
-            <p className="text-3xl font-bold text-amber-400">{formatCurrency(monthlyTotal)}</p>
-          </div>
-          <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
-            <p className="text-stone-400 text-sm mb-1">Günlük Ortalama Gider</p>
-            <p className="text-3xl font-bold text-white">{formatCurrency((monthlyTotal / 30))}</p>
-          </div>
-          <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
-            <p className="text-stone-400 text-sm mb-1">Saatlik Gider (12 saat)</p>
-            <p className="text-3xl font-bold text-white">{formatCurrency((monthlyTotal / 30 / 12))}</p>
-          </div>
-        </div>
-
-        {/* Kategori Dağılımı */}
+        {/* 2. Modern Dağılım Çubuğu */}
         {byCategory.length > 0 && (
-          <div className="bg-stone-900 border border-stone-800 rounded-xl p-5 mb-6">
-            <h3 className="font-bold mb-4 text-stone-300">Kategori Dağılımı (Son 30 Gün)</h3>
-            <div className="space-y-2">
-              {byCategory.sort((a, b) => b.total - a.total).map(cat => (
-                <div key={cat.value} className="flex items-center gap-3">
-                  <span className="text-stone-400 text-sm w-24">{cat.label}</span>
-                  <div className="flex-1 bg-stone-800 rounded-full h-2">
-                    <div
-                      className="bg-amber-400 h-2 rounded-full"
-                      style={{ width: `${(cat.total / monthlyTotal) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-amber-400 text-sm w-24 text-right">{formatCurrency(cat.total)}</span>
-                  <span className="text-stone-500 text-xs w-10 text-right">%{((cat.total / monthlyTotal) * 100).toFixed(0)}</span>
+          <div className="bg-stone-900 border border-stone-800 rounded-3xl p-8 mb-8 shadow-2xl">
+            <h3 className="text-lg font-bold text-stone-300 mb-6 flex items-center gap-2">
+              📊 Son 30 Gün Kategori Dağılımı
+            </h3>
+            
+            {/* Horizontal Bar */}
+            <div className="w-full h-6 flex rounded-full overflow-hidden mb-6 shadow-inner bg-stone-950">
+              {byCategory.sort((a, b) => b.total - a.total).map((cat, i) => {
+                const percentage = (cat.total / monthlyTotal) * 100;
+                return (
+                  <div 
+                    key={cat.value} 
+                    className={`h-full ${chartColors[i % chartColors.length]} hover:brightness-110 transition-all cursor-pointer border-r border-stone-900 last:border-r-0`}
+                    style={{ width: `${percentage}%` }}
+                    title={`${cat.label}: ${formatCurrency(cat.total)} (%${percentage.toFixed(1)})`}
+                  />
+                )
+              })}
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-4">
+              {byCategory.sort((a, b) => b.total - a.total).map((cat, i) => (
+                <div key={cat.value} className="flex items-center gap-2 bg-stone-950/50 px-3 py-1.5 rounded-xl border border-stone-800/50">
+                  <div className={`w-3 h-3 rounded-full ${chartColors[i % chartColors.length]}`} />
+                  <span className="text-stone-300 text-sm font-medium">{getCategoryIcon(cat.value)} {cat.label}</span>
+                  <span className="text-stone-500 text-sm border-l border-stone-800 pl-2">%{((cat.total / monthlyTotal) * 100).toFixed(0)}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Form */}
-        {showForm && (
-          <div className="bg-stone-900 border border-amber-400 rounded-xl p-6 mb-6">
-            <h2 className="font-bold text-lg mb-4">
-              {editingId ? 'Gider Düzenle' : 'Yeni Gider Ekle'}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="text-stone-400 text-sm mb-1 block">Gider Adı *</label>
-                <input
-                  value={form.name}
-                  onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400"
-                  placeholder="örn: Kira Ödemesi"
-                />
-              </div>
-              <div>
-                <label className="text-stone-400 text-sm mb-1 block">Kategori</label>
-                <select
-                  value={form.category}
-                  onChange={e => setForm({ ...form, category: e.target.value })}
-                  className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400 mb-2"
-                >
-                  {categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                  <option value="custom" className="text-amber-500 font-bold">+ Yeni Kategori Ekle</option>
-                </select>
-                {form.category === 'custom' && (
-                  <input
-                    value={customCategory}
-                    onChange={e => setCustomCategory(e.target.value)}
-                    className="w-full bg-stone-800 border border-amber-500 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400"
-                    placeholder="Yeni kategori adı (örn: Nakliye)"
-                    autoFocus
-                  />
-                )}
-              </div>
-              <div>
-                <label className="text-stone-400 text-sm mb-1 block">Tutar (₺) *</label>
-                <input
-                  type="number"
-                  value={form.amount}
-                  onChange={e => setForm({ ...form, amount: e.target.value })}
-                  className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400"
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label className="text-stone-400 text-sm mb-1 block">Periyot</label>
-                <select
-                  value={form.period}
-                  onChange={e => setForm({ ...form, period: e.target.value })}
-                  className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400"
-                >
-                  <option value="monthly">Aylık</option>
-                  <option value="yearly">Yıllık</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-stone-400 text-sm mb-1 block">Tarih</label>
-                <input
-                  type="date"
-                  value={form.expense_date}
-                  onChange={e => setForm({ ...form, expense_date: e.target.value })}
-                  className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={handleSubmit}
-                className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-2 rounded-lg transition-colors"
-              >
-                {editingId ? 'Güncelle' : 'Kaydet'}
-              </button>
-              <button
-                onClick={resetForm}
-                className="bg-stone-700 hover:bg-stone-600 text-white px-6 py-2 rounded-lg transition-colors"
-              >
-                İptal
-              </button>
-            </div>
+        {/* 3. Giderler Tablosu */}
+        <div className="bg-stone-900 border border-stone-800 rounded-3xl shadow-2xl overflow-hidden">
+          <div className="p-6 border-b border-stone-800 flex justify-between items-center">
+            <h3 className="text-lg font-bold text-stone-300 flex items-center gap-2">📋 İşlem Geçmişi</h3>
           </div>
-        )}
-
-        {/* Gider Listesi */}
-        {loading ? (
-          <p className="text-stone-400">Yükleniyor...</p>
-        ) : expenses.length === 0 ? (
-          <div className="text-center py-16 text-stone-500">
-            <div className="text-5xl mb-4">💰</div>
-            <p>Henüz gider eklenmemiş.</p>
-          </div>
-        ) : (
-          <div className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
-            <div className="overflow-x-auto w-full">
-<table className="w-full">
-              <thead>
-                <tr className="border-b border-stone-800">
-                  <th className="text-left px-4 py-3 text-stone-400 text-sm">Gider</th>
-                  <th className="text-left px-4 py-3 text-stone-400 text-sm">Kategori</th>
-                  <th className="text-left px-4 py-3 text-stone-400 text-sm">Periyot</th>
-                  <th className="text-right px-4 py-3 text-stone-400 text-sm">Tutar</th>
-                  <th className="text-right px-4 py-3 text-stone-400 text-sm">Aylık Karşılık</th>
-                  <th className="text-right px-4 py-3 text-stone-400 text-sm">İşlem</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expenses.map((exp) => (
-                  <tr key={exp.id} className="border-b border-stone-800 hover:bg-stone-800 transition-colors">
-                    <td className="px-4 py-3 font-medium">{exp.name}</td>
-                    <td className="px-4 py-3 text-stone-400 text-sm">
-                      {categories.find(c => c.value === exp.category)?.label || exp.category}
-                    </td>
-                    <td className="px-4 py-3 text-stone-400 text-sm">
-                      {exp.period === 'monthly' ? 'Aylık' : 'Yıllık'}
-                    </td>
-                    <td className="px-4 py-3 text-right">{formatCurrency(exp.amount)}</td>
-                    <td className="px-4 py-3 text-right text-amber-400">{formatCurrency((exp.period === 'yearly' ? exp.amount / 12 : exp.amount))}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button onClick={() => handleEdit(exp)} className="text-blue-400 hover:text-blue-300 text-sm mr-3">Düzenle</button>
-                      <button onClick={() => handleDelete(exp.id)} className="text-red-400 hover:text-red-300 text-sm">Sil</button>
-                    </td>
+          
+          {loading ? (
+            <div className="p-8 text-center text-stone-500 animate-pulse">Yükleniyor...</div>
+          ) : expenses.length === 0 ? (
+            <div className="p-16 text-center text-stone-500">
+              <div className="text-6xl mb-4 opacity-50">📭</div>
+              <p>Henüz bir gider kaydedilmemiş.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-stone-950/50 text-stone-400 text-xs uppercase tracking-wider">
+                    <th className="p-4 font-medium border-b border-stone-800">Tarih</th>
+                    <th className="p-4 font-medium border-b border-stone-800">Gider Adı</th>
+                    <th className="p-4 font-medium border-b border-stone-800">Kategori</th>
+                    <th className="p-4 font-medium border-b border-stone-800 text-center">Periyot</th>
+                    <th className="p-4 font-medium border-b border-stone-800 text-right">Tutar</th>
+                    <th className="p-4 font-medium border-b border-stone-800 text-right">İşlem</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-</div>
+                </thead>
+                <tbody className="divide-y divide-stone-800/50">
+                  {expenses.map(exp => {
+                    const isDiscount = exp.category === 'indirim-ikram' || exp.category === 'iade'
+                    return (
+                      <tr key={exp.id} className="hover:bg-stone-800/20 transition-colors group">
+                        <td className="p-4 text-sm text-stone-400 whitespace-nowrap">
+                          {new Date(exp.expense_date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}
+                        </td>
+                        <td className="p-4 font-medium text-stone-200">
+                          {exp.name}
+                          {isDiscount && <span className="ml-2 text-[10px] bg-stone-800 text-stone-400 px-2 py-0.5 rounded-full">Muhasebesel</span>}
+                        </td>
+                        <td className="p-4">
+                          <div className="inline-flex items-center gap-2 bg-stone-950 px-3 py-1 rounded-full border border-stone-800 text-sm">
+                            <span>{getCategoryIcon(exp.category)}</span>
+                            <span className="text-stone-300 capitalize">{categories.find(c => c.value === exp.category)?.label || exp.category}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={`text-xs px-2 py-1 rounded-md font-bold ${
+                            exp.period === 'monthly' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 
+                            exp.period === 'yearly' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                            'bg-stone-800 text-stone-400 border border-stone-700'
+                          }`}>
+                            {exp.period === 'monthly' ? 'Aylık' : exp.period === 'yearly' ? 'Yıllık' : 'Tek Seferlik'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right">
+                          <span className={`font-bold ${isDiscount ? 'text-stone-500 line-through' : 'text-rose-400'}`}>
+                            {formatCurrency(exp.amount)}
+                          </span>
+                          {exp.period === 'yearly' && (
+                            <div className="text-[10px] text-stone-500 mt-1">Aylık Yük: {formatCurrency(exp.amount / 12)}</div>
+                          )}
+                        </td>
+                        <td className="p-4 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => handleEdit(exp)} className="text-blue-400 hover:text-blue-300 text-sm mr-3 font-medium">Düzenle</button>
+                          <button onClick={() => handleDelete(exp.id)} className="text-rose-400 hover:text-rose-300 text-sm font-medium">Sil</button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Sağ Kısım: Sabit "Hızlı Gider Ekle" Paneli */}
+      <div className="w-96 bg-stone-950/80 backdrop-blur-2xl border-l border-stone-800 p-8 flex flex-col h-screen sticky top-0 overflow-y-auto shadow-2xl z-10">
+        <div className="flex items-center gap-3 mb-8 pb-6 border-b border-stone-800">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 text-xl border border-amber-500/20">
+            {editingId ? '✏️' : '⚡'}
           </div>
-        )}
-      </main>
+          <h2 className="text-xl font-bold text-white">
+            {editingId ? 'Gideri Düzenle' : 'Hızlı Gider Ekle'}
+          </h2>
+        </div>
+
+        <div className="flex flex-col gap-5 flex-1">
+          <div>
+            <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Ne Gideri? (Adı)</label>
+            <input
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+              className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors placeholder-stone-700"
+              placeholder="Örn: Kasap Alışverişi"
+            />
+          </div>
+
+          <div>
+            <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Kategori</label>
+            <select
+              value={form.category}
+              onChange={e => setForm({ ...form, category: e.target.value })}
+              className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors mb-2 cursor-pointer"
+            >
+              {categories.map(c => <option key={c.value} value={c.value}>{getCategoryIcon(c.value)} {c.label}</option>)}
+              <option value="custom" className="text-amber-500 font-bold">+ Yeni Kategori Ekle</option>
+            </select>
+            {form.category === 'custom' && (
+              <input
+                value={customCategory}
+                onChange={e => setCustomCategory(e.target.value)}
+                className="w-full bg-stone-900 border border-amber-500/50 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors mt-2"
+                placeholder="Kategori Adı..."
+                autoFocus
+              />
+            )}
+          </div>
+
+          <div>
+            <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Tutar (TL)</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 font-bold">₺</span>
+              <input
+                type="number"
+                value={form.amount}
+                onChange={e => setForm({ ...form, amount: e.target.value })}
+                className="w-full bg-stone-900 border border-stone-800 rounded-xl py-3 pl-10 pr-4 text-white font-bold text-lg focus:outline-none focus:border-amber-500 transition-colors placeholder-stone-700"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Periyot</label>
+              <select
+                value={form.period}
+                onChange={e => setForm({ ...form, period: e.target.value })}
+                className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors cursor-pointer"
+              >
+                <option value="daily">Tek Seferlik / Günlük</option>
+                <option value="monthly">Aylık Düzenli</option>
+                <option value="yearly">Yıllık Düzenli</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-stone-400 text-xs font-bold uppercase tracking-wider mb-2 block">Tarih</label>
+              <input
+                type="date"
+                value={form.expense_date}
+                onChange={e => setForm({ ...form, expense_date: e.target.value })}
+                className="w-full bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-white font-medium focus:outline-none focus:border-amber-500 transition-colors"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-stone-800 flex flex-col gap-3">
+          <button
+            onClick={handleSubmit}
+            className="w-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-lg py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.2)] hover:shadow-[0_0_30px_rgba(245,158,11,0.4)] hover:-translate-y-1"
+          >
+            {editingId ? 'GÜNCELLE' : 'GİDERİ KAYDET'}
+          </button>
+          
+          {editingId && (
+            <button
+              onClick={resetForm}
+              className="w-full bg-stone-800 hover:bg-stone-700 text-white font-bold py-3 rounded-xl transition-colors"
+            >
+              İptal Et
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
