@@ -25,8 +25,8 @@ export default function KasaSayimPage() {
     const [countedCash, setCountedCash] = useState<number | ''>('')
     const [countedCreditCard, setCountedCreditCard] = useState<number | ''>('')
     const [countedMealCard, setCountedMealCard] = useState<number | ''>('')
-    const [adjustmentCash, setAdjustmentCash] = useState<number | ''>('')
-    const [adjustmentCredit, setAdjustmentCredit] = useState<number | ''>('')
+    const [adjustmentType, setAdjustmentType] = useState<'none' | 'cash_to_credit' | 'credit_to_cash'>('none')
+    const [adjustmentAmount, setAdjustmentAmount] = useState<number | ''>('')
     const [adjustmentNote, setAdjustmentNote] = useState('')
 
     const [existingReconciliation, setExistingReconciliation] = useState<any>(null)
@@ -130,9 +130,21 @@ export default function KasaSayimPage() {
     
     // Nakit ve POS kırılımı varsa ayrı ayrı hesapla
     const isMovementFound = expectedCashRaw > 0 || expectedCreditRaw > 0
-    const expectedNetCash = isMovementFound ? expectedCashRaw - expectedExpenses + (Number(adjustmentCash) || 0) : 0
-    const expectedNetCredit = isMovementFound ? expectedCreditRaw + (Number(adjustmentCredit) || 0) : 0
-    const expectedTotalAdjusted = expectedTotal + (Number(adjustmentCash) || 0) + (Number(adjustmentCredit) || 0)
+    const adjAmount = Number(adjustmentAmount) || 0
+    let adjCash = 0;
+    let adjCredit = 0;
+    
+    if (adjustmentType === 'cash_to_credit') {
+        adjCash = -adjAmount;
+        adjCredit = adjAmount;
+    } else if (adjustmentType === 'credit_to_cash') {
+        adjCash = adjAmount;
+        adjCredit = -adjAmount;
+    }
+
+    const expectedNetCash = isMovementFound ? expectedCashRaw - expectedExpenses + adjCash : 0
+    const expectedNetCredit = isMovementFound ? expectedCreditRaw + adjCredit : 0
+    const expectedTotalAdjusted = expectedTotal + adjCash + adjCredit
     
     const cashVariance = isMovementFound ? (Number(countedCash) || 0) - expectedNetCash : 0
     const creditVariance = isMovementFound ? (Number(countedCreditCard) || 0) - expectedNetCredit : 0
@@ -165,7 +177,7 @@ export default function KasaSayimPage() {
                 credit_card_variance: isMovementFound ? creditVariance : 0,
                 meal_card_variance: 0,
                 status,
-                notes: `Toplam Satış: ${expectedSales} TL, Toplam Gider: ${expectedExpenses} TL${adjustmentCash || adjustmentCredit ? ` | Düzeltme: Nakit(${adjustmentCash}), Kart(${adjustmentCredit})` : ''}${adjustmentNote ? ' | Açıklama: ' + adjustmentNote : ''}`,
+                notes: `Toplam Satış: ${expectedSales} TL, Toplam Gider: ${expectedExpenses} TL${adjustmentType !== 'none' && adjAmount > 0 ? ` | Düzeltme: ${adjustmentType === 'cash_to_credit' ? 'Nakit yerine Kart çekilmiş' : 'Kart yerine Nakit alınmış'} (${adjAmount} TL)` : ''}${adjustmentNote ? ' | Açıklama: ' + adjustmentNote : ''}`,
                 is_movement_found: isMovementFound
             }
 
@@ -286,28 +298,35 @@ export default function KasaSayimPage() {
                         </div>
 
                         <div className="pt-6 border-t border-stone-800 mt-2">
-                            <h3 className="text-lg font-bold text-amber-500 mb-4">⚙️ Sistemsel Düzeltmeler (Kasiyer Hataları vb.)</h3>
-                            <div className="grid grid-cols-2 gap-4 mb-4">
+                            <h3 className="text-lg font-bold text-amber-500 mb-4">⚙️ Ödeme Tipi Düzeltmesi (Kasiyer Hatası)</h3>
+                            <div className="flex flex-col gap-4 mb-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-stone-400 mb-2">Nakit Beklentisine Ekle/Çıkar (TL)</label>
-                                    <input 
-                                        type="number" 
-                                        value={adjustmentCash}
-                                        onChange={(e) => setAdjustmentCash(e.target.value === '' ? '' : Number(e.target.value))}
-                                        placeholder="Örn: -190"
-                                        className="w-full bg-stone-950 border border-stone-800 rounded-xl py-3 px-4 text-white font-bold focus:outline-none focus:border-amber-500 transition-all placeholder-stone-700"
-                                    />
+                                    <label className="block text-xs font-medium text-stone-400 mb-2">Hata Tipi</label>
+                                    <select 
+                                        value={adjustmentType}
+                                        onChange={(e) => setAdjustmentType(e.target.value as any)}
+                                        className="w-full bg-stone-950 border border-stone-800 rounded-xl py-3 px-4 text-white font-bold focus:outline-none focus:border-amber-500 transition-all cursor-pointer"
+                                    >
+                                        <option value="none">Bir hata yok (Düzeltme Yapma)</option>
+                                        <option value="cash_to_credit">Z-Raporda Nakit girilmiş, ama fiilen Kredi Kartı çekilmiş</option>
+                                        <option value="credit_to_cash">Z-Raporda Kredi Kartı girilmiş, ama fiilen Nakit alınmış</option>
+                                    </select>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-stone-400 mb-2">POS Beklentisine Ekle/Çıkar (TL)</label>
-                                    <input 
-                                        type="number" 
-                                        value={adjustmentCredit}
-                                        onChange={(e) => setAdjustmentCredit(e.target.value === '' ? '' : Number(e.target.value))}
-                                        placeholder="Örn: 190"
-                                        className="w-full bg-stone-950 border border-stone-800 rounded-xl py-3 px-4 text-white font-bold focus:outline-none focus:border-amber-500 transition-all placeholder-stone-700"
-                                    />
-                                </div>
+                                {adjustmentType !== 'none' && (
+                                    <div className="animate-fade-in">
+                                        <label className="block text-xs font-medium text-stone-400 mb-2">Düzeltilecek Tutar (TL)</label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 font-bold">₺</span>
+                                            <input 
+                                                type="number" 
+                                                value={adjustmentAmount}
+                                                onChange={(e) => setAdjustmentAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                                                placeholder="0.00"
+                                                className="w-full bg-stone-950 border border-stone-800 rounded-xl py-3 pl-10 pr-4 text-white font-bold focus:outline-none focus:border-amber-500 transition-all placeholder-stone-700"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <label className="block text-sm font-medium text-stone-400 mb-2">Düzeltme Açıklaması (Opsiyonel ama tavsiye edilir)</label>
                             <textarea 
