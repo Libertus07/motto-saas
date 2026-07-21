@@ -18,6 +18,7 @@ export default function KasaSayimPage() {
 
     const [expectedSales, setExpectedSales] = useState(0)
     const [expectedExpenses, setExpectedExpenses] = useState(0)
+    const [expectedDiscounts, setExpectedDiscounts] = useState(0)
     const [expectedTotal, setExpectedTotal] = useState(0)
     const [expectedCashRaw, setExpectedCashRaw] = useState(0)
     const [expectedCreditRaw, setExpectedCreditRaw] = useState(0)
@@ -71,15 +72,18 @@ export default function KasaSayimPage() {
             const totalSales = salesData?.reduce((sum, s) => sum + (Number(s.total_price) || 0), 0) || 0
             const validBatchIds = Array.from(new Set(salesData?.map(s => s.batch_id).filter(Boolean)))
 
-            // 3. Günün Giderlerini Getir
+            // 3. Günün Giderlerini Getir (İndirim ve iadeleri fiziki kasadan düşmemek için ayır)
             const { data: expensesData, error: expError } = await supabase
                 .from('expenses')
-                .select('amount')
+                .select('amount, category')
                 .eq('expense_date', date)
             
             if (expError) throw expError
             
-            const totalExpenses = expensesData?.reduce((sum, e) => sum + (Number(e.amount) || 0), 0) || 0
+            // Fiziki olarak kasadan çıkan paralar (Örn: manav, fırın, tüp vb.)
+            const totalExpenses = expensesData?.filter(e => !['indirim-ikram', 'iade'].includes(e.category || '')).reduce((sum, e) => sum + (Number(e.amount) || 0), 0) || 0
+            // Sadece muhasebesel olan düşüşler (İndirimler, ikramlar)
+            const totalDiscounts = expensesData?.filter(e => ['indirim-ikram', 'iade'].includes(e.category || '')).reduce((sum, e) => sum + (Number(e.amount) || 0), 0) || 0
 
             // 4. Günün Ödeme Yöntemi Dağılımını Getir (Z-Raporu hareketleri)
             let totalExpectedCash = 0;
@@ -115,6 +119,7 @@ export default function KasaSayimPage() {
             // Kasa Net Nakit Beklentisi (Giren Nakit - Giderler)
             setExpectedSales(finalExpectedSales)
             setExpectedExpenses(totalExpenses)
+            setExpectedDiscounts(totalDiscounts)
             setExpectedTotal(finalExpectedSales - totalExpenses)
             setExpectedCashRaw(totalExpectedCash)
             setExpectedCreditRaw(totalExpectedCredit)
@@ -386,6 +391,17 @@ export default function KasaSayimPage() {
                                     <div className="flex justify-between items-center p-3 bg-rose-950/20 rounded-lg border border-rose-900/30">
                                         <span className="text-rose-400/80 text-sm">Kasadan Çıkan (Giderler)</span>
                                         <span className="font-bold text-rose-400">- {formatCurrency(expectedExpenses)}</span>
+                                    </div>
+                                )}
+                                
+                                {/* İndirim ve İkramlar (Sadece Bilgi Amaçlı, Fiziksel Kasadan Düşmez) */}
+                                {expectedDiscounts > 0 && (
+                                    <div className="flex justify-between items-center p-3 bg-stone-900/30 rounded-lg border border-stone-800/30 opacity-70">
+                                        <div className="flex flex-col">
+                                            <span className="text-stone-400 text-sm">Uygulanan İndirim / İkram</span>
+                                            <span className="text-stone-500 text-[10px]">(Satıştan düşüldü, kasayı etkilemez)</span>
+                                        </div>
+                                        <span className="font-bold text-stone-400">- {formatCurrency(expectedDiscounts)}</span>
                                     </div>
                                 )}
 
