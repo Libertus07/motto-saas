@@ -1,21 +1,22 @@
 {
   "name": "Motto SaaS - Restoran Zekası",
-  "short_name": "Motto",
-  "description": "Kafe ve Restoran Yönetim Sistemi",
+  "short_name": "Motto SaaS",
+  "description": "Restoran ve Kafe Yönetim Sistemi",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#0c0a09",
-  "theme_color": "#b45309",
+  "theme_color": "#0c0a09",
+  "orientation": "portrait",
   "icons": [
     {
-      "src": "/globe.svg",
+      "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/png"
     },
     {
-      "src": "/globe.svg",
+      "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/png"
     }
   ]
 }

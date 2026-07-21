@@ -33,102 +33,56 @@ export default function Dashboard() {
   useEffect(() => { fetchStats() }, [])
 
   const fetchStats = async () => {
-    const [
-      { data: products },
-      { data: materials },
-      { data: expenses },
-      { data: sales },
-      { data: settings },
-      { data: accounts },
-      { data: investments }
-    ] = await Promise.all([
-      supabase.from('products').select('id, sale_price, calculated_cost'),
-      supabase.from('materials').select('id, name, stock_quantity, unit, critical_stock_level, price_per_unit'),
-      supabase.from('expenses').select('amount, period, expense_date, category'),
-      supabase.from('sales').select('quantity, total_price, sale_date, product_id'),
-      supabase.from('settings').select('*'),
-      supabase.from('accounts').select('type, balance'),
-      supabase.from('investments').select('asset_type, quantity, average_cost')
-    ])
-
-    // Canlı Kurlar
-    let rates: any = null
     try {
-      const res = await fetch('/api/exchange-rates')
-      const data = await res.json()
-      if (data.success) rates = data.rates
-    } catch (e) { devError('Kurlar çekilemedi', e) }
+      // 1. Veritabanından sunucu bazlı hesaplanmış verileri çek (Çok Hızlı)
+      const { data, error } = await supabase.rpc('get_dashboard_stats', { days_ago: 30 })
+      
+      if (error) {
+        devError('RPC Hatası:', error)
+        throw error
+      }
 
-    const criticalItems = (materials || []).filter(
-      i => (i.stock_quantity || 0) <= (i.critical_stock_level || 0) && (i.critical_stock_level || 0) > 0
-    )
-    const criticalStockCount = criticalItems.length
+      const rpcStats = data as any;
 
-    // Net Kâr hesaplaması (Son 30 gün)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      // 2. Canlı Kurlar (Sadece Dolar/Altın vs. hesaplaması için)
+      let rates: any = null
+      try {
+        const res = await fetch('/api/exchange-rates')
+        const rateData = await res.json()
+        if (rateData.success) rates = rateData.rates
+      } catch (e) { devError('Kurlar çekilemedi', e) }
 
-    const recentSales = (sales || []).filter(s => {
-      const d = new Date(s.sale_date);
-      return d >= thirtyDaysAgo;
-    });
+      // 3. Yatırımların canlı kurla çarpılması
+      const totalInvestments = (rpcStats.investmentsList || []).reduce((t: number, inv: any) => {
+          const rate = rates ? rates[inv.asset_type] : inv.average_cost
+          return t + (Number(inv.quantity) * rate)
+      }, 0)
 
-    const recentExpenses = (expenses || []).filter(e => {
-      const d = e.expense_date ? new Date(e.expense_date) : null;
-      return d && d >= thirtyDaysAgo;
-    });
+      const netRev = Number(rpcStats.grossRevenue) - Number(rpcStats.totalDiscounts)
 
-    const grossRevenue = recentSales.reduce((t, s) => t + Number(s.total_price), 0);
-    const totalCogs = recentSales.reduce((t, s) => {
-      const product = (products || []).find(p => p.id === s.product_id);
-      const cost = product ? Number(product.calculated_cost || 0) : 0;
-      return t + (cost * Number(s.quantity));
-    }, 0);
-
-    const totalDiscounts = recentExpenses.filter(e => e.category === 'indirim-ikram').reduce((t, e) => t + Number(e.amount), 0);
-    const monthlyExpenses = recentExpenses.filter(e => e.category !== 'indirim-ikram').reduce((t, e) => t + Number(e.amount), 0);
-
-    const netRevenue = grossRevenue - totalDiscounts;
-    const netProfit = netRevenue - totalCogs - monthlyExpenses;
-
-    const targetMarginSetting = (settings || []).find(s => s.key === 'target_margin')?.value
-    const targetMargin = targetMarginSetting ? Number(targetMarginSetting) : 35
-
-    const lowMarginProducts = (products || []).filter(p => {
-      if (!p.sale_price || !p.calculated_cost) return false
-      const margin = ((p.sale_price - p.calculated_cost) / p.sale_price) * 100
-      return margin < targetMargin
-    }).length
-
-    const totalStockValue = (materials || []).reduce((t, i) =>
-      t + (i.stock_quantity || 0) * i.price_per_unit, 0)
-
-    const totalCash = (accounts || []).filter(a => a.type === 'cash').reduce((t, a) => t + Number(a.balance), 0)
-    const totalBank = (accounts || []).filter(a => a.type === 'bank').reduce((t, a) => t + Number(a.balance), 0)
-    const totalInvestments = (investments || []).reduce((t, inv) => {
-        const rate = rates ? rates[inv.asset_type] : inv.average_cost
-        return t + (Number(inv.quantity) * rate)
-    }, 0)
-
-    setStats({
-      totalProducts: products?.length || 0,
-      totalIngredients: materials?.length || 0,
-      criticalStockCount,
-      monthlyExpenses,
-      lowMarginProducts,
-      totalStockValue,
-      grossRevenue,
-      totalDiscounts,
-      netRevenue,
-      totalCogs,
-      netProfit,
-      targetMargin,
-      criticalItems,
-      totalCash,
-      totalBank,
-      totalInvestments
-    })
-    setLoading(false)
+      setStats({
+        totalProducts: Number(rpcStats.totalProducts) || 0,
+        totalIngredients: Number(rpcStats.totalIngredients) || 0,
+        criticalStockCount: Number(rpcStats.criticalStockCount) || 0,
+        monthlyExpenses: Number(rpcStats.monthlyExpenses) || 0,
+        lowMarginProducts: Number(rpcStats.lowMarginProducts) || 0,
+        totalStockValue: Number(rpcStats.totalStockValue) || 0,
+        grossRevenue: Number(rpcStats.grossRevenue) || 0,
+        totalDiscounts: Number(rpcStats.totalDiscounts) || 0,
+        netRevenue: netRev,
+        totalCogs: Number(rpcStats.totalCogs) || 0,
+        netProfit: netRev - Number(rpcStats.totalCogs) - Number(rpcStats.monthlyExpenses),
+        targetMargin: Number(rpcStats.targetMargin) || 35,
+        criticalItems: rpcStats.criticalItems || [],
+        totalCash: Number(rpcStats.totalCash) || 0,
+        totalBank: Number(rpcStats.totalBank) || 0,
+        totalInvestments
+      })
+    } catch (err) {
+      devError('Dashboard verileri çekilirken hata oluştu:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleLogout = async () => {
