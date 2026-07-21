@@ -298,23 +298,23 @@ export default function KasaSayimPage() {
                         </div>
 
                         <div className="pt-6 border-t border-stone-800 mt-2">
-                            <h3 className="text-lg font-bold text-amber-500 mb-4">⚙️ Ödeme Tipi Düzeltmesi (Kasiyer Hatası)</h3>
+                            <h3 className="text-lg font-bold text-amber-500 mb-4">⚙️ Kasiyer Hatası Düzeltme</h3>
                             <div className="flex flex-col gap-4 mb-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-stone-400 mb-2">Hata Tipi</label>
+                                    <label className="block text-xs font-medium text-stone-400 mb-2">Ne Oldu?</label>
                                     <select 
                                         value={adjustmentType}
                                         onChange={(e) => setAdjustmentType(e.target.value as any)}
                                         className="w-full bg-stone-950 border border-stone-800 rounded-xl py-3 px-4 text-white font-bold focus:outline-none focus:border-amber-500 transition-all cursor-pointer"
                                     >
-                                        <option value="none">Bir hata yok (Düzeltme Yapma)</option>
-                                        <option value="cash_to_credit">Z-Raporda Nakit girilmiş, ama fiilen Kredi Kartı çekilmiş</option>
-                                        <option value="credit_to_cash">Z-Raporda Kredi Kartı girilmiş, ama fiilen Nakit alınmış</option>
+                                        <option value="none">Sorun Yok</option>
+                                        <option value="cash_to_credit">Nakit Girilmiş ➔ Kart Olacak</option>
+                                        <option value="credit_to_cash">Kart Girilmiş ➔ Nakit Olacak</option>
                                     </select>
                                 </div>
                                 {adjustmentType !== 'none' && (
                                     <div className="animate-fade-in">
-                                        <label className="block text-xs font-medium text-stone-400 mb-2">Düzeltilecek Tutar (TL)</label>
+                                        <label className="block text-xs font-medium text-stone-400 mb-2">Tutar (TL)</label>
                                         <div className="relative">
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 font-bold">₺</span>
                                             <input 
@@ -328,7 +328,7 @@ export default function KasaSayimPage() {
                                     </div>
                                 )}
                             </div>
-                            <label className="block text-sm font-medium text-stone-400 mb-2">Düzeltme Açıklaması (Opsiyonel ama tavsiye edilir)</label>
+                            <label className="block text-sm font-medium text-stone-400 mb-2">Açıklama (Opsiyonel)</label>
                             <textarea 
                                 value={adjustmentNote}
                                 onChange={(e) => setAdjustmentNote(e.target.value)}
