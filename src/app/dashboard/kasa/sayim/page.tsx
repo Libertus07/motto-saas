@@ -25,6 +25,8 @@ export default function KasaSayimPage() {
     const [countedCash, setCountedCash] = useState<number | ''>('')
     const [countedCreditCard, setCountedCreditCard] = useState<number | ''>('')
     const [countedMealCard, setCountedMealCard] = useState<number | ''>('')
+    const [adjustmentCash, setAdjustmentCash] = useState<number | ''>('')
+    const [adjustmentCredit, setAdjustmentCredit] = useState<number | ''>('')
     const [adjustmentNote, setAdjustmentNote] = useState('')
 
     const [existingReconciliation, setExistingReconciliation] = useState<any>(null)
@@ -128,12 +130,13 @@ export default function KasaSayimPage() {
     
     // Nakit ve POS kırılımı varsa ayrı ayrı hesapla
     const isMovementFound = expectedCashRaw > 0 || expectedCreditRaw > 0
-    const expectedNetCash = isMovementFound ? expectedCashRaw - expectedExpenses : 0
-    const expectedNetCredit = isMovementFound ? expectedCreditRaw : 0
+    const expectedNetCash = isMovementFound ? expectedCashRaw - expectedExpenses + (Number(adjustmentCash) || 0) : 0
+    const expectedNetCredit = isMovementFound ? expectedCreditRaw + (Number(adjustmentCredit) || 0) : 0
+    const expectedTotalAdjusted = expectedTotal + (Number(adjustmentCash) || 0) + (Number(adjustmentCredit) || 0)
     
     const cashVariance = isMovementFound ? (Number(countedCash) || 0) - expectedNetCash : 0
     const creditVariance = isMovementFound ? (Number(countedCreditCard) || 0) - expectedNetCredit : 0
-    const variance = countedTotal - expectedTotal
+    const variance = countedTotal - expectedTotalAdjusted
 
     const handleSave = async () => {
         if (countedCash === '' || countedCreditCard === '') {
@@ -162,7 +165,7 @@ export default function KasaSayimPage() {
                 credit_card_variance: isMovementFound ? creditVariance : 0,
                 meal_card_variance: 0,
                 status,
-                notes: `Toplam Satış: ${expectedSales} TL, Toplam Gider: ${expectedExpenses} TL${adjustmentNote ? ' | Açıklama/Not: ' + adjustmentNote : ''}`,
+                notes: `Toplam Satış: ${expectedSales} TL, Toplam Gider: ${expectedExpenses} TL${adjustmentCash || adjustmentCredit ? ` | Düzeltme: Nakit(${adjustmentCash}), Kart(${adjustmentCredit})` : ''}${adjustmentNote ? ' | Açıklama: ' + adjustmentNote : ''}`,
                 is_movement_found: isMovementFound
             }
 
@@ -282,8 +285,31 @@ export default function KasaSayimPage() {
                             </div>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-stone-400 mb-2">Günün Kasa Notları (Opsiyonel)</label>
+                        <div className="pt-6 border-t border-stone-800 mt-2">
+                            <h3 className="text-lg font-bold text-amber-500 mb-4">⚙️ Sistemsel Düzeltmeler (Kasiyer Hataları vb.)</h3>
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-stone-400 mb-2">Nakit Beklentisine Ekle/Çıkar (TL)</label>
+                                    <input 
+                                        type="number" 
+                                        value={adjustmentCash}
+                                        onChange={(e) => setAdjustmentCash(e.target.value === '' ? '' : Number(e.target.value))}
+                                        placeholder="Örn: -190"
+                                        className="w-full bg-stone-950 border border-stone-800 rounded-xl py-3 px-4 text-white font-bold focus:outline-none focus:border-amber-500 transition-all placeholder-stone-700"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-stone-400 mb-2">POS Beklentisine Ekle/Çıkar (TL)</label>
+                                    <input 
+                                        type="number" 
+                                        value={adjustmentCredit}
+                                        onChange={(e) => setAdjustmentCredit(e.target.value === '' ? '' : Number(e.target.value))}
+                                        placeholder="Örn: 190"
+                                        className="w-full bg-stone-950 border border-stone-800 rounded-xl py-3 px-4 text-white font-bold focus:outline-none focus:border-amber-500 transition-all placeholder-stone-700"
+                                    />
+                                </div>
+                            </div>
+                            <label className="block text-sm font-medium text-stone-400 mb-2">Düzeltme Açıklaması (Opsiyonel ama tavsiye edilir)</label>
                             <textarea 
                                 value={adjustmentNote}
                                 onChange={(e) => setAdjustmentNote(e.target.value)}
