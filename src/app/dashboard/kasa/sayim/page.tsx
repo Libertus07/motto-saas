@@ -282,6 +282,16 @@ export default function KasaSayimPage() {
                             </div>
                         </div>
 
+                        <div>
+                            <label className="block text-sm font-medium text-stone-400 mb-2">Günün Kasa Notları (Opsiyonel)</label>
+                            <textarea 
+                                value={adjustmentNote}
+                                onChange={(e) => setAdjustmentNote(e.target.value)}
+                                placeholder="Örn: 190 TL'lik hesap kartla çekildi ama yanlışlıkla nakit girildi..."
+                                className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-stone-300 focus:outline-none focus:border-amber-500 transition-colors h-24 resize-none shadow-inner"
+                            />
+                        </div>
+
                         <div className="pt-4 border-t border-stone-800">
                             <div className="flex justify-between items-center text-stone-300">
                                 <span className="font-medium">Sizin Saydığınız Toplam:</span>
@@ -358,18 +368,6 @@ export default function KasaSayimPage() {
                                 </div>
                             )}
                         </div>
-
-                        {variance !== 0 && (
-                            <div className="mt-6 w-full animate-fade-in">
-                                <label className="block text-sm font-medium text-stone-400 mb-2 text-left">Fark Açıklaması (Opsiyonel)</label>
-                                <textarea 
-                                    value={adjustmentNote}
-                                    onChange={(e) => setAdjustmentNote(e.target.value)}
-                                    placeholder="Örn: 190 TL'lik hesap kartla çekildi ama yanlışlıkla nakit girildi..."
-                                    className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-stone-300 focus:outline-none focus:border-amber-500 transition-colors h-24 resize-none shadow-inner"
-                                />
-                            </div>
-                        )}
 
                         {error && (
                             <div className="mt-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm text-center">
