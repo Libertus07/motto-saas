@@ -25,6 +25,7 @@ export default function KasaSayimPage() {
     const [countedCash, setCountedCash] = useState<number | ''>('')
     const [countedCreditCard, setCountedCreditCard] = useState<number | ''>('')
     const [countedMealCard, setCountedMealCard] = useState<number | ''>('')
+    const [adjustmentNote, setAdjustmentNote] = useState('')
 
     const [existingReconciliation, setExistingReconciliation] = useState<any>(null)
 
@@ -161,7 +162,7 @@ export default function KasaSayimPage() {
                 credit_card_variance: isMovementFound ? creditVariance : 0,
                 meal_card_variance: 0,
                 status,
-                notes: `Toplam Satış: ${expectedSales} TL, Toplam Gider: ${expectedExpenses} TL`,
+                notes: `Toplam Satış: ${expectedSales} TL, Toplam Gider: ${expectedExpenses} TL${adjustmentNote ? ' | Açıklama/Not: ' + adjustmentNote : ''}`,
                 is_movement_found: isMovementFound
             }
 
@@ -357,6 +358,18 @@ export default function KasaSayimPage() {
                                 </div>
                             )}
                         </div>
+
+                        {variance !== 0 && (
+                            <div className="mt-6 w-full animate-fade-in">
+                                <label className="block text-sm font-medium text-stone-400 mb-2 text-left">Fark Açıklaması (Opsiyonel)</label>
+                                <textarea 
+                                    value={adjustmentNote}
+                                    onChange={(e) => setAdjustmentNote(e.target.value)}
+                                    placeholder="Örn: 190 TL'lik hesap kartla çekildi ama yanlışlıkla nakit girildi..."
+                                    className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-stone-300 focus:outline-none focus:border-amber-500 transition-colors h-24 resize-none shadow-inner"
+                                />
+                            </div>
+                        )}
 
                         {error && (
                             <div className="mt-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm text-center">
