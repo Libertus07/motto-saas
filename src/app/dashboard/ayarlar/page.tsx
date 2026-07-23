@@ -179,20 +179,14 @@ function Toggle({ checked, onChange, label, description }: { checked: boolean; o
 // ─── Tab Panels ───────────────────────────────────────────────────────────────
 
 function ProfilTab() {
-  const [currentEmail, setCurrentEmail] = useState('')
-  const [email, setEmail] = useState('')
-  const [oldEmailOtp, setOldEmailOtp] = useState('')
-  const [newEmailOtp, setNewEmailOtp] = useState('')
-  const [showOtpInput, setShowOtpInput] = useState(false)
+  const [phone, setPhone] = useState('')
+  const [currentPhone, setCurrentPhone] = useState('')
+  const [phoneSaving, setPhoneSaving] = useState(false)
+  const [phoneMsg, setPhoneMsg] = useState({ text: '', type: '' })
+
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
-  const [pwdOtp, setPwdOtp] = useState('')
-  const [showPwdOtpInput, setShowPwdOtpInput] = useState(false)
-  
-  const [emailSaving, setEmailSaving] = useState(false)
   const [pwdSaving, setPwdSaving] = useState(false)
-  
-  const [emailMsg, setEmailMsg] = useState({ text: '', type: '' })
   const [pwdMsg, setPwdMsg] = useState({ text: '', type: '' })
 
   const supabase = createClient()
@@ -200,68 +194,53 @@ function ProfilTab() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        setCurrentEmail(user.email || '')
+        // Telefon numarasını auth tablosundan (veya yoksa profilden) al
+        setCurrentPhone(user.phone || '')
+        setPhone(user.phone || '')
+        
+        // Eğer auth tablosunda telefon yoksa, profile tablosuna bakalım
+        if (!user.phone) {
+          supabase.from('profiles').select('phone').eq('id', user.id).single().then(({ data, error }) => {
+            if (!error && data && data.phone) {
+              setCurrentPhone(data.phone)
+              setPhone(data.phone)
+            }
+          })
+        }
       }
     })
   }, [])
 
-  const handleUpdateEmail = async () => {
-    if (email === currentEmail) return
-    setEmailSaving(true)
-    setEmailMsg({ text: '', type: '' })
+  const handleUpdatePhone = async () => {
+    if (phone === currentPhone) return
+    setPhoneSaving(true)
+    setPhoneMsg({ text: '', type: '' })
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    let formattedPhone = phone.trim().replace(/\s+/g, '')
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '+9' + formattedPhone
+    } else if (!formattedPhone.startsWith('+')) {
+      formattedPhone = '+90' + formattedPhone
+    }
+
+    // Auth tablosunu güncelle (Şifreli-Ücretsiz seçenekte SMS onayı gerektirmez)
+    const { error: authError } = await supabase.auth.updateUser({ phone: formattedPhone })
     
-    const { error } = await supabase.auth.updateUser({ email })
-    if (error) {
-      setEmailMsg({ text: 'Hata: ' + error.message, type: 'error' })
+    // Aynı zamanda profiles tablosuna da senkronize et (Loglarda vs kolay bulmak için)
+    await supabase.from('profiles').update({ phone: formattedPhone }).eq('id', user.id)
+
+    if (authError) {
+      setPhoneMsg({ text: 'Hata: ' + authError.message, type: 'error' })
     } else {
-      setEmailMsg({ text: 'Mevcut ve yeni e-posta adreslerinize birer doğrulama kodu gönderildi.', type: 'success' })
-      setShowOtpInput(true)
+      setPhoneMsg({ text: 'Telefon numarası başarıyla güncellendi.', type: 'success' })
+      setCurrentPhone(formattedPhone)
+      setPhone(formattedPhone)
+      await logActivity('Ayarlar', 'GUNCELLEME', 'Kullanıcı telefon numarası güncellendi.', { detay: `Tel: ${formattedPhone}` })
     }
-    setEmailSaving(false)
-  }
-
-  const handleVerifyEmailOtp = async () => {
-    if (!oldEmailOtp || !newEmailOtp) {
-      setEmailMsg({ text: 'Lütfen her iki kodu da giriniz.', type: 'error' })
-      return
-    }
-    
-    setEmailSaving(true)
-    setEmailMsg({ text: '', type: '' })
-
-    // 1. Eski E-postaya giden kodu doğrula
-    const { error: errOld } = await supabase.auth.verifyOtp({
-      email: currentEmail,
-      token: oldEmailOtp,
-      type: 'email_change'
-    })
-
-    if (errOld) {
-      setEmailMsg({ text: 'Mevcut e-postanıza gönderilen kod hatalı veya süresi dolmuş.', type: 'error' })
-      setEmailSaving(false)
-      return
-    }
-
-    // 2. Yeni E-postaya giden kodu doğrula
-    const { error: errNew } = await supabase.auth.verifyOtp({
-      email,
-      token: newEmailOtp,
-      type: 'email_change'
-    })
-
-    if (errNew) {
-      setEmailMsg({ text: 'Yeni e-postanıza gönderilen kod hatalı veya süresi dolmuş.', type: 'error' })
-      setEmailSaving(false)
-      return
-    }
-
-    setEmailMsg({ text: 'E-posta adresiniz başarıyla güncellendi.', type: 'success' })
-    setCurrentEmail(email)
-    setShowOtpInput(false)
-    setOldEmailOtp('')
-    setNewEmailOtp('')
-    await logActivity('Ayarlar', 'GUNCELLEME', 'Kullanıcı e-posta adresi güncellendi.', { detay: `Yeni Email: ${email}` })
-    setEmailSaving(false)
+    setPhoneSaving(false)
   }
 
   // Şifre Gücü Hesaplama
@@ -281,45 +260,10 @@ function ProfilTab() {
   const strengthTextColors = ['text-red-500', 'text-orange-500', 'text-amber-400', 'text-green-400', 'text-emerald-500']
   const strengthLabels = ['Çok Zayıf', 'Zayıf', 'Orta', 'Güçlü', 'Çok Güçlü']
 
-  const handleRequestPasswordOtp = async () => {
-    if (!password || password.length < 6) {
-      setPwdMsg({ text: 'Yeni şifre en az 6 karakter olmalıdır.', type: 'error' })
-      return
-    }
-    if (password !== passwordConfirm) {
-      setPwdMsg({ text: 'Yeni şifreler eşleşmiyor.', type: 'error' })
-      return
-    }
-
+  const handleUpdatePassword = async () => {
+    if (!password || password !== passwordConfirm) return
     setPwdSaving(true)
     setPwdMsg({ text: '', type: '' })
-    
-    const { error } = await supabase.auth.resetPasswordForEmail(currentEmail)
-    if (error) {
-      setPwdMsg({ text: 'Hata: ' + error.message, type: 'error' })
-    } else {
-      setPwdMsg({ text: 'E-posta adresinize şifre doğrulama kodu gönderildi.', type: 'success' })
-      setShowPwdOtpInput(true)
-    }
-    setPwdSaving(false)
-  }
-
-  const handleVerifyPasswordOtp = async () => {
-    if (!pwdOtp) return
-    setPwdSaving(true)
-    setPwdMsg({ text: '', type: '' })
-
-    const { error: otpError } = await supabase.auth.verifyOtp({
-      email: currentEmail,
-      token: pwdOtp,
-      type: 'recovery'
-    })
-
-    if (otpError) {
-      setPwdMsg({ text: 'Kod hatalı veya süresi dolmuş.', type: 'error' })
-      setPwdSaving(false)
-      return
-    }
 
     const { error: updateError } = await supabase.auth.updateUser({ password })
     if (updateError) {
@@ -328,61 +272,33 @@ function ProfilTab() {
       setPwdMsg({ text: 'Şifreniz başarıyla güncellendi.', type: 'success' })
       setPassword('')
       setPasswordConfirm('')
-      setPwdOtp('')
-      setShowPwdOtpInput(false)
-      await logActivity('Ayarlar', 'GUNCELLEME', 'Kullanıcı şifresi doğrulama kodu ile güncellendi.', { detay: 'Şifre değiştirildi.' })
+      await logActivity('Ayarlar', 'GUNCELLEME', 'Kullanıcı şifresi güncellendi.', { detay: 'Şifre değiştirildi.' })
     }
     setPwdSaving(false)
   }
 
   return (
     <div className="space-y-6">
-      <SectionCard title="E-Posta Adresi" description="Sisteme giriş yaparken kullandığınız e-posta adresi.">
+      <SectionCard title="Kişisel Bilgiler" description="Sisteme giriş yaparken kullandığınız telefon numarası.">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormRow label="Mevcut E-posta Adresi">
+          <FormRow label="Mevcut Telefon">
             <div className="bg-stone-900 border border-stone-800 rounded-lg px-3 py-2 text-stone-500 text-sm font-medium flex items-center h-[38px] cursor-not-allowed">
-              {currentEmail || 'Yükleniyor...'}
+              {currentPhone || 'Belirtilmemiş'}
             </div>
           </FormRow>
-          <FormRow label="Yeni E-posta Adresi">
-            <Input value={email} onChange={setEmail} type="email" autoComplete="off" />
+          <FormRow label="Yeni Telefon Numarası">
+            <Input value={phone} onChange={setPhone} type="tel" placeholder="+905554443322" />
           </FormRow>
-
           <div className="md:col-span-2 mt-2">
-            {!showOtpInput ? (
-              <button 
-                onClick={handleUpdateEmail} 
-                disabled={emailSaving || email === currentEmail || !email}
-                className="w-full bg-stone-800 hover:bg-stone-700 disabled:opacity-60 border border-stone-700 text-stone-200 font-bold px-6 py-3 rounded-xl transition-all text-sm"
-              >
-                {emailSaving ? 'Gönderiliyor...' : 'Doğrulama Kodlarını Gönder'}
-              </button>
-            ) : null}
-            {emailMsg.text && !showOtpInput && <p className={`text-sm font-medium mt-2 text-center ${emailMsg.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>{emailMsg.text}</p>}
+            <button 
+              onClick={handleUpdatePhone} 
+              disabled={phoneSaving || phone === currentPhone}
+              className="w-full bg-stone-800 hover:bg-stone-700 disabled:opacity-60 border border-stone-700 text-stone-200 font-bold px-6 py-3 rounded-xl transition-all text-sm"
+            >
+              {phoneSaving ? 'Kaydediliyor...' : 'Telefon Numarasını Güncelle'}
+            </button>
+            {phoneMsg.text && <p className={`text-sm font-medium mt-2 text-center ${phoneMsg.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>{phoneMsg.text}</p>}
           </div>
-
-          {showOtpInput && (
-            <>
-              <div className="md:col-span-2 border-t border-stone-800/50 pt-2 mt-1"></div>
-              <FormRow label="Eski E-posta Onay Kodu" hint="Mevcut adresinize gönderilen kod">
-                <Input value={oldEmailOtp} onChange={setOldEmailOtp} type="text" placeholder="123456" />
-              </FormRow>
-              <FormRow label="Yeni E-posta Onay Kodu" hint="Yeni adresinize gönderilen kod">
-                <Input value={newEmailOtp} onChange={setNewEmailOtp} type="text" placeholder="123456" />
-              </FormRow>
-
-              <div className="md:col-span-2 mt-2">
-                <button 
-                  onClick={handleVerifyEmailOtp} 
-                  disabled={emailSaving || !oldEmailOtp || !newEmailOtp}
-                  className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-stone-950 font-bold px-6 py-3 rounded-xl transition-all text-sm"
-                >
-                  {emailSaving ? 'Doğrulanıyor...' : 'Kodları Doğrula ve Güncelle'}
-                </button>
-                {emailMsg.text && <p className={`text-sm font-medium mt-2 text-center ${emailMsg.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>{emailMsg.text}</p>}
-              </div>
-            </>
-          )}
         </div>
       </SectionCard>
 
@@ -428,37 +344,15 @@ function ProfilTab() {
           </FormRow>
 
           <div className="md:col-span-2 mt-2">
-            {!showPwdOtpInput ? (
-              <button 
-                onClick={handleRequestPasswordOtp} 
-                disabled={pwdSaving || !password || !passwordConfirm}
-                className="w-full bg-stone-800 hover:bg-stone-700 disabled:opacity-60 border border-stone-700 text-stone-200 font-bold px-6 py-3 rounded-xl transition-all text-sm"
-              >
-                {pwdSaving ? 'İşleniyor...' : 'Şifreyi Güncellemek İçin Doğrulama Kodu Gönder'}
-              </button>
-            ) : null}
-            {pwdMsg.text && !showPwdOtpInput && <p className={`text-sm font-medium mt-2 text-center ${pwdMsg.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>{pwdMsg.text}</p>}
+            <button 
+              onClick={handleUpdatePassword} 
+              disabled={pwdSaving || !password || password !== passwordConfirm}
+              className="w-full bg-stone-800 hover:bg-stone-700 disabled:opacity-60 border border-stone-700 text-stone-200 font-bold px-6 py-3 rounded-xl transition-all text-sm"
+            >
+              {pwdSaving ? 'Kaydediliyor...' : 'Yeni Şifreyi Kaydet'}
+            </button>
+            {pwdMsg.text && <p className={`text-sm font-medium mt-2 text-center ${pwdMsg.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>{pwdMsg.text}</p>}
           </div>
-
-          {showPwdOtpInput && (
-            <>
-              <div className="md:col-span-2 border-t border-stone-800/50 pt-2 mt-1"></div>
-              <FormRow label="Şifre Değiştirme Onay Kodu" hint="E-posta adresinize gönderilen 6 haneli kod">
-                <Input value={pwdOtp} onChange={setPwdOtp} type="text" placeholder="123456" />
-              </FormRow>
-              
-              <div className="md:col-span-2 mt-2">
-                <button 
-                  onClick={handleVerifyPasswordOtp} 
-                  disabled={pwdSaving || !pwdOtp}
-                  className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-stone-950 font-bold px-6 py-3 rounded-xl transition-all text-sm"
-                >
-                  {pwdSaving ? 'Doğrulanıyor...' : 'Kodu Doğrula ve Şifreyi Güncelle'}
-                </button>
-                {pwdMsg.text && <p className={`text-sm font-medium mt-2 text-center ${pwdMsg.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>{pwdMsg.text}</p>}
-              </div>
-            </>
-          )}
         </div>
       </SectionCard>
     </div>

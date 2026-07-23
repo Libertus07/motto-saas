@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "nextjs-supabase-auth": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nextjs-supabase-auth/SKILL.md",
+      "computedHash": "f2f8b00877ed450e4b5d1e040b52c1c4d312ec2264c75d2248253814c2a9e9ba"
+    },
     "supabase": {
       "source": "supabase/agent-skills",
       "sourceType": "github",

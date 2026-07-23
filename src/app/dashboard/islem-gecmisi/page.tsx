@@ -24,6 +24,7 @@ export default function IslemGecmisi() {
     const [searchTerm, setSearchTerm] = useState('')
     const [expandedDates, setExpandedDates] = useState<string[]>(['Bugün'])
     const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null)
+    const [userMap, setUserMap] = useState<Record<string, string>>({})
 
     const supabase = createClient()
 
@@ -40,18 +41,34 @@ export default function IslemGecmisi() {
 
         if (!error && data) {
             setLogs(data)
+
+            // Extract unique user IDs and fetch their profiles (using secure RPC to get emails too)
+            const userIds = Array.from(new Set(data.map(log => log.user_id)))
+            if (userIds.length > 0) {
+                const { data: userInfos } = await supabase
+                    .rpc('get_users_info', { user_ids: userIds })
+                
+                if (userInfos) {
+                    const map: Record<string, string> = {}
+                    userInfos.forEach((u: any) => {
+                        map[u.id] = u.phone || u.full_name || u.id
+                    })
+                    setUserMap(map)
+                }
+            }
         }
         setLoading(false)
     }
 
     const processedLogs = useMemo(() => {
         return logs.filter(log => {
+            const userName = userMap[log.user_id] || log.user_id
             const matchModule = activeFilter === 'Tümü' || log.module === activeFilter
             const matchAction = actionFilter === 'Tümü' || log.action_type === actionFilter
-            const matchSearch = searchTerm === '' || log.description.toLowerCase().includes(searchTerm.toLowerCase()) || log.user_id.toLowerCase().includes(searchTerm.toLowerCase())
+            const matchSearch = searchTerm === '' || log.description.toLowerCase().includes(searchTerm.toLowerCase()) || userName.toLowerCase().includes(searchTerm.toLowerCase())
             return matchModule && matchAction && matchSearch
         })
-    }, [logs, activeFilter, actionFilter, searchTerm])
+    }, [logs, activeFilter, actionFilter, searchTerm, userMap])
 
     const groupedLogs = useMemo(() => {
         const groups: Record<string, ActivityLog[]> = {}
@@ -207,7 +224,7 @@ export default function IslemGecmisi() {
                                                         )}
                                                     </td>
                                                     <td className="px-6 py-4 text-sm text-stone-500">
-                                                        {log.user_id}
+                                                        {userMap[log.user_id] || log.user_id}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -245,7 +262,7 @@ export default function IslemGecmisi() {
                                 </div>
                                 <div className="bg-stone-800/50 p-3 rounded-lg border border-stone-800">
                                     <p className="text-stone-500 text-xs mb-1">Kullanıcı</p>
-                                    <p className="text-stone-200 text-sm font-medium">{selectedLog.user_id}</p>
+                                    <p className="text-stone-200 text-sm font-medium">{userMap[selectedLog.user_id] || selectedLog.user_id}</p>
                                 </div>
                                 <div className="bg-stone-800/50 p-3 rounded-lg border border-stone-800">
                                     <p className="text-stone-500 text-xs mb-1">Modül</p>

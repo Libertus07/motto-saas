@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS public.organization_members (
     UNIQUE(organization_id, user_id)
 );
 
+-- RLS sorgularının full-table scan yapmasını önlemek için user_id kolonu indekslenir
+CREATE INDEX IF NOT EXISTS idx_organization_members_user_id ON public.organization_members(user_id);
+
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     full_name TEXT,
@@ -61,6 +64,9 @@ BEGIN
     LOOP
         -- Kolon ekle (Eğer yoksa)
         EXECUTE format('ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES public.organizations(id) ON DELETE CASCADE;', row.table_name);
+        
+        -- RLS ve Join performansı için Index ekle (Eğer yoksa)
+        EXECUTE format('CREATE INDEX IF NOT EXISTS idx_%I_org_id ON public.%I(organization_id);', row.table_name, row.table_name);
         
         -- Mevcut verileri Default Organizasyona geçir (Backfill)
         EXECUTE format('UPDATE public.%I SET organization_id = %L WHERE organization_id IS NULL;', row.table_name, '00000000-0000-0000-0000-000000000000');

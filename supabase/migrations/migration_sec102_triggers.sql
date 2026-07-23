@@ -12,6 +12,7 @@ CREATE OR REPLACE FUNCTION public.set_default_organization()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
     default_org UUID;
@@ -21,7 +22,7 @@ BEGIN
         -- Kullanıcının bağlı olduğu organizasyonu bul
         SELECT organization_id INTO default_org 
         FROM public.organization_members 
-        WHERE user_id = auth.uid() 
+        WHERE user_id = (SELECT auth.uid()) 
         LIMIT 1;
 
         -- Bulunduysa otomatik ata

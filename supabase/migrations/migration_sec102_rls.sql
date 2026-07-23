@@ -5,14 +5,19 @@
 
 -- 1. YARDIMCI FONKSİYON: Kullanıcının üye olduğu organizasyonları döndürür.
 -- (Bunu SECURITY DEFINER yapıyoruz ki, organization_members tablosuna gizli erişim yapabilsin)
-CREATE OR REPLACE FUNCTION public.get_user_organizations()
+CREATE SCHEMA IF NOT EXISTS private;
+
+CREATE OR REPLACE FUNCTION private.get_user_organizations()
 RETURNS SETOF UUID
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
-    SELECT organization_id FROM public.organization_members WHERE user_id = auth.uid();
+    SELECT organization_id FROM public.organization_members WHERE user_id = (SELECT auth.uid());
 $$;
+
+-- Fonksiyonun API üzerinden dışarıdan çağrılmasını engelliyoruz
+REVOKE EXECUTE ON FUNCTION private.get_user_organizations() FROM PUBLIC, anon, authenticated;
 
 -- 2. ESKİ VE GÜVENSİZ POLİTİKALARI SİLME (DİNAMİK)
 -- PDF raporunda bahsedilen "sadece auth.role() = 'authenticated' kontrolü yapan"
@@ -61,8 +66,8 @@ BEGIN
         EXECUTE format('
             CREATE POLICY "Tenant Isolation Policy" ON public.%I 
             FOR ALL 
-            USING (organization_id IN (SELECT public.get_user_organizations()))
-            WITH CHECK (organization_id IN (SELECT public.get_user_organizations()));
+            USING (organization_id IN (SELECT private.get_user_organizations()))
+            WITH CHECK (organization_id IN (SELECT private.get_user_organizations()));
         ', t);
     END LOOP;
 END $$;
@@ -70,18 +75,18 @@ END $$;
 -- 5. TEMEL TENANT TABLOLARI İÇİN POLİTİKALAR
 -- Kullanıcı sadece kendi organizasyonunu görebilir
 CREATE POLICY "View own organizations" ON public.organizations
-FOR SELECT USING (id IN (SELECT public.get_user_organizations()));
+FOR SELECT USING (id IN (SELECT private.get_user_organizations()));
 
 -- Kullanıcı sadece kendi organizasyonundaki üyeleri görebilir
 CREATE POLICY "View own organization members" ON public.organization_members
-FOR SELECT USING (organization_id IN (SELECT public.get_user_organizations()));
+FOR SELECT USING (organization_id IN (SELECT private.get_user_organizations()));
 
 -- Kullanıcılar kendi profillerini güncelleyebilir
 CREATE POLICY "Users can insert own profile" ON public.profiles
-FOR INSERT WITH CHECK (auth.uid() = id);
+FOR INSERT WITH CHECK ((SELECT auth.uid()) = id);
 
 CREATE POLICY "Users can update own profile" ON public.profiles
-FOR UPDATE USING (auth.uid() = id);
+FOR UPDATE USING ((SELECT auth.uid()) = id);
 
 CREATE POLICY "Profiles are viewable by authenticated users" ON public.profiles
 FOR SELECT USING (auth.role() = 'authenticated');

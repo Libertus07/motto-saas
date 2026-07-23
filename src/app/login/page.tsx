@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -17,13 +17,21 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
+    // Telefon numarasını E.164 formatına çevir (Örn: 0555 555 55 55 -> +905555555555)
+    let formattedPhone = phone.trim().replace(/\s+/g, '')
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '+9' + formattedPhone
+    } else if (!formattedPhone.startsWith('+')) {
+      formattedPhone = '+90' + formattedPhone
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      phone: formattedPhone,
       password
     })
 
     if (error) {
-      setError('E-posta veya şifre hatalı')
+      setError(`Hata (${formattedPhone}): ${error.message}`)
       setLoading(false)
     } else {
       router.push('/dashboard')
@@ -85,17 +93,17 @@ export default function LoginPage() {
           <div className="space-y-6" suppressHydrationWarning>
             {/* E-Posta */}
             <div className="space-y-2" suppressHydrationWarning>
-              <label className="text-stone-400 text-xs font-bold uppercase tracking-wider ml-1">E-Posta Adresi</label>
+              <label className="text-stone-400 text-xs font-bold uppercase tracking-wider ml-1">Telefon Numarası</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-stone-500 group-focus-within:text-amber-500 transition-colors">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                 </div>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   className="w-full bg-stone-900/40 border border-stone-800 rounded-xl pl-11 pr-4 py-3.5 text-white placeholder-stone-600 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 focus:bg-stone-900/80 transition-all shadow-inner"
-                  placeholder="ornek@email.com"
+                  placeholder="+90 555 555 55 55"
                   suppressHydrationWarning
                   data-1p-ignore
                 />
