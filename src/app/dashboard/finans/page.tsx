@@ -7,6 +7,7 @@ import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
 import { formatCurrency, formatDate } from "@/lib/format";
+import { HistoryAccordion } from '@/components/ui/HistoryAccordion';
 
 type Account = {
     id: string
@@ -35,7 +36,6 @@ export default function FinansPage() {
     const [loading, setLoading] = useState(true)
     
     // UI states
-    const [expandedDates, setExpandedDates] = useState<string[]>(['Bugün'])
     const [selectedMovement, setSelectedMovement] = useState<AccountMovement | null>(null)
     
     // Modal state for manual entry
@@ -188,9 +188,6 @@ export default function FinansPage() {
         return groups
     }, [movements])
 
-    const toggleDate = (dateKey: string) => {
-        setExpandedDates(prev => prev.includes(dateKey) ? prev.filter(d => d !== dateKey) : [...prev, dateKey])
-    }
 
     const handleManualEntry = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -383,67 +380,59 @@ export default function FinansPage() {
                                     Henüz bir hesap hareketi bulunmuyor.
                                 </div>
                             ) : (
-                                Object.entries(groupedMovements).map(([dateKey, groupMoves]) => {
-                                    const isExpanded = expandedDates.includes(dateKey)
-                                    return (
-                                        <div key={dateKey} className="bg-stone-950/50 rounded-xl border border-stone-800 overflow-hidden">
-                                            <button 
-                                                onClick={() => toggleDate(dateKey)}
-                                                className="w-full flex items-center justify-between px-6 py-4 hover:bg-stone-800/30 transition-colors"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-lg">{dateKey === 'Bugün' ? '📅' : dateKey === 'Dün' ? '⏱️' : '🗓️'}</span>
-                                                    <h3 className="font-bold text-stone-200">{dateKey}</h3>
-                                                    <span className="bg-stone-900 text-xs px-2 py-1 rounded-full text-stone-500 border border-stone-800">{groupMoves.length} işlem</span>
-                                                </div>
-                                                <span className="text-stone-500 text-sm font-bold bg-stone-900 w-8 h-8 flex items-center justify-center rounded-lg border border-stone-800">{isExpanded ? '▲' : '▼'}</span>
-                                            </button>
-                                            
-                                            {isExpanded && (
-                                                <div className="overflow-x-auto border-t border-stone-800/50">
-                                                    <table className="w-full text-left text-sm">
-                                                        <thead className="bg-stone-900/30 text-stone-500 text-xs uppercase tracking-wider">
-                                                            <tr>
-                                                                <th className="px-6 py-3 font-medium">Saat</th>
-                                                                <th className="px-6 py-3 font-medium">İşlem Özeti</th>
-                                                                <th className="px-6 py-3 font-medium text-right">Tutar</th>
+                                <HistoryAccordion
+                                    groups={Object.entries(groupedMovements).map(([dateKey, groupMoves]) => ({
+                                        id: dateKey,
+                                        title: dateKey,
+                                        subtitle: `${groupMoves.length} işlem`,
+                                        icon: <span className="text-xl">{dateKey === 'Bugün' ? '📅' : dateKey === 'Dün' ? '⏱️' : '🗓️'}</span>,
+                                        items: groupMoves
+                                    }))}
+                                    defaultExpandedIds={['Bugün']}
+                                    renderContent={(groupMoves: AccountMovement[]) => (
+                                        <div className="overflow-x-auto border-t border-stone-800">
+                                            <table className="w-full text-left text-sm">
+                                                <thead className="bg-stone-900/30 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-800">
+                                                    <tr>
+                                                        <th className="px-6 py-3 font-medium">Saat</th>
+                                                        <th className="px-6 py-3 font-medium">İşlem Özeti</th>
+                                                        <th className="px-6 py-3 font-medium text-right">Tutar</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-stone-800/50">
+                                                    {groupMoves.map((move: AccountMovement) => {
+                                                        const isGiris = move.movement_type === 'giris'
+                                                        return (
+                                                            <tr 
+                                                                key={move.id} 
+                                                                onClick={() => setSelectedMovement(move)}
+                                                                className="hover:bg-stone-800/50 transition-colors cursor-pointer group"
+                                                            >
+                                                                <td className="px-6 py-4 text-stone-400 whitespace-nowrap group-hover:text-amber-400/70 transition-colors">
+                                                                    {formatDate(new Date(move.created_at))}
+                                                                </td>
+                                                                <td className="px-6 py-4">
+                                                                    <p className="font-medium text-stone-300 group-hover:text-amber-400 transition-colors">{move.description}</p>
+                                                                    <p className="text-xs text-stone-500 mt-1">
+                                                                        {move.source_type === 'z_report' ? 'Z-Raporu' :
+                                                                         move.source_type === 'supplier_payment' ? 'Tedarikçi Ödemesi' :
+                                                                         move.source_type === 'expense' ? 'Masraf/Gider' : 
+                                                                         move.source_type === 'z_report_group' ? 'Gün Sonu Net İşlem' : 'Manuel İşlem'}
+                                                                    </p>
+                                                                </td>
+                                                                <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                                    <span className={`font-bold px-3 py-1.5 rounded-lg ${isGiris ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                                                                        {isGiris ? '+ ' : '- '}{formatCurrency(move.amount)}
+                                                                    </span>
+                                                                </td>
                                                             </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-stone-800/30">
-                                                            {groupMoves.map(move => {
-                                                                const isGiris = move.movement_type === 'giris'
-                                                                return (
-                                                                    <tr 
-                                                                        key={move.id} 
-                                                                        onClick={() => setSelectedMovement(move)}
-                                                                        className="hover:bg-stone-800/30 transition-colors cursor-pointer group"
-                                                                    >
-                                                                        <td className="px-6 py-4 text-stone-400 whitespace-nowrap group-hover:text-amber-400/70 transition-colors">
-                                                                            {formatDate(new Date(move.created_at))}
-                                                                        </td>
-                                                                        <td className="px-6 py-4">
-                                                                            <p className="font-medium text-stone-300 group-hover:text-amber-400 transition-colors">{move.description}</p>
-                                                                            <p className="text-xs text-stone-500 mt-1">
-                                                                                {move.source_type === 'z_report' ? 'Z-Raporu' :
-                                                                                 move.source_type === 'supplier_payment' ? 'Tedarikçi Ödemesi' :
-                                                                                 move.source_type === 'expense' ? 'Masraf/Gider' : 'Manuel İşlem'}
-                                                                            </p>
-                                                                        </td>
-                                                                        <td className="px-6 py-4 text-right whitespace-nowrap">
-                                                                            <span className={`font-bold px-3 py-1.5 rounded-lg ${isGiris ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                                                                                {isGiris ? '+ ' : '- '}{formatCurrency(move.amount)}
-                                                                            </span>
-                                                                        </td>
-                                                                    </tr>
-                                                                )
-                                                            })}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
+                                                        )
+                                                    })}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                    )
-                                })
+                                    )}
+                                />
                             )}
                         </div>
                     </div>
