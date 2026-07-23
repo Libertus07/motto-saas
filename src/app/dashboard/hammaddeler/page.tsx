@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { formatDate } from "@/lib/format";
-
+import { MaterialHistoryModal } from "@/features/materials/components/MaterialHistoryModal";
+import { MaterialAutoCatModal } from "@/features/materials/components/MaterialAutoCatModal";
 type Material = {
   id: string
   name: string
@@ -975,150 +976,22 @@ export default function Hammaddeler() {
         )}
       </main>
 
-      {/* Fiyat Geçmişi Modalı */}
-      {historyModalOpen && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-stone-900 border border-stone-800 rounded-xl p-6 w-full max-w-lg mx-4">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-amber-400">Fiyat Geçmişi</h2>
-                <p className="text-stone-400 text-sm">{selectedMatName}</p>
-              </div>
-              <button onClick={() => setHistoryModalOpen(false)} className="text-stone-500 hover:text-white text-xl">✕</button>
-            </div>
+      <MaterialHistoryModal
+        isOpen={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+        selectedMatName={selectedMatName}
+        priceHistory={priceHistory}
+        loadingHistory={loadingHistory}
+      />
 
-            {loadingHistory ? (
-              <p className="text-stone-400 py-8 text-center">Geçmiş yükleniyor...</p>
-            ) : priceHistory.length === 0 ? (
-              <p className="text-stone-500 py-8 text-center">Bu hammadde için fiyat değişimi kaydedilmemiş.</p>
-            ) : (
-              <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3">
-                {priceHistory.map(hist => {
-                  const isIncrease = hist.new_price > hist.old_price
-                  const diffPercent = hist.old_price > 0
-                    ? ((hist.new_price - hist.old_price) / hist.old_price) * 100
-                    : 0
-                  return (
-                    <div key={hist.id} className="bg-stone-800 rounded-lg p-4 flex items-center justify-between">
-                      <div>
-                        <p className="text-stone-400 text-xs mb-1">
-                          {formatDate(new Date(hist.created_at))}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <span className="text-stone-500 line-through">₺{hist.old_price.toFixed(2)}</span>
-                          <span className="text-stone-300">→</span>
-                          <span className="text-white font-bold text-lg">₺{hist.new_price.toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        {hist.old_price > 0 && (
-                          <div className={`font-bold text-sm ${isIncrease ? 'text-red-400' : 'text-green-400'}`}>
-                            {isIncrease ? '▲' : '▼'} %{Math.abs(diffPercent).toFixed(1)}
-                          </div>
-                        )}
-                        <span className="text-stone-500 text-xs">
-                          {hist.source === 'receipt_upload' ? '📸 Fiş Okuma' : '✏️ Manuel'}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      {/* Otomatik Kategorize Modalı */}
-      {autoCatModalOpen && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-stone-900 border border-stone-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
-            {/* Modal Başlık */}
-            <div className="px-6 py-5 border-b border-stone-800 flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xl">🤖</span>
-                  <h2 className="text-lg font-bold text-white">Otomatik Kategorize Önerileri</h2>
-                </div>
-                {autoCatSuggestions.length === 0 ? (
-                  <p className="text-stone-400 text-sm">Tüm hammaddeler zaten doğru kategoride! ✨</p>
-                ) : (
-                  <p className="text-stone-400 text-sm">
-                    Yapay zeka <span className="text-amber-400 font-bold">{autoCatSuggestions.length} hammadde</span> için kategori önerisi üreetti.
-                    Onayla veya reddederek uygulayın.
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => setAutoCatModalOpen(false)}
-                className="text-stone-500 hover:text-white text-xl mt-0.5 ml-4"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Öneri Listesi */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {autoCatSuggestions.length === 0 ? (
-                <div className="text-center py-12 text-stone-500">
-                  <div className="text-4xl mb-3">🎉</div>
-                  <p>Her şey zaten doğru sınıflandırılmış!</p>
-                </div>
-              ) : (
-                autoCatSuggestions.map((s, i) => (
-                  <div
-                    key={s.id}
-                    className="flex items-center justify-between bg-stone-800 rounded-xl px-4 py-3 gap-4"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium text-sm truncate">{s.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-stone-500 text-xs line-through">{s.current}</span>
-                        <span className="text-stone-600 text-xs">→</span>
-                        <span className="text-violet-400 text-xs font-semibold">{s.suggested}</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setAutoCatSuggestions(prev => prev.filter((_, idx) => idx !== i))}
-                      className="text-stone-600 hover:text-red-400 text-xs transition-colors flex-shrink-0"
-                      title="Bu öneriyi listeden çıkar"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Alt Butonlar */}
-            {autoCatSuggestions.length > 0 && (
-              <div className="px-6 py-4 border-t border-stone-800 flex items-center justify-between gap-3">
-                <p className="text-stone-500 text-xs">
-                  İstemediğin öneriyi listeden ✕ ile çıkarabilirsin.
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setAutoCatModalOpen(false)}
-                    className="bg-stone-800 hover:bg-stone-700 text-stone-300 px-4 py-2 rounded-lg text-sm transition-colors border border-stone-700"
-                  >
-                    Vazgeç
-                  </button>
-                  <button
-                    onClick={() => handleApplyAutoCat(autoCatSuggestions.map(s => ({ id: s.id, suggested: s.suggested })))}
-                    disabled={autoCatSaving}
-                    className="bg-violet-600 hover:bg-violet-500 disabled:opacity-60 text-white font-bold px-5 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
-                  >
-                    {autoCatSaving ? (
-                      <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uygulanıyor...</>
-                    ) : (
-                      <>✓ {autoCatSuggestions.length} Öneriyi Uygula</>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <MaterialAutoCatModal
+        isOpen={autoCatModalOpen}
+        onClose={() => setAutoCatModalOpen(false)}
+        suggestions={autoCatSuggestions}
+        onRemoveSuggestion={(index) => setAutoCatSuggestions(prev => prev.filter((_, idx) => idx !== index))}
+        onApply={handleApplyAutoCat}
+        isSaving={autoCatSaving}
+      />
     </div>
   )
 }

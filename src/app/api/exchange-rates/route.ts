@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { devLog, devError } from '@/lib/debug';
+import { requireUser } from '@/lib/supabase-server';
 
 // String formatındaki Türk lirası tutarını (örn: 6.180,61) Float'a çevirir
 const parseTRNumber = (val: string | undefined, fallback: number) => {
@@ -14,6 +15,10 @@ const parseTRNumber = (val: string | undefined, fallback: number) => {
 
 export async function GET() {
     try {
+        const user = await requireUser()
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
         // Truncgil API kullanarak doğru/canlı kurları çekiyoruz
         const response = await fetch('https://finans.truncgil.com/today.json', {
             headers: {

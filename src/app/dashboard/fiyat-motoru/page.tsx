@@ -49,6 +49,7 @@ export default function FiyatMotoru() {
   const [products, setProducts] = useState<Product[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [calculations, setCalculations] = useState<Calculation[]>([])
   const [productSales, setProductSales] = useState<ProductSales>({})
   const [settings, setSettings] = useState({
@@ -148,24 +149,40 @@ export default function FiyatMotoru() {
       return { ...p, calculated_cost: cost }
     })
 
-    // Veritabanındaki calculated_cost değeri ile eşleşmeyenleri güncelle
-    const updates = productsWithCost.filter(p => p.calculated_cost !== (prods?.find(db => db.id === p.id)?.calculated_cost || 0))
-    if (updates.length > 0) {
-      await Promise.all(updates.map(p => 
-        supabase.from('products').update({ calculated_cost: p.calculated_cost }).eq('id', p.id)
-      ))
-      logActivity('Fiyat Motoru', 'GUNCELLEME', `${updates.length} ürünün hesaplanan maliyeti güncellendi.`)
-    }
+    // Veritabanı güncellemesi buradan kaldırıldı (FIN-303). Manuel kaydetme fonksiyonu eklenecek.
 
     setProducts(productsWithCost)
     setExpenses(exps || [])
     setLoading(false)
   }
 
+  const saveCalculatedCosts = async () => {
+    setSaving(true)
+    try {
+      const { data: dbProducts } = await supabase.from('products').select('id, calculated_cost')
+      const updates = products.filter(p => p.calculated_cost !== (dbProducts?.find(db => db.id === p.id)?.calculated_cost || 0))
+      
+      if (updates.length > 0) {
+        await Promise.all(updates.map(p => 
+          supabase.from('products').update({ calculated_cost: p.calculated_cost }).eq('id', p.id)
+        ))
+        logActivity('Fiyat Motoru', 'GUNCELLEME', `${updates.length} ürünün hesaplanan maliyeti güncellendi.`)
+        alert(`${updates.length} ürünün maliyeti veritabanına kaydedildi!`)
+      } else {
+        alert('Tüm maliyetler zaten güncel.')
+      }
+    } catch (error) {
+      console.error(error)
+      alert('Maliyetler kaydedilirken bir hata oluştu.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const calculate = () => {
     // Sabit aylık giderler (Aylık girilenlerin tamamı, yıllık olanların 12'de 1'i)
     const fixedMonthlyExpenses = expenses.reduce((t, e) => {
-      if (e.period === 'Günlük' || e.period === 'daily' || e.period === 'tek_seferlik') return t;
+      if (e.period === 'daily' || e.period === 'one_time') return t;
       return t + (e.period === 'yearly' ? e.amount / 12 : e.amount)
     }, 0)
     
@@ -173,7 +190,7 @@ export default function FiyatMotoru() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const recentDailyExpensesTotal = expenses.reduce((t, e) => {
-      if (e.period === 'Günlük' || e.period === 'daily' || e.period === 'tek_seferlik') {
+      if (e.period === 'daily' || e.period === 'one_time') {
         const expDate = e.expense_date ? new Date(e.expense_date) : null;
         if (!expDate || expDate >= thirtyDaysAgo) {
           return t + Number(e.amount);
@@ -292,13 +309,19 @@ export default function FiyatMotoru() {
   return (
     <div className="min-h-full bg-stone-950 text-white">
 
-      {/* Header */}
       <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <span className="text-2xl">🧠</span>
           <h1 className="font-bold text-amber-400">Fiyat Motoru</h1>
           <span className="text-xs bg-amber-500 text-stone-950 px-2 py-0.5 rounded-full font-bold">Ciro Ağırlıklı</span>
         </div>
+        <button
+          onClick={saveCalculatedCosts}
+          disabled={saving || loading}
+          className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"
+        >
+          {saving ? 'Kaydediliyor...' : 'Hesaplanan Maliyetleri DB\'ye Kaydet'}
+        </button>
       </header>
 
       <main className="p-6">
