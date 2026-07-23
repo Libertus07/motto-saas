@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
@@ -398,47 +399,12 @@ export default function GecmisRaporlar() {
             </main>
 
             {/* Belge Önizleme Modalı */}
-            {previewUrl && (
-                <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[999] p-4" onClick={() => setPreviewUrl(null)}>
-                    <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center" onClick={e => e.stopPropagation()}>
-                        <button 
-                            onClick={() => setPreviewUrl(null)} 
-                            className="absolute -top-12 right-0 text-white hover:text-stone-300 text-sm font-bold bg-stone-900 border border-stone-800 px-4 py-2 rounded-xl flex items-center gap-2 active:scale-95 transition-all"
-                        >
-                            ✕ Kapat
-                        </button>
-                        
-                        <div className="bg-stone-900 border border-stone-800 p-2 rounded-2xl shadow-2xl overflow-hidden max-w-full max-h-[80vh] flex items-center justify-center">
-                            {previewUrl.startsWith('data:application/pdf') || previewUrl.endsWith('.pdf') ? (
-                                <iframe 
-                                    src={previewUrl} 
-                                    className="w-[80vw] h-[70vh] rounded-lg border-0"
-                                    title="Belge Önizleme"
-                                />
-                            ) : previewUrl.endsWith('.xml') || previewUrl.endsWith('.json') || previewUrl.endsWith('.xls') || previewUrl.endsWith('.xlsx') ? (
-                                <div className="p-8 text-center bg-stone-800 rounded-lg">
-                                    <div className="text-4xl mb-4">📄</div>
-                                    <h3 className="text-xl font-bold mb-4 text-stone-200">Bu belge formatı ekranda önizlenemiyor</h3>
-                                    <a 
-                                        href={previewUrl} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="bg-amber-500 hover:bg-amber-600 text-stone-900 font-bold py-2 px-6 rounded-lg inline-block transition-colors"
-                                    >
-                                        Dosyayı İndir / Görüntüle
-                                    </a>
-                                </div>
-                            ) : (
-                                <img 
-                                    src={previewUrl} 
-                                    alt="Belge Önizleme" 
-                                    className="max-w-full max-h-[75vh] object-contain rounded-lg"
-                                />
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            <DocumentPreviewModal 
+                isOpen={!!previewUrl} 
+                onClose={() => setPreviewUrl(null)} 
+                url={previewUrl} 
+                title="Fiş / Fatura Belgesi Önizleme"
+            />
         </div>
     )
 }

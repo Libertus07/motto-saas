@@ -141,3 +141,32 @@ body {
   color: #ef4444 !important; /* hover:text-red-500 */
   transform: rotate(90deg) scale(1.1) !important;
 }
+
+/* Mobil Uyumlu Eğitim Turu (Driver.js) Stilleri */
+@media (max-width: 640px) {
+  .driver-popover.motto-tour-theme {
+    max-width: calc(100vw - 24px) !important;
+    margin: 0 12px !important;
+    padding: 16px !important;
+    border-radius: 1rem !important;
+  }
+  .driver-popover.motto-tour-theme .driver-popover-title {
+    font-size: 1.05rem !important;
+  }
+  .driver-popover.motto-tour-theme .driver-popover-description {
+    font-size: 0.85rem !important;
+    line-height: 1.45 !important;
+  }
+  .driver-popover.motto-tour-theme .driver-popover-footer {
+    margin-top: 1rem !important;
+  }
+  .driver-popover.motto-tour-theme button.driver-popover-next-btn,
+  .driver-popover.motto-tour-theme button.driver-popover-done-btn {
+    padding: 0.5rem 0.9rem !important;
+    font-size: 0.8rem !important;
+  }
+  .driver-popover.motto-tour-theme button.driver-popover-prev-btn {
+    padding: 0.45rem 0.75rem !important;
+    font-size: 0.75rem !important;
+  }
+}

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
@@ -686,34 +687,12 @@ export default function Tedarikciler() {
             )}
 
             {/* Belge Önizleme Modalı */}
-            {previewUrl && (
-                <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[999] p-4" onClick={() => setPreviewUrl(null)}>
-                    <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center" onClick={e => e.stopPropagation()}>
-                        <button 
-                            onClick={() => setPreviewUrl(null)} 
-                            className="absolute -top-12 right-0 text-white hover:text-stone-300 text-sm font-bold bg-stone-900 border border-stone-800 px-4 py-2 rounded-xl flex items-center gap-2 active:scale-95 transition-all"
-                        >
-                            ✕ Kapat
-                        </button>
-                        
-                        <div className="bg-stone-900 border border-stone-800 p-2 rounded-2xl shadow-2xl overflow-hidden max-w-full max-h-[80vh] flex items-center justify-center">
-                            {previewUrl.startsWith('data:application/pdf') || previewUrl.endsWith('.pdf') ? (
-                                <iframe 
-                                    src={previewUrl} 
-                                    className="w-[80vw] h-[70vh] rounded-lg border-0"
-                                    title="Belge Önizleme"
-                                />
-                            ) : (
-                                <img 
-                                    src={previewUrl} 
-                                    alt="Belge Önizleme" 
-                                    className="max-w-full max-h-[75vh] object-contain rounded-lg"
-                                />
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            <DocumentPreviewModal 
+                isOpen={!!previewUrl} 
+                onClose={() => setPreviewUrl(null)} 
+                url={previewUrl} 
+                title="Tedarikçi Belgesi Önizleme"
+            />
 
         </div>
     )
