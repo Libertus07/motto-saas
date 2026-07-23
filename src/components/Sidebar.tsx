@@ -121,7 +121,7 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
         )}
       </div>
       
-      <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+      <nav id="tour-sidebar-nav" className="flex-1 p-4 space-y-6 overflow-y-auto">
         {menuGroups.map((group, groupIndex) => (
           <div key={groupIndex}>
             <div className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-3 px-4">
@@ -176,6 +176,7 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
           </div>
         )}
         <button 
+          id="tour-sidebar-profile"
           onClick={() => setShowProfileMenu(!showProfileMenu)}
           className="w-full bg-stone-950 rounded-lg p-3 text-left border border-stone-800 hover:border-amber-500/50 hover:bg-stone-900 transition-colors flex items-center justify-between group"
         >

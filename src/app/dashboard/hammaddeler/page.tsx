@@ -8,6 +8,8 @@ import { useNotification } from '@/components/NotificationProvider'
 import { formatDate } from "@/lib/format";
 import { MaterialHistoryModal } from "@/features/materials/components/MaterialHistoryModal";
 import { MaterialAutoCatModal } from "@/features/materials/components/MaterialAutoCatModal";
+import { useAppTour } from '@/hooks/useAppTour'
+
 type Material = {
   id: string
   name: string
@@ -434,6 +436,36 @@ export default function Hammaddeler() {
 
   const totalValue = materials.reduce((t, m) => t + (m.stock_quantity || 0) * m.price_per_unit, 0)
 
+  useAppTour('hammaddeler', [
+    {
+      element: '#tour-mat-add',
+      popover: {
+        title: 'Hammadde Ekle ➕',
+        description: 'Tedarikçinizden aldığınız hammaddeleri sisteme buradan tek tek girebilirsiniz.',
+        side: 'bottom',
+        align: 'end'
+      }
+    },
+    {
+      element: '#tour-mat-bulk-edit',
+      popover: {
+        title: 'Hızlı Düzenleme ⚡',
+        description: 'Excel gibi çalışır! Fiyat güncellemelerini veya stok sayımlarını ekrana tıklayarak hızlıca yapıp toplu kaydedebilirsiniz.',
+        side: 'bottom',
+        align: 'center'
+      }
+    },
+    {
+      element: '#tour-mat-autocat',
+      popover: {
+        title: 'Yapay Zeka ile Düzenle 🤖',
+        description: 'Yüzlerce hammaddeniz mi var? Yapay zeka asistanımız hepsini saniyeler içinde "Süt Ürünleri", "Paketleme" gibi kategorilere ayırır.',
+        side: 'bottom',
+        align: 'center'
+      }
+    }
+  ], 800);
+
   return (
     <div className="min-h-full bg-stone-950 text-white">
       {/* Header */}
@@ -503,12 +535,14 @@ export default function Hammaddeler() {
                 🗑️ Tümünü Sil
               </button>
               <button
+                id="tour-mat-bulk-edit"
                 onClick={enterBulkEdit}
                 className="bg-stone-700 hover:bg-stone-600 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors border border-stone-600 flex items-center gap-2"
               >
                 ✏️ Hızlı Düzenleme
               </button>
               <button
+                id="tour-mat-autocat"
                 onClick={handleAutoCategorize}
                 disabled={autoCatLoading}
                 className="bg-violet-700 hover:bg-violet-600 disabled:opacity-60 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
@@ -520,6 +554,7 @@ export default function Hammaddeler() {
                 )}
               </button>
               <button
+                id="tour-mat-add"
                 onClick={() => { resetForm(); setShowForm(true) }}
                 className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-4 py-2 rounded-lg text-sm transition-colors"
               >

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency } from "@/lib/format";
+import { useAppTour } from '@/hooks/useAppTour'
 
 type Expense = {
   id: string
@@ -174,6 +175,36 @@ export default function Giderler() {
   // Dağılım çubuğu için renkler
   const chartColors = ['bg-amber-400', 'bg-emerald-400', 'bg-blue-400', 'bg-rose-400', 'bg-purple-400', 'bg-cyan-400']
 
+  useAppTour('giderler_kokpit', [
+    {
+      element: '#tour-expense-kpis',
+      popover: {
+        title: 'Maliyet Kokpiti ⏱️',
+        description: 'İşletmenizin 30 günlük, günlük ve hatta SAATLİK giderlerini anlık görün. Karar alırken saatlik maliyetinize göre hesap yapın.',
+        side: 'bottom',
+        align: 'center'
+      }
+    },
+    {
+      element: '#tour-expense-chart',
+      popover: {
+        title: 'Gider Dağılımı 📊',
+        description: 'Paranızın tam olarak hangi kalemlere (Kira, Personel, Elektrik) gittiğini tek bakışta anlayın.',
+        side: 'top',
+        align: 'start'
+      }
+    },
+    {
+      element: '#tour-expense-add',
+      popover: {
+        title: 'Yeni Gider Ekle ⚡',
+        description: 'Buradan yeni bir gider faturası işlediğinizde, "Fiyat Motoru" ürünlerinizin birim maliyetlerini anında güncelleyecektir.',
+        side: 'bottom',
+        align: 'end'
+      }
+    }
+  ], 800);
+
   return (
     <div className="flex flex-col-reverse xl:flex-row min-h-screen bg-stone-950 text-white">
       
@@ -187,6 +218,7 @@ export default function Giderler() {
             <p className="text-stone-400 mt-1">İşletmenizin finansal çıkışlarını ve masraf dağılımını analiz edin.</p>
           </div>
           <button
+            id="tour-expense-add"
             onClick={() => { resetForm(); setShowForm(true) }}
             className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-black px-6 py-3 rounded-2xl shadow-[0_0_20px_rgba(245,158,11,0.2)] hover:shadow-[0_0_30px_rgba(245,158,11,0.4)] hover:-translate-y-1 transition-all flex items-center gap-2"
           >
@@ -196,7 +228,7 @@ export default function Giderler() {
         </header>
 
         {/* 1. Bento Grid: Özet Kartları */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div id="tour-expense-kpis" className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div className="bg-gradient-to-br from-stone-900 to-stone-950 border border-stone-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform" />
             <div className="flex items-center gap-4 mb-4">
@@ -239,7 +271,7 @@ export default function Giderler() {
 
         {/* 2. Modern Dağılım Çubuğu */}
         {byCategory.length > 0 && (
-          <div className="bg-stone-900 border border-stone-800 rounded-3xl p-8 mb-8 shadow-2xl">
+          <div id="tour-expense-chart" className="bg-stone-900 border border-stone-800 rounded-3xl p-8 mb-8 shadow-2xl">
             <h3 className="text-lg font-bold text-stone-300 mb-6 flex items-center gap-2">
               📊 Son 30 Gün Kategori Dağılımı
             </h3>

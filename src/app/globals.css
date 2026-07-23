@@ -49,3 +49,95 @@ body {
   animation: scaleUp 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
+/* Motto Tour Theme for driver.js */
+.driver-popover.motto-tour-theme {
+  background-color: rgba(28, 25, 23, 0.95) !important; /* bg-stone-900 with opacity */
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(245, 158, 11, 0.4) !important; /* amber-500/40 */
+  border-radius: 1.25rem !important; /* rounded-2xl */
+  color: #fff !important;
+  font-family: inherit !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(245, 158, 11, 0.15) !important;
+  padding: 24px !important;
+  max-width: 380px !important;
+}
+
+.driver-popover.motto-tour-theme .driver-popover-title {
+  color: #fbbf24 !important; /* text-amber-400 */
+  font-weight: 800 !important;
+  font-size: 1.25rem !important;
+  margin-bottom: 0.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}
+
+.driver-popover.motto-tour-theme .driver-popover-description {
+  color: #e7e5e4 !important; /* text-stone-200 */
+  font-size: 0.95rem !important;
+  line-height: 1.6 !important;
+}
+
+.driver-popover.motto-tour-theme .driver-popover-footer {
+  margin-top: 1.5rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.driver-popover.motto-tour-theme .driver-popover-progress-text {
+  color: #a8a29e !important; /* text-stone-400 */
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  padding: 6px 12px !important;
+  border-radius: 20px !important;
+}
+
+.driver-popover.motto-tour-theme button.driver-popover-next-btn,
+.driver-popover.motto-tour-theme button.driver-popover-done-btn {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; /* amber gradient */
+  color: #0c0a09 !important; /* text-stone-950 */
+  border: none !important;
+  border-radius: 0.75rem !important;
+  padding: 0.6rem 1.25rem !important;
+  font-weight: 800 !important;
+  text-shadow: none !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3) !important;
+}
+
+.driver-popover.motto-tour-theme button.driver-popover-next-btn:hover,
+.driver-popover.motto-tour-theme button.driver-popover-done-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.5) !important;
+}
+
+.driver-popover.motto-tour-theme button.driver-popover-prev-btn {
+  background-color: transparent !important;
+  color: #a8a29e !important; /* text-stone-400 */
+  border: 1px solid #44403c !important; /* border-stone-700 */
+  border-radius: 0.75rem !important;
+  padding: 0.5rem 1rem !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+
+.driver-popover.motto-tour-theme button.driver-popover-prev-btn:hover {
+  background-color: #292524 !important; /* bg-stone-800 */
+  color: #fff !important;
+  border-color: #78716c !important;
+}
+
+.driver-popover.motto-tour-theme button.driver-popover-close-btn {
+  color: #a8a29e !important;
+  top: 15px !important;
+  right: 15px !important;
+  transition: all 0.2s ease !important;
+}
+
+.driver-popover.motto-tour-theme button.driver-popover-close-btn:hover {
+  color: #ef4444 !important; /* hover:text-red-500 */
+  transform: rotate(90deg) scale(1.1) !important;
+}

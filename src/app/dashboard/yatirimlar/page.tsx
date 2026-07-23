@@ -19,6 +19,7 @@ import { UpdateValueModal } from '@/features/investments/components/UpdateValueM
 import { EditInvestmentModal } from '@/features/investments/components/EditInvestmentModal'
 import { DocumentPreviewModal } from '@/features/investments/components/DocumentPreviewModal'
 import { NotePreviewModal } from '@/features/investments/components/NotePreviewModal'
+import { useAppTour } from '@/hooks/useAppTour'
 
 export default function YatirimlarPage() {
     const { showAlert } = useNotification()
@@ -257,6 +258,36 @@ export default function YatirimlarPage() {
         ui.openEditModal(inv)
     }
 
+    useAppTour('yatirimlar', [
+        {
+            element: '#tour-inv-kpis',
+            popover: {
+                title: 'Yatırım Özetiniz 💰',
+                description: 'Cebinizden çıkan toplam para, anlık canlı kurlara göre bugünkü değeriniz ve kazancınız hesaplanır.',
+                side: 'bottom',
+                align: 'center'
+            }
+        },
+        {
+            element: '#tour-inv-tools',
+            popover: {
+                title: 'Portföy Yönetimi 📈',
+                description: 'Varlıklarınızı altın, döviz gibi türüne veya aldığınız aya göre gruplayarak detaylı analiz edebilirsiniz.',
+                side: 'top',
+                align: 'start'
+            }
+        },
+        {
+            element: '#tour-inv-add',
+            popover: {
+                title: 'Varlık Ekleyin 💎',
+                description: 'Yeni bir döviz, altın veya gayrimenkul aldığınızda buradan portföyünüze dahil edin.',
+                side: 'bottom',
+                align: 'end'
+            }
+        }
+    ], 800);
+
     return (
         <div className="min-h-full bg-stone-950 text-white pb-20">
             <header className="mb-8 p-6 pb-0 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -270,6 +301,7 @@ export default function YatirimlarPage() {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
                     <button 
+                        id="tour-inv-add"
                         onClick={() => ui.setIsBuyModalOpen(true)}
                         className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-3 rounded-xl transition-colors shadow-[0_0_20px_rgba(245,158,11,0.2)] whitespace-nowrap"
                     >
@@ -281,7 +313,7 @@ export default function YatirimlarPage() {
             <main className="p-6 pt-0 space-y-6">
                 
                 {/* Genel Özet Paneli */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div id="tour-inv-kpis" className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-stone-900 border border-stone-800 rounded-2xl p-6 relative overflow-hidden">
                         <div className="absolute -right-4 -top-4 text-7xl opacity-5">💰</div>
                         <p className="text-stone-400 text-sm mb-1 font-bold">Toplam Yatırım Maliyeti</p>
@@ -318,7 +350,7 @@ export default function YatirimlarPage() {
                 </div>
 
                 {/* Varlıklar Listesi & Toolbar */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-8 mb-4 gap-4">
+                <div id="tour-inv-tools" className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-8 mb-4 gap-4">
                     <h3 className="text-xl font-bold">Varlık Portföyünüz</h3>
                     
                     <div className="flex flex-wrap items-center gap-2 bg-stone-900 border border-stone-800 p-2 rounded-xl">

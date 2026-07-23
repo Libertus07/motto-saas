@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { devLog, devError } from '@/lib/debug';
 import { formatCurrency } from "@/lib/format";
+import { useAppTour } from '@/hooks/useAppTour'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -105,6 +106,36 @@ export default function Dashboard() {
     { icon: '⚙️', title: 'Ayarlar', desc: 'Sistem ve hesap yapılandırması', path: '/dashboard/ayarlar' },
   ]
 
+  useAppTour('dashboard_main', [
+    {
+      element: '#tour-dash-alerts',
+      popover: {
+        title: 'Akıllı Uyarılar 🚨',
+        description: 'Stoklarınız azaldığında veya kârlılığınız düştüğünde sistem sizi burada uyarır.',
+        side: 'bottom',
+        align: 'start'
+      }
+    },
+    {
+      element: '#tour-dash-financials',
+      popover: {
+        title: 'Finansal Özet 💼',
+        description: 'Tüm nakit, banka ve yatırım varlıklarınızı tek ekrandan anlık takip edin.',
+        side: 'top',
+        align: 'start'
+      }
+    },
+    {
+      element: '#tour-dash-pnl',
+      popover: {
+        title: 'Kâr / Zarar Şelalesi 📊',
+        description: 'Satışlardan kasaya giren net paraya, oradan da aylık kârınıza kadar paranın yolculuğunu görün.',
+        side: 'top',
+        align: 'center'
+      }
+    }
+  ], 1200);
+
   return (
     <div className="min-h-screen bg-stone-950 text-white p-4 md:p-8 overflow-y-auto">
       
@@ -120,7 +151,7 @@ export default function Dashboard() {
 
       {/* ⚡ Smart Alerts (Kritik Stok & Düşük Kâr) */}
       {!loading && (stats.criticalStockCount > 0 || stats.lowMarginProducts > 0) && (
-        <div className="flex flex-col gap-4 mb-8">
+        <div id="tour-dash-alerts" className="flex flex-col gap-4 mb-8">
           {stats.criticalStockCount > 0 && (
             <div className="bg-red-500/10 border border-red-500/20 backdrop-blur-md rounded-3xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-[0_0_30px_rgba(239,68,68,0.1)] relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-bl-full -z-10" />
@@ -164,7 +195,7 @@ export default function Dashboard() {
 
       {/* 💼 Varlıklarım (Financials) */}
       <h3 className="text-lg font-bold mb-6 text-stone-300 flex items-center gap-2 uppercase tracking-wider"><span>💼</span> Finansal Özet</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div id="tour-dash-financials" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-gradient-to-br from-stone-900 to-stone-950 border border-stone-800 rounded-3xl p-6 relative overflow-hidden group hover:border-amber-500/30 transition-all shadow-xl">
            <div className="absolute -right-4 -bottom-4 text-8xl opacity-[0.03] group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500">💵</div>
            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 text-xl border border-emerald-500/20 mb-4">💵</div>
@@ -200,7 +231,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
         {/* P&L (Kâr/Zarar) Tablosu - 2 Sütun */}
-        <div className="lg:col-span-2 bg-gradient-to-br from-stone-900 to-stone-950 border border-stone-800 rounded-3xl p-8 relative overflow-hidden shadow-2xl">
+        <div id="tour-dash-pnl" className="lg:col-span-2 bg-gradient-to-br from-stone-900 to-stone-950 border border-stone-800 rounded-3xl p-8 relative overflow-hidden shadow-2xl">
             <div className={`absolute -top-32 -right-32 w-64 h-64 blur-[100px] opacity-20 transition-all duration-1000 ${stats.netProfit >= 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
             
             <h4 className="text-sm font-bold text-stone-400 uppercase tracking-wider mb-8 flex items-center gap-3">

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Sidebar from '@/components/Sidebar'
+import { useAppTour } from '@/hooks/useAppTour'
 
 export default function DashboardLayout({
   children,
@@ -9,6 +10,37 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  // GLOBAL TOUR
+  useAppTour('global_dashboard', [
+    {
+      element: 'body',
+      popover: {
+        title: 'Motto SaaS\'a Hoş Geldiniz! 🎉',
+        description: 'Size işletmenizi daha karlı yöneteceğiniz akıllı asistanınızı hızlıca tanıtalım.',
+        side: 'top',
+        align: 'center'
+      }
+    },
+    {
+      element: '#tour-sidebar-nav',
+      popover: {
+        title: 'Modül Menüsü 🧭',
+        description: 'Uygulamanın tüm güçlerine buradan erişebilirsiniz. Hammaddeler, Üretim Reçeteleri ve Fiyat Motoru birbiriyle entegre çalışır.',
+        side: 'right',
+        align: 'start'
+      }
+    },
+    {
+      element: '#tour-sidebar-profile',
+      popover: {
+        title: 'Hesap & Ayarlar 👤',
+        description: 'Tıklayarak şirket ayarlarınızı güncelleyebilir veya güvenle çıkış yapabilirsiniz.',
+        side: 'right',
+        align: 'end'
+      }
+    }
+  ], 1000); // Sayfa yüklenmesinden 1 sn sonra başlasın
 
   return (
     <div className="flex h-screen bg-stone-950 overflow-hidden">

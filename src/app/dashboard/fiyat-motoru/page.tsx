@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
+import { useAppTour } from '@/hooks/useAppTour'
 import { formatCurrency } from "@/lib/format";
 import {
   ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -282,6 +283,36 @@ export default function FiyatMotoru() {
     currentMargin: Number(c.currentMargin.toFixed(1))
   })).sort((a, b) => b.dailyProfit - a.dailyProfit);
 
+  useAppTour('fiyat_motoru', [
+    {
+      element: '#tour-fm-params',
+      popover: {
+        title: 'Hesaplama Parametreleri ⚙️',
+        description: 'Kar marjı ve vergi oranlarınıza göre sistem tüm matematiksel hesaplamaları otomatik yapacaktır.',
+        side: 'bottom',
+        align: 'start'
+      }
+    },
+    {
+      element: '#tour-fm-tabs',
+      popover: {
+        title: 'Veri Girişi & Sonuçlar 📊',
+        description: 'Önce günlük satış tahminlerinizi (ya da gerçek Z-Raporunu) girin, ardından "Fiyat Analizi" veya "Görsel Raporlar" sekmesinden sonuçları inceleyin.',
+        side: 'top',
+        align: 'center'
+      }
+    },
+    {
+      element: '#tour-fm-save',
+      popover: {
+        title: 'Maliyetleri Kaydedin 💾',
+        description: 'Bulunan en doğru birim maliyetlerini (Hammadde + Gider) sisteme kaydetmek için son olarak buraya tıklamanız yeterli.',
+        side: 'bottom',
+        align: 'end'
+      }
+    }
+  ], 800);
+
   const totalRawCost = calculations.reduce((t, c) => {
     const sales = productSales[c.product.id]?.dailySales || 0
     return t + (c.rawCost * sales)
@@ -316,6 +347,7 @@ export default function FiyatMotoru() {
           <span className="text-xs bg-amber-500 text-stone-950 px-2 py-0.5 rounded-full font-bold">Ciro Ağırlıklı</span>
         </div>
         <button
+          id="tour-fm-save"
           onClick={saveCalculatedCosts}
           disabled={saving || loading}
           className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"
@@ -327,7 +359,7 @@ export default function FiyatMotoru() {
       <main className="p-6">
 
         {/* Ayarlar */}
-        <div className="bg-stone-900 border border-stone-800 rounded-xl p-5 mb-6">
+        <div id="tour-fm-params" className="bg-stone-900 border border-stone-800 rounded-xl p-5 mb-6">
           <h3 className="font-bold mb-4 text-amber-400">⚙️ Hesaplama Parametreleri</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -375,7 +407,7 @@ export default function FiyatMotoru() {
         </div>
 
         {/* Tabs */}
-        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div id="tour-fm-tabs" className="flex flex-col sm:flex-row gap-2 mb-4">
           <button
             onClick={() => setActiveTab('sales')}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeTab === 'sales' ? 'bg-amber-500 text-stone-950' : 'bg-stone-800 text-stone-400 hover:text-white'}`}
