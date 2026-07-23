@@ -11,10 +11,12 @@ type DocumentPreviewModalProps = {
 
 export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Önizleme' }: DocumentPreviewModalProps) {
     const [zoom, setZoom] = useState(1)
+    const [viewMode, setViewMode] = useState<'fitWidth' | 'fitScreen'>('fitWidth')
 
     // Reset view state when modal opens or URL changes
     useEffect(() => {
         setZoom(1)
+        setViewMode('fitWidth')
     }, [url, isOpen])
 
     // Handle escape key
@@ -40,6 +42,11 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3))
     const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.6))
     const handleResetView = () => setZoom(1)
+
+    const toggleViewMode = () => {
+        setViewMode(prev => (prev === 'fitWidth' ? 'fitScreen' : 'fitWidth'))
+        setZoom(1)
+    }
 
     const handleDownload = () => {
         const link = document.createElement('a')
@@ -87,7 +94,7 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
                 {/* Sol Taraf: Belge Bilgisi ve Rozet */}
                 <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-lg shrink-0">
-                        {isPdf ? '📄' : isImage ? '🖼️' : '📎'}
+                        {isPdf ? '📄' : isImage ? '🧾' : '📎'}
                     </div>
                     <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -95,7 +102,7 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
                                 {title}
                             </h3>
                             <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full bg-stone-800 text-amber-400 border border-stone-700 shrink-0">
-                                {isPdf ? 'PDF' : isImage ? 'GÖRSEL' : 'BELGE'}
+                                {isPdf ? 'PDF' : isImage ? 'FATURA / FİŞ' : 'BELGE'}
                             </span>
                         </div>
                     </div>
@@ -114,20 +121,20 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
                 </div>
             </header>
 
-            {/* ORTA DOKÜMAN VİEWPORT ALANI (Sabit Çerçeve) */}
+            {/* ORTA DOKÜMAN VİEWPORT ALANI */}
             <main 
-                className="flex-1 w-full h-full relative overflow-auto flex items-center justify-center p-2 sm:p-6"
+                className="flex-1 w-full h-full relative overflow-y-auto overflow-x-auto p-2 sm:p-6 flex flex-col items-center"
                 onClick={e => e.stopPropagation()}
             >
-                {/* Mobil için İpucu Notu */}
-                <div className="sm:hidden absolute top-3 left-1/2 -translate-x-1/2 z-30 bg-stone-900/95 backdrop-blur-md border border-stone-800 text-stone-300 text-[11px] px-3.5 py-1.5 rounded-full shadow-xl flex items-center gap-1.5 pointer-events-none whitespace-nowrap">
+                {/* Mobil için Okuma İpucu Notu */}
+                <div className="sm:hidden sticky top-2 z-30 bg-stone-900/95 backdrop-blur-md border border-stone-800 text-stone-300 text-[11px] px-3.5 py-1.5 rounded-full shadow-xl flex items-center gap-1.5 pointer-events-none mb-3">
                     <span className="text-amber-400">💡</span>
-                    <span>Rahat yakınlaştırmak için <strong>Sekmede Aç</strong>'ı kullanın</span>
+                    <span>Uzun faturaları aşağı kaydırarak net bir şekilde okuyabilirsiniz</span>
                 </div>
 
                 {isPdf ? (
                     <div 
-                        className="w-full max-w-5xl h-full rounded-2xl overflow-hidden shadow-2xl border border-stone-800/80 bg-stone-900 transition-transform duration-200 ease-out origin-center"
+                        className="w-full max-w-5xl h-full rounded-2xl overflow-hidden shadow-2xl border border-stone-800/80 bg-stone-900 transition-transform duration-200 ease-out origin-top"
                         style={{
                             transform: `scale(${zoom})`
                         }}
@@ -139,11 +146,15 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
                         />
                     </div>
                 ) : isImage ? (
-                    <div className="w-full h-full flex items-center justify-center overflow-auto p-4">
+                    <div className="w-full min-h-full flex flex-col items-center justify-start my-auto">
                         <img 
                             src={url} 
-                            alt="Belge Önizleme" 
-                            className="max-w-full max-h-[78vh] object-contain rounded-2xl shadow-2xl border border-stone-800/60 transition-transform duration-200 ease-out origin-center"
+                            alt="Fatura Önizleme" 
+                            className={`rounded-2xl shadow-2xl border border-stone-800/80 transition-all duration-200 ease-out origin-top ${
+                                viewMode === 'fitWidth' 
+                                    ? 'w-full sm:w-auto sm:max-w-2xl h-auto' 
+                                    : 'max-w-full max-h-[78vh] object-contain'
+                            }`}
                             style={{
                                 transform: `scale(${zoom})`
                             }}
@@ -151,7 +162,7 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
                         />
                     </div>
                 ) : (
-                    <div className="p-8 text-center bg-stone-900/90 border border-stone-800 rounded-3xl max-w-md shadow-2xl backdrop-blur-md">
+                    <div className="p-8 text-center bg-stone-900/90 border border-stone-800 rounded-3xl max-w-md shadow-2xl backdrop-blur-md my-auto">
                         <div className="text-5xl mb-4 animate-bounce">📄</div>
                         <h4 className="text-xl font-bold text-stone-100 mb-2">Desteklenmeyen Önizleme Formatı</h4>
                         <p className="text-stone-400 text-sm mb-6 leading-relaxed">
@@ -182,8 +193,24 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
             >
                 <div className="pointer-events-auto bg-stone-900/95 backdrop-blur-xl border border-stone-800 px-3.5 py-2 rounded-2xl shadow-2xl flex items-center gap-2 sm:gap-3 max-w-full overflow-x-auto">
                     
+                    {/* Okuma Modu Değiştirici (Dikey Oku / Ekrana Sığdır) */}
+                    {isImage && (
+                        <>
+                            <button
+                                onClick={toggleViewMode}
+                                className="h-9 px-3 bg-stone-800/90 hover:bg-stone-700 text-amber-400 font-semibold text-xs rounded-xl border border-stone-700 flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+                                title="Görünüm Modunu Değiştir"
+                            >
+                                <span className="text-sm">{viewMode === 'fitWidth' ? '📜' : '🖼️'}</span>
+                                <span>{viewMode === 'fitWidth' ? 'Net Oku (Dikey)' : 'Ekrana Sığdır'}</span>
+                            </button>
+
+                            <div className="w-px h-6 bg-stone-800 shrink-0" />
+                        </>
+                    )}
+
                     {/* Görsel / Belge Zoom Kontrol Kümesi */}
-                    <div className="flex items-center bg-stone-950/90 border border-stone-800 rounded-xl p-1 text-xs">
+                    <div className="flex items-center bg-stone-950/90 border border-stone-800 rounded-xl p-1 text-xs shrink-0">
                         <button
                             onClick={handleZoomOut}
                             className="w-8 h-8 flex items-center justify-center text-stone-300 hover:text-white hover:bg-stone-800 rounded-lg transition-colors font-bold text-base active:scale-95"
