@@ -415,7 +415,8 @@ export default function ZRaporuYukle() {
                 }
 
                 if (cashAccount && parsedData.expenses && parsedData.expenses.length > 0) {
-                    const totalExpense = parsedData.expenses.reduce((acc, exp) => acc + Number(exp.amount), 0)
+                    const realExpenses = parsedData.expenses.filter(exp => exp.category !== 'indirim-ikram')
+                    const totalExpense = realExpenses.reduce((acc, exp) => acc + Number(exp.amount), 0)
                     if (totalExpense > 0) {
                         accountMovements.push({
                             account_id: cashAccount.id,
