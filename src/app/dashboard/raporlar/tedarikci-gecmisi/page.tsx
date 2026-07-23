@@ -7,6 +7,7 @@ import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
 import { formatCurrency, formatDate } from "@/lib/format";
+import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
 
 type StockMovement = {
     id: string
@@ -340,145 +341,128 @@ export default function TedarikciGecmisi() {
                         <p className="text-stone-500">Seçili kriterlere uygun fiş bulunmuyor.</p>
                     </div>
                 ) : (
-                    <div className="space-y-6">
-                        {displayData.map((mainGroup: any, idx) => {
+                    <HistoryAccordion
+                        groups={displayData.map((mainGroup: any) => {
                             const mainKey = groupBy === 'supplier' ? mainGroup.supplierName : mainGroup.monthKey;
                             const mainTitle = groupBy === 'supplier' ? mainGroup.supplierName : mainGroup.monthLabel;
-                            const isMainExpanded = expandedMain === mainKey || (expandedMain === null && idx === 0);
 
+                            return {
+                                id: mainKey,
+                                title: mainTitle,
+                                subtitle: `${mainGroup.receiptCount} adet fiş bulundu`,
+                                icon: <span className="text-xl">{groupBy === 'supplier' ? '🏢' : '📅'}</span>,
+                                items: mainGroup.receipts
+                            }
+                        })}
+                        defaultExpandedIds={displayData.length > 0 ? [groupBy === 'supplier' ? (displayData[0] as any).supplierName : (displayData[0] as any).monthKey] : []}
+                        renderHeaderRight={(group) => {
+                            const mainGroup = displayData.find((g: any) => (groupBy === 'supplier' ? g.supplierName : g.monthKey) === group.id)
                             return (
-                                <div key={mainKey} className="bg-stone-900/50 border border-stone-800 rounded-2xl overflow-hidden">
-                                    {/* Main Accordion Header */}
-                                    <div 
-                                        onClick={() => setExpandedMain(isMainExpanded ? null : mainKey)}
-                                        className="w-full px-6 py-5 flex items-center justify-between cursor-pointer hover:bg-stone-800/50 transition-colors border-b border-stone-800/0"
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 bg-green-500/10 text-green-500 rounded-xl flex items-center justify-center text-xl font-bold">
-                                                {groupBy === 'supplier' ? '🏢' : '📅'}
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-xl text-white">{mainTitle}</h3>
-                                                <p className="text-sm text-stone-400 mt-1">
-                                                    <span className="font-bold text-green-400">{mainGroup.receiptCount}</span> adet fiş bulundu
-                                                </p>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="flex items-center gap-6">
-                                            <div className="text-right hidden sm:block">
-                                                <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Toplam Alış Tutarı</p>
-                                                <p className="text-2xl font-bold text-white">{formatCurrency(mainGroup.totalAmount)}</p>
-                                            </div>
-                                            <div className={`text-stone-500 p-2 transform transition-transform duration-200 ${isMainExpanded ? 'rotate-180' : ''}`}>
-                                                ▼
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* İçerik (Fişler) */}
-                                    {isMainExpanded && (
-                                        <div className="bg-stone-950 p-4 sm:p-6 space-y-4 border-t border-stone-800">
-                                            {mainGroup.receipts.map((receipt: GroupedReceipt) => {
-                                                const isReceiptExpanded = expandedReceipt === receipt.id;
-                                                const dateObj = new Date(receipt.date)
-                                                const dateStr = formatDate(dateObj)
-
-                                                return (
-                                                    <div key={receipt.id} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden transition-all duration-200">
-                                                        <div className="w-full px-5 py-3 flex items-center justify-between hover:bg-stone-800/30 transition-colors">
-                                                            <button 
-                                                                onClick={() => setExpandedReceipt(isReceiptExpanded ? null : receipt.id)}
-                                                                className="flex-1 text-left flex items-center gap-3"
-                                                            >
-                                                                <div className="bg-stone-800 px-3 py-1.5 rounded-lg text-green-400 font-bold tracking-wider text-sm whitespace-nowrap">
-                                                                    {formatDate(dateObj)}
-                                                                </div>
-                                                                <div>
-                                                                    <h4 className="font-bold text-stone-200">{groupBy === 'supplier' ? dateStr : receipt.supplierName}</h4>
-                                                                    <p className="text-xs text-stone-500 mt-0.5">{groupBy === 'supplier' ? 'Fiş Tarihi' : dateStr} • {receipt.totalItems} kalem ürün</p>
-                                                                </div>
-                                                            </button>
-                                                            
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="text-right">
-                                                                    <p className="text-lg font-bold text-white">{formatCurrency(receipt.totalAmount)}</p>
-                                                                </div>
-                                                                
-                                                                <div className="flex items-center gap-1">
-                                                                    {receipt.batchId && (
-                                                                        <button
-                                                                            onClick={(e) => { e.stopPropagation(); viewDocument(receipt.batchId); }}
-                                                                            className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg flex items-center justify-center transition-colors border border-stone-700 active:scale-95"
-                                                                            title="Fiş Belgesini Gör"
-                                                                        >
-                                                                            🖼️
-                                                                        </button>
-                                                                    )}
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleDelete(receipt) }}
-                                                                        disabled={deletingId === receipt.id || !receipt.batchId}
-                                                                        className={`p-2 rounded-lg transition-colors border ${
-                                                                            !receipt.batchId ? 'bg-stone-800 border-stone-800 text-stone-600 cursor-not-allowed opacity-50' :
-                                                                            'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20'
-                                                                        }`}
-                                                                        title={!receipt.batchId ? "Eski kayıt silinemez" : "Fişi Sil"}
-                                                                    >
-                                                                        {deletingId === receipt.id ? '⏳' : '🗑️'}
-                                                                    </button>
-                                                                    <button 
-                                                                        onClick={() => setExpandedReceipt(isReceiptExpanded ? null : receipt.id)}
-                                                                        className={`text-stone-500 p-2 transform transition-transform duration-200 ${isReceiptExpanded ? 'rotate-180' : ''}`}
-                                                                    >
-                                                                        ▼
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {isReceiptExpanded && (
-                                                            <div className="border-t border-stone-800 bg-stone-900/50">
-                                                                <div className="overflow-x-auto w-full">
-                                                                    <table className="w-full text-sm text-left">
-                                                                        <thead className="bg-stone-800/30 text-stone-400 border-b border-stone-800">
-                                                                            <tr>
-                                                                                <th className="px-5 py-2.5 font-medium">Hammadde</th>
-                                                                                <th className="px-5 py-2.5 font-medium text-center">Birim Fiyat</th>
-                                                                                <th className="px-5 py-2.5 font-medium text-center">Miktar</th>
-                                                                                <th className="px-5 py-2.5 font-medium text-right">Toplam Tutar</th>
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody className="divide-y divide-stone-800/50">
-                                                                            {receipt.items.map((item) => (
-                                                                                <tr key={item.id} className="hover:bg-stone-800/50 transition-colors">
-                                                                                    <td className="px-5 py-2.5 font-medium text-stone-300">
-                                                                                        {item.materials?.name || 'Bilinmeyen'}
-                                                                                    </td>
-                                                                                    <td className="px-5 py-2.5 text-center text-stone-400">{formatCurrency(item.unit_price)}
-                                                                                    </td>
-                                                                                    <td className="px-5 py-2.5 text-center">
-                                                                                        <span className="inline-block bg-stone-800 text-green-400 px-2 py-0.5 rounded text-xs font-bold min-w-[2rem]">
-                                                                                            {item.quantity} {item.materials?.unit || ''}
-                                                                                        </span>
-                                                                                    </td>
-                                                                                    <td className="px-5 py-2.5 text-right font-medium text-white">{formatCurrency((item.quantity * item.unit_price))}
-                                                                                    </td>
-                                                                                </tr>
-                                                                            ))}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
+                                <div className="text-right">
+                                    <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Toplam Alış Tutarı</p>
+                                    <p className="text-2xl font-bold text-white">{formatCurrency(mainGroup?.totalAmount || 0)}</p>
                                 </div>
                             )
-                        })}
-                    </div>
+                        }}
+                        renderContent={(receipts: any[]) => (
+                            <div className="p-4 sm:p-6 space-y-4">
+                                {receipts.map((receipt: GroupedReceipt) => {
+                                    const isReceiptExpanded = expandedReceipt === receipt.id;
+                                    const dateObj = new Date(receipt.date)
+                                    const dateStr = formatDate(dateObj)
+
+                                    return (
+                                        <div key={receipt.id} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden transition-all duration-200">
+                                            <div className="w-full px-5 py-3 flex items-center justify-between hover:bg-stone-800/30 transition-colors">
+                                                <button 
+                                                    onClick={() => setExpandedReceipt(isReceiptExpanded ? null : receipt.id)}
+                                                    className="flex-1 text-left flex items-center gap-3"
+                                                >
+                                                    <div className="bg-stone-800 px-3 py-1.5 rounded-lg text-green-400 font-bold tracking-wider text-sm whitespace-nowrap">
+                                                        {formatDate(dateObj)}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-stone-200">{groupBy === 'supplier' ? dateStr : receipt.supplierName}</h4>
+                                                        <p className="text-xs text-stone-500 mt-0.5">{groupBy === 'supplier' ? 'Fiş Tarihi' : dateStr} • {receipt.totalItems} kalem ürün</p>
+                                                    </div>
+                                                </button>
+                                                
+                                                <div className="flex items-center gap-4">
+                                                    <div className="text-right">
+                                                        <p className="text-lg font-bold text-white">{formatCurrency(receipt.totalAmount)}</p>
+                                                    </div>
+                                                    
+                                                    <div className="flex items-center gap-1">
+                                                        {receipt.batchId && (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); viewDocument(receipt.batchId); }}
+                                                                className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg flex items-center justify-center transition-colors border border-stone-700 active:scale-95"
+                                                                title="Fiş Belgesini Gör"
+                                                            >
+                                                                🖼️
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDelete(receipt) }}
+                                                            disabled={deletingId === receipt.id || !receipt.batchId}
+                                                            className={`p-2 rounded-lg transition-colors border ${
+                                                                !receipt.batchId ? 'bg-stone-800 border-stone-800 text-stone-600 cursor-not-allowed opacity-50' :
+                                                                'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20'
+                                                            }`}
+                                                            title={!receipt.batchId ? "Eski kayıt silinemez" : "Fişi Sil"}
+                                                        >
+                                                            {deletingId === receipt.id ? '⏳' : '🗑️'}
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => setExpandedReceipt(isReceiptExpanded ? null : receipt.id)}
+                                                            className={`text-stone-500 p-2 transform transition-transform duration-200 ${isReceiptExpanded ? 'rotate-180' : ''}`}
+                                                        >
+                                                            ▼
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {isReceiptExpanded && (
+                                                <div className="border-t border-stone-800 bg-stone-900/50">
+                                                    <div className="overflow-x-auto w-full">
+                                                        <table className="w-full text-sm text-left">
+                                                            <thead className="bg-stone-800/30 text-stone-400 border-b border-stone-800">
+                                                                <tr>
+                                                                    <th className="px-5 py-2.5 font-medium">Hammadde</th>
+                                                                    <th className="px-5 py-2.5 font-medium text-center">Birim Fiyat</th>
+                                                                    <th className="px-5 py-2.5 font-medium text-center">Miktar</th>
+                                                                    <th className="px-5 py-2.5 font-medium text-right">Toplam Tutar</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-stone-800/50">
+                                                                {receipt.items.map((item) => (
+                                                                    <tr key={item.id} className="hover:bg-stone-800/50 transition-colors">
+                                                                        <td className="px-5 py-2.5 font-medium text-stone-300">
+                                                                            {item.materials?.name || 'Bilinmeyen'}
+                                                                        </td>
+                                                                        <td className="px-5 py-2.5 text-center text-stone-400">{formatCurrency(item.unit_price)}
+                                                                        </td>
+                                                                        <td className="px-5 py-2.5 text-center">
+                                                                            <span className="inline-block bg-stone-800 text-green-400 px-2 py-0.5 rounded text-xs font-bold min-w-[2rem]">
+                                                                                {item.quantity} {item.materials?.unit || ''}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="px-5 py-2.5 text-right font-medium text-white">{formatCurrency((item.quantity * item.unit_price))}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    />
                 )}
             </main>
 

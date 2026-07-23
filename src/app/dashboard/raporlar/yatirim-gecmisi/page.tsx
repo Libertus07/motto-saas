@@ -8,6 +8,7 @@ import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
 import { formatCurrency, formatDate } from "@/lib/format";
 import { deleteInvestmentTransactionWithRefund } from '@/lib/investment-transactions'
+import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
 
 type InvestmentTransaction = {
     id: string
@@ -194,91 +195,74 @@ export default function YatirimGecmisi() {
                         </button>
                     </div>
                 ) : (
-                    <div className="space-y-4">
-                        {displayData.map((group) => {
-                            const isExpanded = expandedMonth === group.monthKey
-                            
+                    <HistoryAccordion
+                        groups={displayData.map(group => ({
+                            id: group.monthKey,
+                            title: group.monthLabel,
+                            subtitle: `${group.receiptCount} adet yatırım fişi`,
+                            icon: <span className="text-xl">📅</span>,
+                            items: group.items
+                        }))}
+                        defaultExpandedIds={displayData.length > 0 ? [displayData[0].monthKey] : []}
+                        renderHeaderRight={(group) => {
+                            const dataGroup = displayData.find(g => g.monthKey === group.id)!
                             return (
-                                <div key={group.monthKey} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden transition-all">
-                                    <div 
-                                        className="p-4 flex items-center justify-between cursor-pointer hover:bg-stone-800/50"
-                                        onClick={() => setExpandedMonth(isExpanded ? null : group.monthKey)}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="bg-purple-900/30 text-purple-400 w-12 h-12 rounded-lg flex items-center justify-center font-bold text-xl">
-                                                📅
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-lg text-white">{group.monthLabel}</h3>
-                                                <p className="text-stone-400 text-sm">{group.receiptCount} adet yatırım fişi</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-6">
-                                            <div className="text-right hidden sm:block">
-                                                <p className="text-stone-500 text-xs uppercase tracking-wider mb-1">Toplam Yatırım Tutarı</p>
-                                                <p className="font-bold text-purple-400">{formatCurrency(group.totalAmount)}</p>
-                                            </div>
-                                            <div className={`text-stone-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                                                ▼
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {isExpanded && (
-                                        <div className="border-t border-stone-800 bg-stone-950/50 p-4">
-                                            <div className="space-y-3">
-                                                {group.items.map(inv => (
-                                                    <div key={inv.id} className="bg-stone-900 border border-stone-800 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="text-3xl">
-                                                                {inv.investments?.asset_type === 'eur' || inv.investments?.asset_type === 'usd' ? '💵' : inv.investments?.asset_type === 'gold' ? '🪙' : '🏢'}
-                                                            </div>
-                                                            <div>
-                                                                <h4 className="font-bold text-white">{inv.investments?.name || 'Yatırım'}</h4>
-                                                                <p className="text-stone-400 text-sm">
-                                                                    {formatDate(new Date(inv.transaction_date || new Date().toISOString()))} • {inv.quantity} {inv.investments?.asset_type === 'gold' ? 'Gram' : inv.investments?.asset_type === 'real_estate' ? 'Adet' : 'Birim'}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="flex flex-wrap items-center gap-6">
-                                                            <div className="text-right">
-                                                                <p className="text-stone-500 text-xs">Birim Maliyet</p>
-                                                                <p className="font-medium text-stone-300">{formatCurrency(Number(inv.price_per_unit))}</p>
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <p className="text-stone-500 text-xs">Toplam Tutar</p>
-                                                                <p className="font-bold text-purple-400">{formatCurrency(Number(inv.total_amount))}</p>
-                                                            </div>
-                                                            
-                                                            {inv.document_url && (
-                                                                <button 
-                                                                    onClick={(e) => { e.stopPropagation(); setPreviewUrl(inv.document_url); }}
-                                                                    className="bg-stone-800 hover:bg-stone-700 text-stone-300 px-3 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors border border-stone-700 active:scale-95"
-                                                                >
-                                                                    <span>🖼️</span> Belgeyi Gör
-                                                                </button>
-                                                            )}
-                                                            
-                                                            {inv.transaction_type === 'buy' && (
-                                                                <button 
-                                                                    onClick={(e) => { e.stopPropagation(); handleDelete(inv.id, inv.investments?.name || 'Yatırım İşlemi', Number(inv.total_amount)); }}
-                                                                    className="text-red-400 hover:text-red-300 bg-red-400/10 hover:bg-red-400/20 px-3 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors border border-red-400/20"
-                                                                    title="Sil"
-                                                                >
-                                                                    🗑️ Sil
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
+                                <div className="text-right">
+                                    <p className="text-stone-500 text-xs uppercase tracking-wider mb-1">Toplam Yatırım Tutarı</p>
+                                    <p className="font-bold text-purple-400">{formatCurrency(dataGroup.totalAmount)}</p>
                                 </div>
                             )
-                        })}
-                    </div>
+                        }}
+                        renderContent={(items) => (
+                            <div className="p-4 space-y-3">
+                                {items.map(inv => (
+                                    <div key={inv.id} className="bg-stone-900 border border-stone-800 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-3xl">
+                                                {inv.investments?.asset_type === 'eur' || inv.investments?.asset_type === 'usd' ? '💵' : inv.investments?.asset_type === 'gold' ? '🪙' : '🏢'}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-white">{inv.investments?.name || 'Yatırım'}</h4>
+                                                <p className="text-stone-400 text-sm">
+                                                    {formatDate(new Date(inv.transaction_date || new Date().toISOString()))} • {inv.quantity} {inv.investments?.asset_type === 'gold' ? 'Gram' : inv.investments?.asset_type === 'real_estate' ? 'Adet' : 'Birim'}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-6">
+                                            <div className="text-right">
+                                                <p className="text-stone-500 text-xs">Birim Maliyet</p>
+                                                <p className="font-medium text-stone-300">{formatCurrency(Number(inv.price_per_unit))}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-stone-500 text-xs">Toplam Tutar</p>
+                                                <p className="font-bold text-purple-400">{formatCurrency(Number(inv.total_amount))}</p>
+                                            </div>
+                                            
+                                            {inv.document_url && (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setPreviewUrl(inv.document_url); }}
+                                                    className="bg-stone-800 hover:bg-stone-700 text-stone-300 px-3 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors border border-stone-700 active:scale-95"
+                                                >
+                                                    <span>🖼️</span> Belgeyi Gör
+                                                </button>
+                                            )}
+                                            
+                                            {inv.transaction_type === 'buy' && (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); handleDelete(inv.id, inv.investments?.name || 'Yatırım İşlemi', Number(inv.total_amount)); }}
+                                                    className="text-red-400 hover:text-red-300 bg-red-400/10 hover:bg-red-400/20 px-3 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors border border-red-400/20"
+                                                    title="Sil"
+                                                >
+                                                    🗑️ Sil
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    />
                 )}
             </main>
 

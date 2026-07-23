@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { formatCurrency, formatDate } from "@/lib/format";
+import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
 
 type ActivityLog = {
     id: string
@@ -156,74 +157,65 @@ export default function IslemGecmisi() {
                             Bu kriterlerde işlem geçmişi bulunamadı.
                         </div>
                     ) : (
-                        Object.entries(groupedLogs).map(([dateKey, groupLogs]) => {
-                            const isExpanded = expandedDates.includes(dateKey)
-                            return (
-                                <div key={dateKey} className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
-                                    <button 
-                                        onClick={() => toggleDate(dateKey)}
-                                        className="w-full flex items-center justify-between px-6 py-4 bg-stone-800/30 hover:bg-stone-800/50 transition-colors"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-lg">{dateKey === 'Bugün' ? '📅' : dateKey === 'Dün' ? '⏱️' : '🗓️'}</span>
-                                            <h3 className="font-bold text-stone-200">{dateKey}</h3>
-                                            <span className="bg-stone-800 text-xs px-2 py-1 rounded-full text-stone-400 border border-stone-700">{groupLogs.length} işlem</span>
-                                        </div>
-                                        <span className="text-stone-500 text-sm font-bold bg-stone-800 w-8 h-8 flex items-center justify-center rounded-lg">{isExpanded ? '▲' : '▼'}</span>
-                                    </button>
-                                    
-                                    {isExpanded && (
-                                        <div className="overflow-x-auto border-t border-stone-800">
-                                            <table className="w-full text-left">
-                                                <thead className="bg-stone-800/20 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-800">
-                                                    <tr>
-                                                        <th className="px-6 py-3 font-medium">Saat</th>
-                                                        <th className="px-6 py-3 font-medium">Modül</th>
-                                                        <th className="px-6 py-3 font-medium">İşlem Tipi</th>
-                                                        <th className="px-6 py-3 font-medium">Açıklama</th>
-                                                        <th className="px-6 py-3 font-medium">Kullanıcı</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-stone-800/50">
-                                                    {groupLogs.map(log => (
-                                                        <tr 
-                                                            key={log.id} 
-                                                            onClick={() => setSelectedLog(log)}
-                                                            className="hover:bg-stone-800/40 transition-colors cursor-pointer"
-                                                        >
-                                                            <td className="px-6 py-4 text-sm text-stone-400 whitespace-nowrap">
-                                                                {formatDate(new Date(log.created_at))}
-                                                            </td>
-                                                            <td className="px-6 py-4">
-                                                                <span className="inline-block whitespace-nowrap bg-stone-800 text-stone-300 px-2 py-1 rounded text-xs border border-stone-700">
-                                                                    {log.module}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                                {log.action_type === 'EKLEME' && <span className="inline-block whitespace-nowrap text-green-400 font-bold text-[10px] uppercase tracking-wider bg-green-500/10 px-2 py-1 rounded border border-green-500/20">➕ Ekleme</span>}
-                                                                {log.action_type === 'SILME' && <span className="inline-block whitespace-nowrap text-red-400 font-bold text-[10px] uppercase tracking-wider bg-red-500/10 px-2 py-1 rounded border border-red-500/20">🗑️ Silme</span>}
-                                                                {log.action_type === 'GUNCELLEME' && <span className="inline-block whitespace-nowrap text-blue-400 font-bold text-[10px] uppercase tracking-wider bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">🔄 Güncelleme</span>}
-                                                            </td>
-                                                            <td className="px-6 py-4">
-                                                                <p className="text-stone-300 font-medium text-sm">{log.description}</p>
-                                                                {log.details?.detay && typeof log.details.detay === 'string' && (
-                                                                    <p className="text-stone-500 text-xs mt-1 truncate max-w-md">
-                                                                        {log.details.detay.replace(/[()]/g, '')}
-                                                                    </p>
-                                                                )}
-                                                            </td>
-                                                            <td className="px-6 py-4 text-sm text-stone-500">
-                                                                {log.user_id}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
+                        <HistoryAccordion
+                            groups={Object.entries(groupedLogs).map(([dateKey, groupLogs]) => ({
+                                id: dateKey,
+                                title: dateKey,
+                                subtitle: `${groupLogs.length} işlem`,
+                                icon: <span className="text-lg">{dateKey === 'Bugün' ? '📅' : dateKey === 'Dün' ? '⏱️' : '🗓️'}</span>,
+                                items: groupLogs
+                            }))}
+                            defaultExpandedIds={['Bugün']}
+                            renderContent={(items) => (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-stone-800/20 text-stone-500 text-xs uppercase tracking-wider border-b border-stone-800">
+                                            <tr>
+                                                <th className="px-6 py-3 font-medium">Saat</th>
+                                                <th className="px-6 py-3 font-medium">Modül</th>
+                                                <th className="px-6 py-3 font-medium">İşlem Tipi</th>
+                                                <th className="px-6 py-3 font-medium">Açıklama</th>
+                                                <th className="px-6 py-3 font-medium">Kullanıcı</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-stone-800/50">
+                                            {items.map(log => (
+                                                <tr 
+                                                    key={log.id} 
+                                                    onClick={() => setSelectedLog(log)}
+                                                    className="hover:bg-stone-800/40 transition-colors cursor-pointer"
+                                                >
+                                                    <td className="px-6 py-4 text-sm text-stone-400 whitespace-nowrap">
+                                                        {formatDate(new Date(log.created_at))}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="inline-block whitespace-nowrap bg-stone-800 text-stone-300 px-2 py-1 rounded text-xs border border-stone-700">
+                                                            {log.module}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        {log.action_type === 'EKLEME' && <span className="inline-block whitespace-nowrap text-green-400 font-bold text-[10px] uppercase tracking-wider bg-green-500/10 px-2 py-1 rounded border border-green-500/20">➕ Ekleme</span>}
+                                                        {log.action_type === 'SILME' && <span className="inline-block whitespace-nowrap text-red-400 font-bold text-[10px] uppercase tracking-wider bg-red-500/10 px-2 py-1 rounded border border-red-500/20">🗑️ Silme</span>}
+                                                        {log.action_type === 'GUNCELLEME' && <span className="inline-block whitespace-nowrap text-blue-400 font-bold text-[10px] uppercase tracking-wider bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">🔄 Güncelleme</span>}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <p className="text-stone-300 font-medium text-sm">{log.description}</p>
+                                                        {log.details?.detay && typeof log.details.detay === 'string' && (
+                                                            <p className="text-stone-500 text-xs mt-1 truncate max-w-md">
+                                                                {log.details.detay.replace(/[()]/g, '')}
+                                                            </p>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-stone-500">
+                                                        {log.user_id}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
-                            )
-                        })
+                            )}
+                        />
                     )}
                 </div>
             </main>

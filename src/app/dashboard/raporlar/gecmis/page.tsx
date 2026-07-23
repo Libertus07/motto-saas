@@ -7,6 +7,7 @@ import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devLog, devError } from '@/lib/debug';
 import { formatCurrency, formatDate } from "@/lib/format";
+import { HistoryAccordion } from '@/components/ui/HistoryAccordion';
 
 type SaleItem = {
     id: string
@@ -278,141 +279,121 @@ export default function GecmisRaporlar() {
                         <p className="text-stone-500">Seçili kriterlere uygun Z-Raporu bulunmuyor.</p>
                     </div>
                 ) : (
-                    <div className="space-y-6">
-                        {groupedMonths.map((month) => {
-                            const isMonthExpanded = expandedMonth === month.monthKey || (expandedMonth === null && groupedMonths[0].monthKey === month.monthKey); // Varsayılan olarak en yeni ay açık
-
+                    <HistoryAccordion
+                        groups={groupedMonths.map(month => ({
+                            id: month.monthKey,
+                            title: month.monthLabel,
+                            subtitle: `${month.days.length} gün • ${month.totalItems} satılan ürün`,
+                            icon: <span className="text-xl">📅</span>,
+                            items: month.days
+                        }))}
+                        defaultExpandedIds={groupedMonths.length > 0 ? [groupedMonths[0].monthKey] : []}
+                        renderHeaderRight={(group) => {
+                            const month = groupedMonths.find(m => m.monthKey === group.id)!
                             return (
-                                <div key={month.monthKey} className="bg-stone-900/50 border border-stone-800 rounded-2xl overflow-hidden">
-                                    {/* Ay Accordion Header */}
-                                    <div 
-                                        onClick={() => toggleMonthExpand(month.monthKey)}
-                                        className="w-full px-6 py-5 flex items-center justify-between cursor-pointer hover:bg-stone-800/50 transition-colors border-b border-stone-800/0"
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 bg-amber-500/10 text-amber-500 rounded-xl flex items-center justify-center text-xl font-bold">
-                                                📅
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-xl text-white">{month.monthLabel}</h3>
-                                                <p className="text-sm text-stone-400 mt-1">
-                                                    <span className="font-bold text-amber-400">{month.days.length}</span> gün • <span className="font-bold text-stone-300">{month.totalItems}</span> satılan ürün
-                                                </p>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="flex items-center gap-6">
-                                            <div className="text-right hidden sm:block">
-                                                <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Aylık Toplam Ciro</p>
-                                                <p className="text-2xl font-bold text-green-400">{formatCurrency(month.totalRevenue)}</p>
-                                            </div>
-                                            <div className={`text-stone-500 p-2 transform transition-transform duration-200 ${isMonthExpanded ? 'rotate-180' : ''}`}>
-                                                ▼
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Ay İçeriği (Günler) */}
-                                    {isMonthExpanded && (
-                                        <div className="bg-stone-950 p-4 sm:p-6 space-y-4 border-t border-stone-800">
-                                            {month.days.map(day => {
-                                                const isDateExpanded = expandedDate === day.date;
-                                                const dateObj = new Date(day.date)
-                                                const dayName = formatDate(dateObj)
-                                                const dayNum = formatDate(dateObj)
-
-                                                return (
-                                                    <div key={day.date} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden transition-all duration-200">
-                                                        <div className="w-full px-5 py-3 flex items-center justify-between hover:bg-stone-800/30 transition-colors">
-                                                            <button 
-                                                                onClick={() => toggleDateExpand(day.date)}
-                                                                className="flex-1 text-left flex items-center gap-3"
-                                                            >
-                                                                <div className="bg-stone-800 px-3 py-1.5 rounded-lg text-amber-400 font-bold tracking-wider text-sm">
-                                                                    {dayNum}
-                                                                </div>
-                                                                <div>
-                                                                    <h4 className="font-bold text-stone-200">{dayName}</h4>
-                                                                    <p className="text-xs text-stone-500 mt-0.5">{day.totalItems} ürün</p>
-                                                                </div>
-                                                            </button>
-                                                            
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="text-right">
-                                                                    <p className="text-lg font-bold text-green-400">{formatCurrency(day.totalRevenue)}</p>
-                                                                </div>
-                                                                
-                                                                <div className="flex items-center gap-1">
-                                                                    {day.documentUrl && (
-                                                                        <button 
-                                                                            onClick={(e) => { e.stopPropagation(); setPreviewUrl(day.documentUrl!); }}
-                                                                            className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg text-sm flex items-center justify-center transition-colors border border-stone-700 active:scale-95"
-                                                                            title="Z-Raporu Belgesini Gör"
-                                                                        >
-                                                                            🖼️
-                                                                        </button>
-                                                                    )}
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleDelete(day) }}
-                                                                        disabled={deletingDate === day.date || !day.batchId}
-                                                                        className={`p-2 rounded-lg transition-colors border ${
-                                                                            !day.batchId ? 'bg-stone-800 border-stone-800 text-stone-600 cursor-not-allowed opacity-50' :
-                                                                            'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20'
-                                                                        }`}
-                                                                        title={!day.batchId ? "Eski kayıt silinemez" : "Raporu Sil"}
-                                                                    >
-                                                                        {deletingDate === day.date ? '⏳' : '🗑️'}
-                                                                    </button>
-                                                                    <button 
-                                                                        onClick={() => toggleDateExpand(day.date)}
-                                                                        className={`text-stone-500 p-2 transform transition-transform duration-200 ${isDateExpanded ? 'rotate-180' : ''}`}
-                                                                    >
-                                                                        ▼
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {isDateExpanded && (
-                                                            <div className="border-t border-stone-800 bg-stone-900/50">
-                                                                <div className="overflow-x-auto w-full">
-                                                                    <table className="w-full text-sm text-left">
-                                                                        <thead className="bg-stone-800/30 text-stone-400 border-b border-stone-800">
-                                                                            <tr>
-                                                                                <th className="px-5 py-2.5 font-medium">Satılan Ürün</th>
-                                                                                <th className="px-5 py-2.5 font-medium text-center">Adet</th>
-                                                                                <th className="px-5 py-2.5 font-medium text-right">Toplam Tutar</th>
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody className="divide-y divide-stone-800/50">
-                                                                            {day.items.map((item) => (
-                                                                                <tr key={item.id} className="hover:bg-stone-800/50 transition-colors">
-                                                                                    <td className="px-5 py-2.5 font-medium text-stone-300">
-                                                                                        {item.product_name}
-                                                                                    </td>
-                                                                                    <td className="px-5 py-2.5 text-center">
-                                                                                        <span className="inline-block bg-stone-800 text-amber-400 px-2 py-0.5 rounded text-xs font-bold min-w-[2rem]">
-                                                                                            {item.quantity}
-                                                                                        </span>
-                                                                                    </td>
-                                                                                    <td className="px-5 py-2.5 text-right font-medium text-white">{formatCurrency(item.total_price)}
-                                                                                    </td>
-                                                                                </tr>
-                                                                            ))}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
+                                <div className="text-right">
+                                    <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Aylık Toplam Ciro</p>
+                                    <p className="text-2xl font-bold text-green-400">{formatCurrency(month.totalRevenue)}</p>
                                 </div>
                             )
-                        })}
-                    </div>
+                        }}
+                        renderContent={(days) => (
+                            <div className="p-4 sm:p-6 space-y-4">
+                                {days.map(day => {
+                                    const isDateExpanded = expandedDate === day.date;
+                                    const dateObj = new Date(day.date)
+                                    const dayName = formatDate(dateObj)
+                                    const dayNum = formatDate(dateObj)
+
+                                    return (
+                                        <div key={day.date} className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden transition-all duration-200">
+                                            <div className="w-full px-5 py-3 flex items-center justify-between hover:bg-stone-800/30 transition-colors">
+                                                <button 
+                                                    onClick={() => toggleDateExpand(day.date)}
+                                                    className="flex-1 text-left flex items-center gap-3"
+                                                >
+                                                    <div className="bg-stone-800 px-3 py-1.5 rounded-lg text-amber-400 font-bold tracking-wider text-sm">
+                                                        {dayNum}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-stone-200">{dayName}</h4>
+                                                        <p className="text-xs text-stone-500 mt-0.5">{day.totalItems} ürün</p>
+                                                    </div>
+                                                </button>
+                                                
+                                                <div className="flex items-center gap-4">
+                                                    <div className="text-right">
+                                                        <p className="text-lg font-bold text-green-400">{formatCurrency(day.totalRevenue)}</p>
+                                                    </div>
+                                                    
+                                                    <div className="flex items-center gap-1">
+                                                        {day.documentUrl && (
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); setPreviewUrl(day.documentUrl!); }}
+                                                                className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg text-sm flex items-center justify-center transition-colors border border-stone-700 active:scale-95"
+                                                                title="Z-Raporu Belgesini Gör"
+                                                            >
+                                                                🖼️
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDelete(day) }}
+                                                            disabled={deletingDate === day.date || !day.batchId}
+                                                            className={`p-2 rounded-lg transition-colors border ${
+                                                                !day.batchId ? 'bg-stone-800 border-stone-800 text-stone-600 cursor-not-allowed opacity-50' :
+                                                                'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20'
+                                                            }`}
+                                                            title={!day.batchId ? "Eski kayıt silinemez" : "Raporu Sil"}
+                                                        >
+                                                            {deletingDate === day.date ? '⏳' : '🗑️'}
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => toggleDateExpand(day.date)}
+                                                            className={`text-stone-500 p-2 transform transition-transform duration-200 ${isDateExpanded ? 'rotate-180' : ''}`}
+                                                        >
+                                                            ▼
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {isDateExpanded && (
+                                                <div className="border-t border-stone-800 bg-stone-900/50">
+                                                    <div className="overflow-x-auto w-full">
+                                                        <table className="w-full text-sm text-left">
+                                                            <thead className="bg-stone-800/30 text-stone-400 border-b border-stone-800">
+                                                                <tr>
+                                                                    <th className="px-5 py-2.5 font-medium">Satılan Ürün</th>
+                                                                    <th className="px-5 py-2.5 font-medium text-center">Adet</th>
+                                                                    <th className="px-5 py-2.5 font-medium text-right">Toplam Tutar</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-stone-800/50">
+                                                                {day.items.map((item) => (
+                                                                    <tr key={item.id} className="hover:bg-stone-800/50 transition-colors">
+                                                                        <td className="px-5 py-2.5 font-medium text-stone-300">
+                                                                            {item.product_name}
+                                                                        </td>
+                                                                        <td className="px-5 py-2.5 text-center">
+                                                                            <span className="inline-block bg-stone-800 text-amber-400 px-2 py-0.5 rounded text-xs font-bold min-w-[2rem]">
+                                                                                {item.quantity}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="px-5 py-2.5 text-right font-medium text-white">{formatCurrency(item.total_price)}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    />
                 )}
             </main>
 
