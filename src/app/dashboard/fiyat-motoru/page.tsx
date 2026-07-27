@@ -73,6 +73,10 @@ export default function FiyatMotoru() {
   const [activeTab, setActiveTab] = useState<'sales' | 'results' | 'reports'>('sales')
   const [targetMargin, setTargetMargin] = useState(35)
   const [search, setSearch] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<string>('Tümü')
+  const [analysisFilter, setAnalysisFilter] = useState<'tumu' | 'artirilmali' | 'ideal' | 'indirim'>(
+    'tumu'
+  )
 
   const supabase = createClient()
   const router = useRouter()
@@ -270,8 +274,13 @@ export default function FiyatMotoru() {
   const updateSales = (productId: string, field: 'dailySales', value: number) => {
     setProductSales(prev => ({
       ...prev,
-      [productId]: { ...prev[productId], [field]: value, isRealData: false }
+      [productId]: { ...prev[productId], [field]: Math.max(0, value), isRealData: false }
     }))
+  }
+
+  const adjustSalesByDelta = (productId: string, delta: number) => {
+    const current = productSales[productId]?.dailySales || 0
+    updateSales(productId, 'dailySales', current + delta)
   }
 
   const totalDailyRevenue = calculations.reduce((t, c) => t + c.dailyRevenue, 0)
@@ -315,17 +324,68 @@ export default function FiyatMotoru() {
     return diff
   }
 
+  // Categories list
+  const categoriesList = useMemo(() => {
+    const cats = new Set(products.map(p => p.category || 'Diğer'))
+    return ['Tümü', ...Array.from(cats)]
+  }, [products])
+
   const filteredProducts = useMemo(() => {
-    if (!search.trim()) return products
-    const q = search.toLowerCase()
-    return products.filter(p => p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q))
-  }, [products, search])
+    let list = [...products]
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(p => p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q))
+    }
+    if (selectedCategory !== 'Tümü') {
+      list = list.filter(p => (p.category || 'Diğer') === selectedCategory)
+    }
+    return list
+  }, [products, search, selectedCategory])
+
+  // Pricing Analysis Counts & Filtered Calculations
+  const analysisStats = useMemo(() => {
+    let ideal = 0
+    let artirilmali = 0
+    let indirim = 0
+
+    calculations.forEach(c => {
+      const diff = getPriceDiff(c.product.sale_price || 0, c.suggestedPrice)
+      if (diff === null) ideal++
+      else if (diff < 0) artirilmali++
+      else indirim++
+    })
+
+    return { ideal, artirilmali, indirim }
+  }, [calculations])
 
   const filteredCalculations = useMemo(() => {
-    if (!search.trim()) return calculations
-    const q = search.toLowerCase()
-    return calculations.filter(c => c.product.name.toLowerCase().includes(q) || (c.product.category || '').toLowerCase().includes(q))
-  }, [calculations, search])
+    let list = [...calculations]
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(
+        c => c.product.name.toLowerCase().includes(q) || (c.product.category || '').toLowerCase().includes(q)
+      )
+    }
+
+    if (analysisFilter === 'artirilmali') {
+      list = list.filter(c => {
+        const diff = getPriceDiff(c.product.sale_price || 0, c.suggestedPrice)
+        return diff !== null && diff < 0
+      })
+    } else if (analysisFilter === 'ideal') {
+      list = list.filter(c => {
+        const diff = getPriceDiff(c.product.sale_price || 0, c.suggestedPrice)
+        return diff === null
+      })
+    } else if (analysisFilter === 'indirim') {
+      list = list.filter(c => {
+        const diff = getPriceDiff(c.product.sale_price || 0, c.suggestedPrice)
+        return diff !== null && diff > 0
+      })
+    }
+
+    return list
+  }, [calculations, search, analysisFilter])
 
   useAppTour(
     'fiyat_motoru',
@@ -548,9 +608,31 @@ export default function FiyatMotoru() {
             </p>
           </div>
         ) : activeTab === 'sales' ? (
-          /* TAB 1: SATIŞ ADETLERİ GİRİŞİ */
+          /* ──────────────── TAB 1: SATIŞ ADETLERİ GİRİŞİ ──────────────── */
           <div className="space-y-4">
-            <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-4 shadow-xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Informational Banner Card */}
+            <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl shrink-0">
+                  📝
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-white text-sm sm:text-base">Günlük Satış Tahminleri & Z-Raporu</h4>
+                  <p className="text-stone-400 text-xs mt-0.5">
+                    Adetleri değiştirdiğinizde, ciro ağırlıklı gider payı dağıtımı ve fiyat önerileri otomatik yenilenir.
+                  </p>
+                </div>
+              </div>
+
+              {realSalesMeta && realSalesMeta.activeDays > 0 && (
+                <span className="text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-xl border border-emerald-500/20 font-bold whitespace-nowrap self-start md:self-auto">
+                  ✓ {realSalesMeta.activeDays} Günlük Z-Raporu Otomatik Aktif
+                </span>
+              )}
+            </div>
+
+            {/* Search and Category Filter Bar */}
+            <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 shadow-xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="flex-1 relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">🔍</span>
                 <input
@@ -562,13 +644,25 @@ export default function FiyatMotoru() {
                 />
               </div>
 
-              {realSalesMeta && realSalesMeta.activeDays > 0 && (
-                <span className="text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-xl border border-emerald-500/20 font-bold whitespace-nowrap">
-                  ✓ {realSalesMeta.activeDays} Günlük Z-Raporu Baz Alındı
-                </span>
-              )}
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                {categoriesList.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                      selectedCategory === cat
+                        ? 'bg-amber-500 text-stone-950 shadow-md shadow-amber-500/20'
+                        : 'bg-stone-950 text-stone-400 hover:text-stone-200 border border-stone-800'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
             </div>
 
+            {/* Main Products Table & Cards */}
             <div className="bg-stone-900/80 border border-stone-800/80 rounded-2xl overflow-hidden backdrop-blur-md shadow-xl">
               {/* Desktop Table View */}
               <div className="hidden md:block overflow-x-auto">
@@ -578,7 +672,8 @@ export default function FiyatMotoru() {
                       <th className="px-5 py-3.5">Ürün Adı</th>
                       <th className="px-4 py-3.5">Kategori</th>
                       <th className="px-4 py-3.5 text-right">Satış Fiyatı (₺)</th>
-                      <th className="px-4 py-3.5 text-right w-44">Günlük Satış Adedi</th>
+                      <th className="px-4 py-3.5 text-center w-56">Günlük Satış Adedi</th>
+                      <th className="px-4 py-3.5 text-right">Ciro Payı (%)</th>
                       <th className="px-5 py-3.5 text-right">Günlük Ciro (₺)</th>
                     </tr>
                   </thead>
@@ -587,6 +682,8 @@ export default function FiyatMotoru() {
                       const salesData = productSales[product.id]
                       const sales = salesData?.dailySales || 0
                       const isReal = salesData?.isRealData
+                      const productRev = (product.sale_price || 0) * sales
+                      const revenuePercent = totalDailyRevenue > 0 ? (productRev / totalDailyRevenue) * 100 : 0
 
                       return (
                         <tr key={product.id} className="hover:bg-stone-800/30 transition-colors">
@@ -612,21 +709,62 @@ export default function FiyatMotoru() {
                           <td className="px-4 py-3.5 text-right font-extrabold text-amber-400">
                             ₺{product.sale_price || 0}
                           </td>
-                          <td className="px-4 py-3.5 text-right">
-                            <input
-                              type="number"
-                              value={sales || ''}
-                              onChange={e =>
-                                updateSales(product.id, 'dailySales', parseInt(e.target.value) || 0)
-                              }
-                              className={`w-28 bg-stone-950 border ${
-                                isReal ? 'border-emerald-500/50' : 'border-stone-700'
-                              } rounded-xl px-2.5 py-1 text-white text-right text-xs font-bold focus:outline-none focus:border-amber-500`}
-                              placeholder="0"
-                            />
+                          <td className="px-4 py-3.5 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => adjustSalesByDelta(product.id, -5)}
+                                className="px-2 py-0.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded text-xs font-bold border border-stone-700 transition-colors"
+                                title="-5 Adet"
+                              >
+                                -5
+                              </button>
+                              <button
+                                onClick={() => adjustSalesByDelta(product.id, -1)}
+                                className="px-2 py-0.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded text-xs font-bold border border-stone-700 transition-colors"
+                                title="-1 Adet"
+                              >
+                                -1
+                              </button>
+                              <input
+                                type="number"
+                                value={sales || ''}
+                                onChange={e =>
+                                  updateSales(product.id, 'dailySales', parseInt(e.target.value) || 0)
+                                }
+                                className={`w-16 bg-stone-950 border ${
+                                  isReal ? 'border-emerald-500/50' : 'border-stone-700'
+                                } rounded-lg px-2 py-1 text-white text-center text-xs font-bold focus:outline-none focus:border-amber-500`}
+                                placeholder="0"
+                              />
+                              <button
+                                onClick={() => adjustSalesByDelta(product.id, 1)}
+                                className="px-2 py-0.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded text-xs font-bold border border-stone-700 transition-colors"
+                                title="+1 Adet"
+                              >
+                                +1
+                              </button>
+                              <button
+                                onClick={() => adjustSalesByDelta(product.id, 5)}
+                                className="px-2 py-0.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded text-xs font-bold border border-stone-700 transition-colors"
+                                title="+5 Adet"
+                              >
+                                +5
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-semibold text-stone-400">
+                            <div className="flex items-center justify-end gap-2">
+                              <span>%{revenuePercent.toFixed(1)}</span>
+                              <div className="w-12 bg-stone-950 h-1.5 rounded-full overflow-hidden border border-stone-800">
+                                <div
+                                  className="bg-amber-500 h-full rounded-full"
+                                  style={{ width: `${Math.min(100, revenuePercent)}%` }}
+                                />
+                              </div>
+                            </div>
                           </td>
                           <td className="px-5 py-3.5 text-right font-extrabold text-stone-100">
-                            {formatCurrency((product.sale_price || 0) * sales)}
+                            {formatCurrency(productRev)}
                           </td>
                         </tr>
                       )
@@ -637,9 +775,10 @@ export default function FiyatMotoru() {
                       <td colSpan={3} className="px-5 py-3.5 text-stone-300">
                         Toplam
                       </td>
-                      <td className="px-4 py-3.5 text-right font-black text-white">
+                      <td className="px-4 py-3.5 text-center font-black text-white">
                         {Object.values(productSales).reduce((t, s) => t + (s.dailySales || 0), 0)} adet
                       </td>
+                      <td className="px-4 py-3.5 text-right font-bold text-stone-400">%100</td>
                       <td className="px-5 py-3.5 text-right font-black text-amber-400 text-sm">
                         {formatCurrency(totalDailyRevenue)}
                       </td>
@@ -676,15 +815,29 @@ export default function FiyatMotoru() {
                       </div>
 
                       <div className="flex items-center justify-between bg-stone-950/60 p-2.5 rounded-xl border border-stone-800/60 text-xs">
-                        <span className="text-stone-400 font-medium">Günlük Satış Adedi:</span>
-                        <input
-                          type="number"
-                          value={sales || ''}
-                          onChange={e =>
-                            updateSales(product.id, 'dailySales', parseInt(e.target.value) || 0)
-                          }
-                          className="w-20 bg-stone-900 border border-stone-700 rounded-lg px-2 py-1 text-white font-bold text-center text-xs"
-                        />
+                        <span className="text-stone-400 font-medium">Günlük Adet:</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => adjustSalesByDelta(product.id, -1)}
+                            className="w-7 h-7 bg-stone-800 text-white rounded-lg font-bold border border-stone-700 flex items-center justify-center active:scale-95"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            value={sales || ''}
+                            onChange={e =>
+                              updateSales(product.id, 'dailySales', parseInt(e.target.value) || 0)
+                            }
+                            className="w-16 bg-stone-900 border border-stone-700 rounded-lg px-2 py-1 text-white font-bold text-center text-xs"
+                          />
+                          <button
+                            onClick={() => adjustSalesByDelta(product.id, 1)}
+                            className="w-7 h-7 bg-stone-800 text-white rounded-lg font-bold border border-stone-700 flex items-center justify-center active:scale-95"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -693,9 +846,61 @@ export default function FiyatMotoru() {
             </div>
           </div>
         ) : activeTab === 'results' ? (
-          /* TAB 2: FİYAT ANALİZİ */
+          /* ──────────────── TAB 2: FİYAT ANALİZİ ──────────────── */
           <div className="space-y-4">
-            <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-4 shadow-xl flex items-center justify-between gap-3">
+            {/* Analysis Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              <div
+                onClick={() => setAnalysisFilter('ideal')}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer backdrop-blur-md ${
+                  analysisFilter === 'ideal'
+                    ? 'bg-emerald-500/20 border-emerald-500/40 shadow-lg shadow-emerald-500/10'
+                    : 'bg-stone-900/80 border-stone-800/80 hover:bg-stone-800/40'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-emerald-400 text-xs font-bold uppercase">✓ İdeal Fiyatlananlar</span>
+                  <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs">🟢</span>
+                </div>
+                <div className="text-2xl font-black text-emerald-400">{analysisStats.ideal} Ürün</div>
+                <p className="text-stone-400 text-[11px] mt-0.5">Hedef marjı yakalayan uygun fiyatlar</p>
+              </div>
+
+              <div
+                onClick={() => setAnalysisFilter('artirilmali')}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer backdrop-blur-md ${
+                  analysisFilter === 'artirilmali'
+                    ? 'bg-rose-500/20 border-rose-500/40 shadow-lg shadow-rose-500/10'
+                    : 'bg-stone-900/80 border-stone-800/80 hover:bg-stone-800/40'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-rose-400 text-xs font-bold uppercase">🚨 Fiyat Artırılmalı</span>
+                  <span className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-xs">▲</span>
+                </div>
+                <div className="text-2xl font-black text-rose-400">{analysisStats.artirilmali} Ürün</div>
+                <p className="text-stone-400 text-[11px] mt-0.5">Düşük marjlı veya maliyet altı kalanlar</p>
+              </div>
+
+              <div
+                onClick={() => setAnalysisFilter('indirim')}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer backdrop-blur-md ${
+                  analysisFilter === 'indirim'
+                    ? 'bg-amber-500/20 border-amber-500/40 shadow-lg shadow-amber-500/10'
+                    : 'bg-stone-900/80 border-stone-800/80 hover:bg-stone-800/40'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-amber-400 text-xs font-bold uppercase">🟡 İndirim Yapılabilir</span>
+                  <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 text-xs">▼</span>
+                </div>
+                <div className="text-2xl font-black text-amber-400">{analysisStats.indirim} Ürün</div>
+                <p className="text-stone-400 text-[11px] mt-0.5">Piyasa marjının üstünde yüksek fiyatlılar</p>
+              </div>
+            </div>
+
+            {/* Search and Analysis Filter Bar */}
+            <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 shadow-xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="flex-1 relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">🔍</span>
                 <input
@@ -706,22 +911,56 @@ export default function FiyatMotoru() {
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-9 pr-4 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500/50"
                 />
               </div>
+
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                <button
+                  onClick={() => setAnalysisFilter('tumu')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                    analysisFilter === 'tumu'
+                      ? 'bg-amber-500 text-stone-950 shadow-md shadow-amber-500/20'
+                      : 'bg-stone-950 text-stone-400 hover:text-stone-200 border border-stone-800'
+                  }`}
+                >
+                  Tümü ({calculations.length})
+                </button>
+                <button
+                  onClick={() => setAnalysisFilter('artirilmali')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                    analysisFilter === 'artirilmali'
+                      ? 'bg-rose-500/30 text-rose-300 border border-rose-500/40'
+                      : 'bg-stone-950 text-rose-400/80 hover:text-rose-400 border border-stone-800'
+                  }`}
+                >
+                  🚨 Fiyat Artırılmalı ({analysisStats.artirilmali})
+                </button>
+                <button
+                  onClick={() => setAnalysisFilter('ideal')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                    analysisFilter === 'ideal'
+                      ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'
+                      : 'bg-stone-950 text-emerald-400/80 hover:text-emerald-400 border border-stone-800'
+                  }`}
+                >
+                  ✓ İdeal ({analysisStats.ideal})
+                </button>
+              </div>
             </div>
 
+            {/* Analysis Table & Cards */}
             <div className="bg-stone-900/80 border border-stone-800/80 rounded-2xl overflow-hidden backdrop-blur-md shadow-xl">
               {/* Desktop Table View */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-stone-950/60 border-b border-stone-800 text-stone-400 text-[11px] uppercase tracking-wider font-semibold">
-                      <th className="px-5 py-3.5">Ürün</th>
+                      <th className="px-5 py-3.5">Ürün Adı</th>
                       <th className="px-4 py-3.5 text-right">Ham Maliyet</th>
                       <th className="px-4 py-3.5 text-right">Gider Payı</th>
                       <th className="px-4 py-3.5 text-right">Toplam Maliyet</th>
                       <th className="px-4 py-3.5 text-right">Mevcut Fiyat</th>
                       <th className="px-4 py-3.5 text-right">Önerilen Fiyat</th>
                       <th className="px-4 py-3.5 text-right">Mevcut Marj</th>
-                      <th className="px-5 py-3.5 text-right">Durum</th>
+                      <th className="px-5 py-3.5 text-right">Öneri Durumu</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-800/50 text-xs sm:text-sm">
@@ -749,7 +988,7 @@ export default function FiyatMotoru() {
                             <td className="px-5 py-3.5 text-right">
                               {diff === null ? (
                                 <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold">
-                                  ✓ Uygun
+                                  ✓ Uygun Fiyat
                                 </span>
                               ) : diff > 0 ? (
                                 <span className="inline-block px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold">
@@ -812,7 +1051,7 @@ export default function FiyatMotoru() {
             </div>
           </div>
         ) : (
-          /* TAB 3: GÖRSEL RAPORLAR (RECHARTS) */
+          /* ──────────────── TAB 3: GÖRSEL RAPORLAR (RECHARTS) ──────────────── */
           <div className="space-y-6">
             {/* Nakit Katkı Grafiği */}
             <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-5 shadow-xl space-y-4">
@@ -898,7 +1137,7 @@ export default function FiyatMotoru() {
                 </div>
               </div>
 
-              {/* BCG Matrisi */}
+              {/* BCG Matrisi (Quad Card View) */}
               <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-5 shadow-xl space-y-4">
                 <div>
                   <h3 className="font-extrabold text-amber-400 text-sm sm:text-base flex items-center gap-2">
@@ -908,6 +1147,18 @@ export default function FiyatMotoru() {
                   <p className="text-stone-400 text-xs mt-0.5">
                     Sağ üst köşe: Çok satan, çok kâr ettiren (Yıldız). Sol alt: Az satan, az kâr ettiren (Köpek).
                   </p>
+                </div>
+
+                {/* Legend Guide Cards */}
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-xl text-emerald-400 flex items-center gap-1.5 font-bold">
+                    <span>⭐</span>
+                    <span>Yıldızlar (Yüksek Marj + Yüksek Satış)</span>
+                  </div>
+                  <div className="bg-rose-500/10 border border-rose-500/20 p-2 rounded-xl text-rose-400 flex items-center gap-1.5 font-bold">
+                    <span>🚨</span>
+                    <span>Risk Grubu (Düşük Marj + Düşük Satış)</span>
+                  </div>
                 </div>
 
                 <div className="h-64 w-full text-xs">
