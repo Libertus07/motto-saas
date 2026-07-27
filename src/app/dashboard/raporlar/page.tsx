@@ -1,476 +1,720 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useNotification } from '@/components/NotificationProvider'
-import { devLog, devError } from '@/lib/debug';
-import { formatCurrency } from "@/lib/format";
+import { devLog, devError } from '@/lib/debug'
+import { formatCurrency } from '@/lib/format'
 
 type Product = {
-    id: string
-    name: string
-    category: string
-    sale_price: number
-    calculated_cost: number
+  id: string
+  name: string
+  category: string
+  sale_price: number
+  calculated_cost: number
 }
 
 type Expense = {
-    amount: number
-    period: string
-    category: string
-    expense_date: string
+  amount: number
+  period: string
+  category: string
+  expense_date: string
 }
 
 export default function Raporlar() {
-    const { showAlert } = useNotification()
-    const [products, setProducts] = useState<Product[]>([])
-    const [expenses, setExpenses] = useState<Expense[]>([])
-    const [sales, setSales] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
+  const { showAlert } = useNotification()
+  const [products, setProducts] = useState<Product[]>([])
+  const [expenses, setExpenses] = useState<Expense[]>([])
+  const [sales, setSales] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-    const [targetMargin, setTargetMargin] = useState(35)
-    const [categoryLabels, setCategoryLabels] = useState<Record<string, string>>({
-        kira: 'Kira', personel: 'Personel', elektrik: 'Elektrik', su: 'Su',
-        dogalgaz: 'Doğalgaz', internet: 'İnternet', muhasebe: 'Muhasebe',
-        sigorta: 'Sigorta', pazarlama: 'Pazarlama', diger: 'Diğer'
-    })
+  const [targetMargin, setTargetMargin] = useState(35)
+  const [categoryLabels, setCategoryLabels] = useState<Record<string, string>>({
+    kira: 'Kira',
+    personel: 'Personel',
+    elektrik: 'Elektrik',
+    su: 'Su',
+    dogalgaz: 'Doğalgaz',
+    internet: 'İnternet',
+    muhasebe: 'Muhasebe',
+    sigorta: 'Sigorta',
+    pazarlama: 'Pazarlama',
+    diger: 'Diğer'
+  })
 
-    // AI States
-    const [aiLoading, setAiLoading] = useState(false)
-    const [aiModalOpen, setAiModalOpen] = useState(false)
-    const [aiReport, setAiReport] = useState<{ summary: string; recommendations: any[] } | null>(null)
+  // AI States
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiModalOpen, setAiModalOpen] = useState(false)
+  const [aiReport, setAiReport] = useState<{ summary: string; recommendations: any[] } | null>(null)
 
-    const supabase = createClient()
-    const router = useRouter()
+  const supabase = createClient()
+  const router = useRouter()
 
-    useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    fetchData()
+  }, [])
 
-    const fetchData = async () => {
-        const [{ data: prods }, { data: exps }, { data: salesData }, { data: settings }] = await Promise.all([
-            supabase.from('products').select('*'),
-            supabase.from('expenses').select('amount, period, category, expense_date'),
-            supabase.from('sales').select('product_id, quantity, total_price'),
-            supabase.from('settings').select('*')
-        ])
-        setProducts(prods || [])
-        setExpenses(exps || [])
-        setSales(salesData || [])
+  const fetchData = async () => {
+    setLoading(true)
+    const [{ data: prods }, { data: exps }, { data: salesData }, { data: settings }] = await Promise.all([
+      supabase.from('products').select('*'),
+      supabase.from('expenses').select('amount, period, category, expense_date'),
+      supabase.from('sales').select('product_id, quantity, total_price'),
+      supabase.from('settings').select('*')
+    ])
+    setProducts(prods || [])
+    setExpenses(exps || [])
+    setSales(salesData || [])
 
-        if (settings) {
-            const marginSetting = settings.find(s => s.key === 'target_margin')?.value
-            if (marginSetting) setTargetMargin(Number(marginSetting))
+    if (settings) {
+      const marginSetting = settings.find(s => s.key === 'target_margin')?.value
+      if (marginSetting) setTargetMargin(Number(marginSetting))
 
-            const expenseCatSetting = settings.find(s => s.key === 'expense_categories')?.value
-            if (expenseCatSetting) setCategoryLabels(typeof expenseCatSetting === 'string' ? JSON.parse(expenseCatSetting) : expenseCatSetting)
-        }
-
-        setLoading(false)
+      const expenseCatSetting = settings.find(s => s.key === 'expense_categories')?.value
+      if (expenseCatSetting)
+        setCategoryLabels(
+          typeof expenseCatSetting === 'string' ? JSON.parse(expenseCatSetting) : expenseCatSetting
+        )
     }
 
+    setLoading(false)
+  }
 
-
-    const handleAiAnalyze = async () => {
-        setAiLoading(true)
-        setAiModalOpen(true)
-        setAiReport(null)
-        try {
-            const response = await fetch('/api/ai-menu-engineer', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ products })
-            })
-            const data = await response.json()
-            if (!data.error) {
-                setAiReport(data)
-            } else {
-                await showAlert(data.error, 'error')
-                setAiModalOpen(false)
-            }
-        } catch (e) {
-            devError(e)
-            await showAlert('Yapay zeka ile bağlantı kurulamadı.', 'error')
-            setAiModalOpen(false)
-        }
-        setAiLoading(false)
+  const handleAiAnalyze = async () => {
+    setAiLoading(true)
+    setAiModalOpen(true)
+    setAiReport(null)
+    try {
+      const response = await fetch('/api/ai-menu-engineer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ products })
+      })
+      const data = await response.json()
+      if (!data.error) {
+        setAiReport(data)
+      } else {
+        await showAlert(data.error, 'error')
+        setAiModalOpen(false)
+      }
+    } catch (e) {
+      devError(e)
+      await showAlert('Yapay zeka ile bağlantı kurulamadı.', 'error')
+      setAiModalOpen(false)
     }
+    setAiLoading(false)
+  }
 
-    // Hesaplamalar
-    const monthlyExpenses = expenses.reduce((t, e) =>
-        t + (e.period === 'yearly' ? e.amount / 12 : e.amount), 0)
+  // Computations
+  const monthlyExpenses = useMemo(() => {
+    return expenses.reduce((t, e) => t + (e.period === 'yearly' ? e.amount / 12 : e.amount), 0)
+  }, [expenses])
 
-    const productsWithMargin = products
-        .filter(p => p.sale_price > 0)
-        .map(p => ({
-            ...p,
-            margin: ((p.sale_price - (p.calculated_cost || 0)) / p.sale_price) * 100,
-            profit: p.sale_price - (p.calculated_cost || 0)
-        }))
-
-    const productSalesStats = sales.reduce((acc, sale) => {
-        if (!acc[sale.product_id]) acc[sale.product_id] = { revenue: 0, quantity: 0 }
-        acc[sale.product_id].revenue += Number(sale.total_price) || 0
-        acc[sale.product_id].quantity += sale.quantity || 0
-        return acc
-    }, {} as Record<string, { revenue: number, quantity: number }>)
-
-    const productsWithStats = productsWithMargin.map(p => ({
+  const productsWithMargin = useMemo(() => {
+    return products
+      .filter(p => p.sale_price > 0)
+      .map(p => ({
         ...p,
-        totalRevenue: productSalesStats[p.id]?.revenue || 0,
-        totalQuantity: productSalesStats[p.id]?.quantity || 0,
-        totalProfit: (productSalesStats[p.id]?.quantity || 0) * p.profit
+        margin: ((p.sale_price - (p.calculated_cost || 0)) / p.sale_price) * 100,
+        profit: p.sale_price - (p.calculated_cost || 0)
+      }))
+  }, [products])
+
+  const productSalesStats = useMemo(() => {
+    return sales.reduce((acc, sale) => {
+      if (!acc[sale.product_id]) acc[sale.product_id] = { revenue: 0, quantity: 0 }
+      acc[sale.product_id].revenue += Number(sale.total_price) || 0
+      acc[sale.product_id].quantity += sale.quantity || 0
+      return acc
+    }, {} as Record<string, { revenue: number; quantity: number }>)
+  }, [sales])
+
+  const productsWithStats = useMemo(() => {
+    return productsWithMargin.map(p => ({
+      ...p,
+      totalRevenue: productSalesStats[p.id]?.revenue || 0,
+      totalQuantity: productSalesStats[p.id]?.quantity || 0,
+      totalProfit: (productSalesStats[p.id]?.quantity || 0) * p.profit
     }))
+  }, [productsWithMargin, productSalesStats])
 
-    const topByRevenue = [...productsWithStats].sort((a, b) => b.totalRevenue - a.totalRevenue).slice(0, 5)
-    const topByTotalProfit = [...productsWithStats].sort((a, b) => b.totalProfit - a.totalProfit).slice(0, 5)
+  const topByRevenue = useMemo(() => {
+    return [...productsWithStats].sort((a, b) => b.totalRevenue - a.totalRevenue).slice(0, 5)
+  }, [productsWithStats])
 
-    const avgMargin = productsWithMargin.length > 0
-        ? productsWithMargin.reduce((t, p) => t + p.margin, 0) / productsWithMargin.length
-        : 0
+  const topByTotalProfit = useMemo(() => {
+    return [...productsWithStats].sort((a, b) => b.totalProfit - a.totalProfit).slice(0, 5)
+  }, [productsWithStats])
 
-    // Kategori bazlı
-    const categoryStats = products.reduce((acc, p) => {
-        if (!acc[p.category]) acc[p.category] = { count: 0, avgCost: 0, totalCost: 0 }
-        acc[p.category].count++
-        acc[p.category].totalCost += p.calculated_cost || 0
-        return acc
+  const avgMargin = useMemo(() => {
+    return productsWithMargin.length > 0
+      ? productsWithMargin.reduce((t, p) => t + p.margin, 0) / productsWithMargin.length
+      : 0
+  }, [productsWithMargin])
+
+  const categoryStats = useMemo(() => {
+    const statsObj = products.reduce((acc, p) => {
+      if (!acc[p.category]) acc[p.category] = { count: 0, avgCost: 0, totalCost: 0 }
+      acc[p.category].count++
+      acc[p.category].totalCost += p.calculated_cost || 0
+      return acc
     }, {} as Record<string, { count: number; avgCost: number; totalCost: number }>)
 
-    Object.keys(categoryStats).forEach(cat => {
-        categoryStats[cat].avgCost = categoryStats[cat].totalCost / categoryStats[cat].count
+    Object.keys(statsObj).forEach(cat => {
+      statsObj[cat].avgCost = statsObj[cat].totalCost / statsObj[cat].count
     })
 
-    // Gider kategorisi dağılımı
-    const expenseCategories = expenses.reduce((acc, e) => {
-        const monthlyAmount = e.period === 'yearly' ? e.amount / 12 : e.amount
-        acc[e.category] = (acc[e.category] || 0) + monthlyAmount
-        return acc
+    return statsObj
+  }, [products])
+
+  const expenseCategories = useMemo(() => {
+    return expenses.reduce((acc, e) => {
+      const monthlyAmount = e.period === 'yearly' ? e.amount / 12 : e.amount
+      acc[e.category] = (acc[e.category] || 0) + monthlyAmount
+      return acc
     }, {} as Record<string, number>)
+  }, [expenses])
 
-    const getMarginColor = (margin: number) => {
-        if (margin >= targetMargin + 20) return 'text-green-400'
-        if (margin >= targetMargin) return 'text-yellow-400'
-        return 'text-red-400'
+  const lowMarginCount = useMemo(() => {
+    return productsWithMargin.filter(p => p.margin < targetMargin).length
+  }, [productsWithMargin, targetMargin])
+
+  const getMarginColor = (margin: number) => {
+    if (margin >= targetMargin + 20) return 'text-emerald-400 font-bold'
+    if (margin >= targetMargin) return 'text-amber-400 font-bold'
+    return 'text-rose-400 font-bold'
+  }
+
+  const actionCards = [
+    {
+      title: 'Hammadde Faturası Yükle',
+      desc: 'Yapay zeka ile tedarikçi fişlerinden fiyat ve stokları otomatik güncelle.',
+      icon: '🧾',
+      color: 'amber',
+      path: '/dashboard/hammaddeler/fis-yukle'
+    },
+    {
+      title: 'Gün Sonu Z Raporu Yükle',
+      desc: 'Z raporunun fotoğrafını çek, gün sonu satışlarını ve stok düşümlerini yap.',
+      icon: '📸',
+      color: 'blue',
+      path: '/dashboard/raporlar/z-raporu'
+    },
+    {
+      title: 'Yatırım Fişi Yükle',
+      desc: 'Altın, döviz veya varlık fişlerinizi okutarak portföyünüze ekleyin.',
+      icon: '💰',
+      color: 'purple',
+      path: '/dashboard/raporlar/yatirim-fisi'
+    },
+    {
+      title: 'Geçmiş Fişler',
+      desc: 'Geçmiş tedarikçi ve hammadde faturalarını detaylıca incele.',
+      icon: '📂',
+      color: 'amber',
+      path: '/dashboard/raporlar/tedarikci-gecmisi'
+    },
+    {
+      title: 'Geçmiş Z Raporları',
+      desc: 'Daha önce işlenen gün sonu satış raporlarını ve detaylarını gör.',
+      icon: '📅',
+      color: 'blue',
+      path: '/dashboard/raporlar/gecmis'
+    },
+    {
+      title: 'Geçmiş Yatırım Fişleri',
+      desc: 'Yüklediğiniz tüm yatırım ve dekont arşivine göz atın.',
+      icon: '🗂️',
+      color: 'purple',
+      path: '/dashboard/raporlar/yatirim-gecmisi'
     }
+  ]
 
-    return (
-        <div className="min-h-full bg-stone-950 text-white">
+  return (
+    <div className="min-h-screen bg-stone-950 text-stone-100 pb-16">
+      {/* ──────────────── HEADER BAR ──────────────── */}
+      <header className="bg-stone-900/90 backdrop-blur-xl border-b border-stone-800/80 sticky top-0 z-30 px-4 sm:px-8 py-4">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-2xl text-amber-400 shadow-inner">
+              📊
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-extrabold text-xl sm:text-2xl text-white tracking-tight">
+                  Raporlar ve Finansal Analiz
+                </h1>
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-stone-800 text-amber-400 border border-stone-700">
+                  Performans & Karlılık
+                </span>
+              </div>
+              <p className="text-stone-400 text-xs mt-0.5">
+                Menü mühendisliği, ciro şampiyonları, gider dağılımı ve yapay zeka analiz raporu.
+              </p>
+            </div>
+          </div>
 
-            {/* Header */}
-            <header className="bg-stone-900 border-b border-stone-800 px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <span className="text-2xl">📊</span>
-                    <h1 className="font-bold text-amber-400">Raporlar</h1>
-                </div>
-                <button 
-                    onClick={handleAiAnalyze}
-                    className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-4 py-2 rounded-lg text-sm transition-colors flex items-center gap-2"
-                >
-                    <span>🧠</span> Yapay Zeka Asistanı
-                </button>
-            </header>
-
-            <main className="p-6">
-                {loading ? <p className="text-stone-400">Yükleniyor...</p> : (
-                    <div className="space-y-6">
-
-                        {/* Akıllı Veri Girişi & Fiş Arşivi */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {/* Üst Satır - Yüklemeler */}
-                            <div 
-                                onClick={() => router.push('/dashboard/hammaddeler/fis-yukle')}
-                                className="bg-stone-900 border border-stone-800 hover:border-amber-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
-                            >
-                                <div className="text-4xl">🧾</div>
-                                <div>
-                                    <h3 className="font-bold text-amber-400 text-lg">Hammadde Faturası Yükle</h3>
-                                    <p className="text-stone-400 text-sm">Yapay zeka ile tedarikçi fişlerinden fiyat ve stokları otomatik güncelle.</p>
-                                </div>
-                            </div>
-                            <div 
-                                onClick={() => router.push('/dashboard/raporlar/z-raporu')}
-                                className="bg-stone-900 border border-stone-800 hover:border-blue-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
-                            >
-                                <div className="text-4xl">📸</div>
-                                <div>
-                                    <h3 className="font-bold text-blue-400 text-lg">Gün Sonu Z Raporu Yükle</h3>
-                                    <p className="text-stone-400 text-sm">Z raporunun fotoğrafını çek, gün sonu satışlarını ve stok düşümlerini otomatik yap.</p>
-                                </div>
-                            </div>
-                            <div 
-                                onClick={() => router.push('/dashboard/raporlar/yatirim-fisi')}
-                                className="bg-stone-900 border border-stone-800 hover:border-purple-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
-                            >
-                                <div className="text-4xl">💰</div>
-                                <div>
-                                    <h3 className="font-bold text-purple-400 text-lg">Yatırım Fişi Yükle</h3>
-                                    <p className="text-stone-400 text-sm">Altın, döviz veya varlık fişlerinizi okutarak portföyünüze ekleyin.</p>
-                                </div>
-                            </div>
-
-                            {/* Alt Satır - Arşivler */}
-                            <div 
-                                onClick={() => router.push('/dashboard/raporlar/tedarikci-gecmisi')}
-                                className="bg-stone-900 border border-stone-800 hover:border-amber-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
-                            >
-                                <div className="text-4xl">📂</div>
-                                <div>
-                                    <h3 className="font-bold text-amber-400 text-lg">Geçmiş Fişler</h3>
-                                    <p className="text-stone-400 text-sm">Geçmiş tedarikçi ve hammadde faturalarını incele.</p>
-                                </div>
-                            </div>
-                            <div 
-                                onClick={() => router.push('/dashboard/raporlar/gecmis')}
-                                className="bg-stone-900 border border-stone-800 hover:border-blue-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
-                            >
-                                <div className="text-4xl">📅</div>
-                                <div>
-                                    <h3 className="font-bold text-blue-400 text-lg">Geçmiş Z Raporları</h3>
-                                    <p className="text-stone-400 text-sm">Daha önce işlenen gün sonu satış raporlarını gör.</p>
-                                </div>
-                            </div>
-                            <div 
-                                onClick={() => router.push('/dashboard/raporlar/yatirim-gecmisi')}
-                                className="bg-stone-900 border border-stone-800 hover:border-purple-500/50 rounded-xl p-5 cursor-pointer transition-all hover:bg-stone-800 flex items-center gap-4"
-                            >
-                                <div className="text-4xl">🗂️</div>
-                                <div>
-                                    <h3 className="font-bold text-purple-400 text-lg">Geçmiş Yatırım Fişleri</h3>
-                                    <p className="text-stone-400 text-sm">Yüklediğiniz tüm yatırım ve dekont arşivine göz atın.</p>
-                                </div>
-                            </div>
-                        </div>
-
-
-
-                        {/* Genel Özet */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
-                                <p className="text-stone-400 text-xs mb-1">Toplam Ürün</p>
-                                <p className="text-2xl font-bold text-white">{products.length}</p>
-                            </div>
-                            <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
-                                <p className="text-stone-400 text-xs mb-1">Ortalama Kar Marjı</p>
-                                <p className={`text-2xl font-bold ${getMarginColor(avgMargin)}`}>%{avgMargin.toFixed(1)}</p>
-                            </div>
-                            <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
-                                <p className="text-stone-400 text-xs mb-1">Aylık Gider</p>
-                                <p className="text-2xl font-bold text-amber-400">{formatCurrency(monthlyExpenses)}
-                                </p>
-                            </div>
-                            <div className="bg-stone-900 border border-stone-800 rounded-xl p-4">
-                                <p className="text-stone-400 text-xs mb-1">Düşük Marjlı Ürün</p>
-                                <p className="text-2xl font-bold text-red-400">
-                                    {productsWithMargin.filter(p => p.margin < targetMargin).length}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* En Çok Satan / En Karlı Ürünler */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                            <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
-                                <h3 className="font-bold mb-4 text-blue-400">🔥 Ciro Şampiyonları (En Çok Para Getirenler)</h3>
-                                {topByRevenue.length === 0 || topByRevenue[0].totalRevenue === 0 ? (
-                                    <p className="text-stone-500 text-sm">Veri yok</p>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {topByRevenue.map(p => (
-                                            <div key={p.id} className="flex items-center justify-between">
-                                                <div>
-                                                    <p className="font-medium text-sm">{p.name}</p>
-                                                    <p className="text-stone-500 text-xs">{p.totalQuantity} adet satıldı</p>
-                                                </div>
-                                                <span className="text-blue-400 font-bold">{formatCurrency(p.totalRevenue)}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
-                                <h3 className="font-bold mb-4 text-green-400">💰 Kâr Şampiyonları (En Çok Kâr Bırakanlar)</h3>
-                                {topByTotalProfit.length === 0 || topByTotalProfit[0].totalProfit === 0 ? (
-                                    <p className="text-stone-500 text-sm">Veri yok</p>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {topByTotalProfit.map(p => (
-                                            <div key={p.id} className="flex items-center justify-between">
-                                                <div>
-                                                    <p className="font-medium text-sm">{p.name}</p>
-                                                    <p className="text-stone-500 text-xs">Marj: %{p.margin.toFixed(1)}</p>
-                                                </div>
-                                                <span className="text-green-400 font-bold">{formatCurrency(p.totalProfit)}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Kategori Bazlı Maliyet */}
-                        <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
-                            <h3 className="font-bold mb-4 text-stone-300">📦 Kategori Bazlı Ortalama Maliyet</h3>
-                            {Object.keys(categoryStats).length === 0 ? (
-                                <p className="text-stone-500 text-sm">Veri yok</p>
-                            ) : (
-                                <div className="space-y-3">
-                                    {Object.entries(categoryStats).map(([cat, stat]) => (
-                                        <div key={cat} className="flex items-center gap-3">
-                                            <span className="text-stone-400 text-sm w-32">{cat}</span>
-                                            <span className="text-stone-500 text-xs w-16">{stat.count} ürün</span>
-                                            <div className="flex-1 bg-stone-800 rounded-full h-2">
-                                                <div
-                                                    className="bg-amber-400 h-2 rounded-full"
-                                                    style={{ width: `${Math.min((stat.avgCost / 50) * 100, 100)}%` }}
-                                                />
-                                            </div>
-                                            <span className="text-amber-400 text-sm w-20 text-right">₺{stat.avgCost.toFixed(2)}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Gider Dağılımı */}
-                        <div className="bg-stone-900 border border-stone-800 rounded-xl p-5">
-                            <h3 className="font-bold mb-4 text-stone-300">💰 Gider Kategori Dağılımı (Aylık)</h3>
-                            {Object.keys(expenseCategories).length === 0 ? (
-                                <p className="text-stone-500 text-sm">Veri yok</p>
-                            ) : (
-                                <div className="space-y-3">
-                                    {Object.entries(expenseCategories)
-                                        .sort((a, b) => b[1] - a[1])
-                                        .map(([cat, amount]) => (
-                                            <div key={cat} className="flex items-center gap-3">
-                                                <span className="text-stone-400 text-sm w-24">{categoryLabels[cat] || cat}</span>
-                                                <div className="flex-1 bg-stone-800 rounded-full h-2">
-                                                    <div
-                                                        className="bg-red-400 h-2 rounded-full"
-                                                        style={{ width: `${(amount / monthlyExpenses) * 100}%` }}
-                                                    />
-                                                </div>
-                                                <span className="text-red-400 text-sm w-24 text-right">{formatCurrency(amount)}
-                                                </span>
-                                                <span className="text-stone-500 text-xs w-10 text-right">
-                                                    %{((amount / monthlyExpenses) * 100).toFixed(0)}
-                                                </span>
-                                            </div>
-                                        ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Tüm Ürünler Tablosu */}
-                        <div className="bg-stone-900 rounded-xl border border-stone-800 overflow-hidden">
-                            <div className="px-5 py-3 border-b border-stone-800">
-                                <h3 className="font-bold text-stone-300">Tüm Ürünler — Detaylı Karlılık</h3>
-                            </div>
-                            <div className="overflow-x-auto w-full">
-<table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-stone-800">
-                                        <th className="text-left px-4 py-3 text-stone-400 text-sm">Ürün</th>
-                                        <th className="text-left px-4 py-3 text-stone-400 text-sm">Kategori</th>
-                                        <th className="text-right px-4 py-3 text-stone-400 text-sm">Maliyet</th>
-                                        <th className="text-right px-4 py-3 text-stone-400 text-sm">Satış Fiyatı</th>
-                                        <th className="text-right px-4 py-3 text-stone-400 text-sm">Kar</th>
-                                        <th className="text-right px-4 py-3 text-stone-400 text-sm">Marj</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {productsWithMargin.length === 0 ? (
-                                        <tr><td colSpan={6} className="text-center py-8 text-stone-500">Henüz ürün eklenmemiş</td></tr>
-                                    ) : productsWithMargin
-                                        .sort((a, b) => a.margin - b.margin)
-                                        .map(p => (
-                                            <tr key={p.id} className="border-b border-stone-800 hover:bg-stone-800 transition-colors">
-                                                <td className="px-4 py-3 font-medium">{p.name}</td>
-                                                <td className="px-4 py-3 text-stone-400 text-sm">{p.category}</td>
-                                                <td className="px-4 py-3 text-right text-stone-400">₺{(p.calculated_cost || 0).toFixed(2)}</td>
-                                                <td className="px-4 py-3 text-right">₺{p.sale_price.toFixed(2)}</td>
-                                                <td className={`px-4 py-3 text-right font-bold ${p.profit > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                    ₺{p.profit.toFixed(2)}
-                                                </td>
-                                                <td className={`px-4 py-3 text-right font-bold ${getMarginColor(p.margin)}`}>
-                                                    %{p.margin.toFixed(1)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                </tbody>
-                            </table>
-</div>
-                        </div>
-
-                    </div>
-                )}
-            </main>
-
-            {/* AI Asistan Modalı */}
-            {aiModalOpen && (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <div className="bg-stone-900 border border-amber-500/30 rounded-xl p-6 w-full max-w-2xl max-h-[90vh] flex flex-col">
-                        <div className="flex justify-between items-center mb-6">
-                            <div className="flex items-center gap-3">
-                                <span className="text-3xl">🧠</span>
-                                <div>
-                                    <h2 className="text-xl font-bold text-amber-400">AI Menü Mühendisi</h2>
-                                    <p className="text-stone-400 text-sm">Finansal Analiz ve Strateji Önerileri</p>
-                                </div>
-                            </div>
-                            <button onClick={() => setAiModalOpen(false)} className="text-stone-500 hover:text-white text-xl">✕</button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto pr-2">
-                            {aiLoading ? (
-                                <div className="py-12 text-center space-y-4">
-                                    <div className="text-6xl animate-pulse">🤖</div>
-                                    <p className="text-stone-400">Menünüz inceleniyor, kar marjları hesaplanıyor...</p>
-                                    <p className="text-sm text-stone-500">Bu işlem 10-15 saniye sürebilir.</p>
-                                </div>
-                            ) : aiReport ? (
-                                <div className="space-y-6">
-                                    <div className="bg-amber-900/20 border border-amber-500/30 rounded-lg p-4">
-                                        <h3 className="font-bold text-amber-400 mb-2">Genel Durum Özeti</h3>
-                                        <p className="text-stone-300 leading-relaxed">{aiReport.summary}</p>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-bold text-white mb-4">Aksiyon Bekleyen Ürünler (Öneriler)</h3>
-                                        <div className="space-y-4">
-                                            {aiReport.recommendations?.map((rec, i) => (
-                                                <div key={i} className="bg-stone-800 rounded-lg p-4 border border-stone-700">
-                                                    <div className="flex items-start justify-between mb-2">
-                                                        <h4 className="font-bold text-lg text-white">{rec.product_name}</h4>
-                                                        <span className="bg-stone-900 text-xs text-stone-400 px-2 py-1 rounded">Öneri #{i + 1}</span>
-                                                    </div>
-                                                    
-                                                    <div className="space-y-3 mt-3">
-                                                        <div>
-                                                            <span className="text-xs text-red-400 font-bold uppercase tracking-wider block mb-1">Tespit Edilen Sorun</span>
-                                                            <p className="text-sm text-stone-300">{rec.issue}</p>
-                                                        </div>
-                                                        <div>
-                                                            <span className="text-xs text-green-400 font-bold uppercase tracking-wider block mb-1">Çözüm Aksiyonu</span>
-                                                            <p className="text-sm text-stone-300 bg-green-900/10 p-2 rounded border border-green-900/30">{rec.action}</p>
-                                                        </div>
-                                                        <div>
-                                                            <span className="text-xs text-amber-400 font-bold uppercase tracking-wider block mb-1">Beklenen Etki</span>
-                                                            <p className="text-sm text-amber-200">{rec.impact}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <p className="text-stone-400 text-center py-8">Bir hata oluştu, rapor alınamadı.</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+          <button
+            onClick={handleAiAnalyze}
+            className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-extrabold px-4 py-2.5 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95 whitespace-nowrap"
+          >
+            <span>🧠</span>
+            <span>Yapay Zeka Menü Mühendisi</span>
+          </button>
         </div>
-    )
+      </header>
+
+      {/* ──────────────── MAIN CONTAINER ──────────────── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
+        {loading ? (
+          <div className="bg-stone-900/60 border border-stone-800 rounded-2xl p-16 text-center text-stone-400 backdrop-blur-md">
+            <div className="animate-spin text-amber-500 text-3xl mb-3">📊</div>
+            <p className="text-sm font-medium">Finansal Raporlar Hesaplanıyor...</p>
+          </div>
+        ) : (
+          <>
+            {/* EXECUTIVE KPI METRIC CARDS */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+              <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden group">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-stone-400 text-xs font-semibold">Toplam Ürün</span>
+                  <span className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 text-base">
+                    📦
+                  </span>
+                </div>
+                <div className="text-xl sm:text-2xl font-black text-white">{products.length} Ürün</div>
+                <div className="text-stone-400 text-[11px] mt-1">Sistemdeki Aktif Menü</div>
+              </div>
+
+              <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden group">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-stone-400 text-xs font-semibold">Ortalama Kâr Marjı</span>
+                  <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-base">
+                    📈
+                  </span>
+                </div>
+                <div className={`text-xl sm:text-2xl font-black ${getMarginColor(avgMargin)}`}>
+                  %{avgMargin.toFixed(1)}
+                </div>
+                <div className="text-stone-400 text-[11px] mt-1">Hedef Marj: %{targetMargin}</div>
+              </div>
+
+              <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden group">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-stone-400 text-xs font-semibold">Aylık Toplam Gider</span>
+                  <span className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 text-base">
+                    💸
+                  </span>
+                </div>
+                <div className="text-xl sm:text-2xl font-black text-amber-400">
+                  {formatCurrency(monthlyExpenses)}
+                </div>
+                <div className="text-stone-400 text-[11px] mt-1">İşletme Sabit & Değişken Gideri</div>
+              </div>
+
+              <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden group">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-stone-400 text-xs font-semibold">Düşük Marjlı Ürün</span>
+                  <span
+                    className={`p-2 rounded-xl text-base ${
+                      lowMarginCount > 0
+                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse'
+                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    }`}
+                  >
+                    🚨
+                  </span>
+                </div>
+                <div
+                  className={`text-xl sm:text-2xl font-black ${
+                    lowMarginCount > 0 ? 'text-rose-400' : 'text-emerald-400'
+                  }`}
+                >
+                  {lowMarginCount} Ürün
+                </div>
+                <div className="text-stone-400 text-[11px] mt-1">Maliyeti Kurtarmayanlar</div>
+              </div>
+            </div>
+
+            {/* ──────────────── SMART RECEIPT & ARCHIVE CARDS ──────────────── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {actionCards.map((card, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => router.push(card.path)}
+                  className="bg-stone-900/80 border border-stone-800/80 hover:border-amber-500/40 rounded-2xl p-5 cursor-pointer transition-all hover:bg-stone-800/50 backdrop-blur-md shadow-xl flex items-start gap-4 group active:scale-[0.98]"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-stone-950 border border-stone-800 flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 transition-transform shadow-inner">
+                    {card.icon}
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-white text-sm sm:text-base group-hover:text-amber-400 transition-colors">
+                      {card.title}
+                    </h3>
+                    <p className="text-stone-400 text-xs mt-1 leading-relaxed">{card.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* ──────────────── LEADERBOARDS (CIRO & KAR ŞAMPİYONLARI) ──────────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Ciro Şampiyonları */}
+              <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-5 shadow-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-blue-400 text-sm sm:text-base flex items-center gap-2">
+                    <span>🔥</span>
+                    <span>Ciro Şampiyonları (En Çok Para Getirenler)</span>
+                  </h3>
+                  <span className="text-[10px] text-stone-400 uppercase font-bold bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
+                    Top 5
+                  </span>
+                </div>
+
+                {topByRevenue.length === 0 || topByRevenue[0].totalRevenue === 0 ? (
+                  <p className="text-stone-500 text-xs text-center py-6">Henüz satış verisi bulunmuyor.</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {topByRevenue.map((p, index) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between bg-stone-950/60 p-3 rounded-xl border border-stone-800/60 hover:bg-stone-800/30 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 h-6 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 font-black text-xs flex items-center justify-center">
+                            #{index + 1}
+                          </span>
+                          <div>
+                            <p className="font-bold text-white text-xs sm:text-sm">{p.name}</p>
+                            <p className="text-stone-400 text-[11px]">{p.totalQuantity} adet satıldı</p>
+                          </div>
+                        </div>
+                        <span className="text-blue-400 font-black text-xs sm:text-sm">
+                          {formatCurrency(p.totalRevenue)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Kâr Şampiyonları */}
+              <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-5 shadow-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-emerald-400 text-sm sm:text-base flex items-center gap-2">
+                    <span>💰</span>
+                    <span>Kâr Şampiyonları (En Çok Net Kâr Bırakanlar)</span>
+                  </h3>
+                  <span className="text-[10px] text-stone-400 uppercase font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                    Top 5
+                  </span>
+                </div>
+
+                {topByTotalProfit.length === 0 || topByTotalProfit[0].totalProfit === 0 ? (
+                  <p className="text-stone-500 text-xs text-center py-6">Henüz satış kâr verisi bulunmuyor.</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {topByTotalProfit.map((p, index) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between bg-stone-950/60 p-3 rounded-xl border border-stone-800/60 hover:bg-stone-800/30 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 h-6 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-black text-xs flex items-center justify-center">
+                            #{index + 1}
+                          </span>
+                          <div>
+                            <p className="font-bold text-white text-xs sm:text-sm">{p.name}</p>
+                            <p className="text-stone-400 text-[11px]">Kâr Marjı: %{p.margin.toFixed(1)}</p>
+                          </div>
+                        </div>
+                        <span className="text-emerald-400 font-black text-xs sm:text-sm">
+                          {formatCurrency(p.totalProfit)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ──────────────── BREAKDOWNS (KATEGORİ VE GİDER DAĞILIMI) ──────────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Kategori Bazlı Ortalama Maliyet */}
+              <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-5 shadow-xl space-y-4">
+                <h3 className="font-extrabold text-stone-200 text-sm sm:text-base flex items-center gap-2">
+                  <span>📦</span>
+                  <span>Kategori Bazlı Ortalama Maliyet</span>
+                </h3>
+
+                {Object.keys(categoryStats).length === 0 ? (
+                  <p className="text-stone-500 text-xs text-center py-6">Kategori verisi bulunmuyor.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {Object.entries(categoryStats).map(([cat, stat]) => (
+                      <div key={cat} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-semibold">
+                          <span className="text-stone-300">{cat}</span>
+                          <span className="text-amber-400 font-extrabold">₺{stat.avgCost.toFixed(2)}</span>
+                        </div>
+                        <div className="w-full bg-stone-950 rounded-full h-2 overflow-hidden border border-stone-800">
+                          <div
+                            className="bg-gradient-to-r from-amber-500 to-amber-600 h-full rounded-full"
+                            style={{ width: `${Math.min((stat.avgCost / 50) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Gider Kategori Dağılımı */}
+              <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-5 shadow-xl space-y-4">
+                <h3 className="font-extrabold text-stone-200 text-sm sm:text-base flex items-center gap-2">
+                  <span>💸</span>
+                  <span>Gider Kategori Dağılımı (Aylık)</span>
+                </h3>
+
+                {Object.keys(expenseCategories).length === 0 ? (
+                  <p className="text-stone-500 text-xs text-center py-6">Gider kaydı bulunmuyor.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {Object.entries(expenseCategories)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([cat, amount]) => {
+                        const percent = monthlyExpenses > 0 ? (amount / monthlyExpenses) * 100 : 0
+                        return (
+                          <div key={cat} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs font-semibold">
+                              <span className="text-stone-300">{categoryLabels[cat] || cat}</span>
+                              <span className="text-rose-400 font-extrabold">
+                                {formatCurrency(amount)} (%{percent.toFixed(0)})
+                              </span>
+                            </div>
+                            <div className="w-full bg-stone-950 rounded-full h-2 overflow-hidden border border-stone-800">
+                              <div
+                                className="bg-gradient-to-r from-rose-500 to-rose-600 h-full rounded-full"
+                                style={{ width: `${Math.min(100, percent)}%` }}
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ──────────────── DETAYLI KARLILIK TABLOSU ──────────────── */}
+            <div className="bg-stone-900/80 border border-stone-800/80 rounded-2xl overflow-hidden backdrop-blur-md shadow-xl">
+              <div className="px-6 py-4 border-b border-stone-800/80 bg-stone-950/60 flex items-center justify-between">
+                <h3 className="font-extrabold text-white text-sm sm:text-base flex items-center gap-2">
+                  <span>📊</span>
+                  <span>Tüm Ürünler — Detaylı Kârlılık Dökümü</span>
+                </h3>
+                <span className="text-xs text-stone-400 font-bold bg-stone-900 px-2.5 py-0.5 rounded-full border border-stone-800">
+                  {productsWithMargin.length} ürün
+                </span>
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-stone-950/60 border-b border-stone-800 text-stone-400 text-[11px] uppercase tracking-wider font-semibold">
+                      <th className="px-5 py-3.5">Ürün Adı</th>
+                      <th className="px-4 py-3.5">Kategori</th>
+                      <th className="px-4 py-3.5 text-right">Birim Maliyet</th>
+                      <th className="px-4 py-3.5 text-right">Satış Fiyatı</th>
+                      <th className="px-4 py-3.5 text-right">Net Kâr</th>
+                      <th className="px-5 py-3.5 text-right">Kâr Marjı (%)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-800/50 text-xs sm:text-sm">
+                    {productsWithMargin.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-12 text-stone-500">
+                          Henüz menü ürünü eklenmemiş.
+                        </td>
+                      </tr>
+                    ) : (
+                      productsWithMargin
+                        .sort((a, b) => a.margin - b.margin)
+                        .map(p => (
+                          <tr key={p.id} className="hover:bg-stone-800/30 transition-colors">
+                            <td className="px-5 py-3.5 font-bold text-stone-100">{p.name}</td>
+                            <td className="px-4 py-3.5 text-stone-400 font-medium">{p.category}</td>
+                            <td className="px-4 py-3.5 text-right text-stone-400 font-medium">
+                              ₺{(p.calculated_cost || 0).toFixed(2)}
+                            </td>
+                            <td className="px-4 py-3.5 text-right font-bold text-white">
+                              ₺{p.sale_price.toFixed(2)}
+                            </td>
+                            <td
+                              className={`px-4 py-3.5 text-right font-black ${
+                                p.profit > 0 ? 'text-emerald-400' : 'text-rose-400'
+                              }`}
+                            >
+                              ₺{p.profit.toFixed(2)}
+                            </td>
+                            <td className={`px-5 py-3.5 text-right font-black ${getMarginColor(p.margin)}`}>
+                              %{p.margin.toFixed(1)}
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards View */}
+              <div className="md:hidden divide-y divide-stone-800/60">
+                {productsWithMargin
+                  .sort((a, b) => a.margin - b.margin)
+                  .map(p => (
+                    <div key={p.id} className="p-4 space-y-2 hover:bg-stone-800/20 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-white text-sm">{p.name}</h4>
+                        <span className={getMarginColor(p.margin)}>%{p.margin.toFixed(1)} Marj</span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 bg-stone-950/60 p-2.5 rounded-xl border border-stone-800/60 text-xs">
+                        <div>
+                          <span className="text-stone-400 block text-[10px]">Maliyet</span>
+                          <span className="font-medium text-stone-300">₺{(p.calculated_cost || 0).toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="text-stone-400 block text-[10px]">Fiyat</span>
+                          <span className="font-bold text-white">₺{p.sale_price.toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="text-stone-400 block text-[10px]">Net Kâr</span>
+                          <span className={`font-black ${p.profit > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            ₺{p.profit.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </>
+        )}
+      </main>
+
+      {/* ──────────────── AI MENU ENGINEER MODAL ──────────────── */}
+      {aiModalOpen && (
+        <div
+          className="fixed inset-0 bg-stone-950/90 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn"
+          onClick={() => setAiModalOpen(false)}
+        >
+          <div
+            className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden relative my-auto max-h-[90vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-stone-950 border-b border-stone-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-lg">
+                  🧠
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-base">Yapay Zeka Menü Mühendisi</h3>
+                  <p className="text-stone-400 text-xs">Finansal Analiz & Stratejik Menü Önerileri</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAiModalOpen(false)}
+                className="text-stone-400 hover:text-white p-2 rounded-xl bg-stone-800/80 border border-stone-700/80 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              {aiLoading ? (
+                <div className="py-16 text-center space-y-4">
+                  <div className="text-6xl animate-pulse">🤖</div>
+                  <h4 className="font-extrabold text-amber-400 text-base">Menünüz İnceleniyor...</h4>
+                  <p className="text-stone-400 text-xs max-w-sm mx-auto">
+                    Kâr marjları, hammadde maliyetleri ve ciro katkıları yapay zeka ile analiz ediliyor.
+                  </p>
+                </div>
+              ) : aiReport ? (
+                <div className="space-y-5">
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 space-y-1.5">
+                    <h4 className="font-extrabold text-amber-400 text-xs uppercase tracking-wider">
+                      Genel Durum Özeti
+                    </h4>
+                    <p className="text-stone-200 text-xs sm:text-sm leading-relaxed">{aiReport.summary}</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-extrabold text-white text-xs uppercase tracking-wider">
+                      Aksiyon Bekleyen Ürünler & Strateji
+                    </h4>
+                    <div className="space-y-3">
+                      {aiReport.recommendations?.map((rec, i) => (
+                        <div
+                          key={i}
+                          className="bg-stone-950 p-4 rounded-2xl border border-stone-800 space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <h5 className="font-extrabold text-white text-sm">{rec.product_name}</h5>
+                            <span className="bg-stone-900 text-[10px] text-amber-400 px-2.5 py-0.5 rounded-full border border-stone-800 font-bold">
+                              Öneri #{i + 1}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2 text-xs">
+                            <div className="bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20">
+                              <span className="text-rose-400 font-extrabold text-[10px] uppercase block mb-0.5">
+                                Tespit Edilen Sorun
+                              </span>
+                              <p className="text-stone-300">{rec.issue}</p>
+                            </div>
+
+                            <div className="bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/20">
+                              <span className="text-emerald-400 font-extrabold text-[10px] uppercase block mb-0.5">
+                                Çözüm Aksiyonu
+                              </span>
+                              <p className="text-stone-200 font-semibold">{rec.action}</p>
+                            </div>
+
+                            <div className="bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
+                              <span className="text-amber-400 font-extrabold text-[10px] uppercase block mb-0.5">
+                                Beklenen Etki
+                              </span>
+                              <p className="text-amber-200">{rec.impact}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-stone-400 text-center py-12 text-xs">
+                  Analiz oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.
+                </p>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-stone-950 border-t border-stone-800 flex justify-end">
+              <button
+                onClick={() => setAiModalOpen(false)}
+                className="bg-stone-800 hover:bg-stone-700 text-white px-6 py-2 rounded-xl text-xs font-semibold border border-stone-700 transition-colors"
+              >
+                Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
