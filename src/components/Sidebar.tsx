@@ -20,15 +20,17 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
   useEffect(() => {
     async function fetchData() {
       // Kullanıcı Bilgisi
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user }
+      } = await supabase.auth.getUser()
       if (user) {
-         setUserName(user.email?.split('@')[0] || 'Kullanıcı')
-         setUserRole('Yönetici')
+        setUserName(user.email?.split('@')[0] || 'Kullanıcı')
+        setUserRole('Yönetici')
       } else {
-         setUserName('Test Kullanıcısı')
-         setUserRole('Geliştirici Modu')
+        setUserName('Test Kullanıcısı')
+        setUserRole('Geliştirici Modu')
       }
-      
+
       // İşletme Ayarları
       const { data: settingsData } = await supabase.from('settings').select('key, value')
       if (settingsData) {
@@ -50,50 +52,59 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
   const menuGroups = [
     {
       title: 'Genel',
-      items: [
-        { name: 'Ana Ekran', icon: '🏠', path: '/dashboard' },
-      ]
+      badgeColor: 'bg-amber-500',
+      items: [{ name: 'Ana Ekran', icon: '🏠', path: '/dashboard' }]
     },
     {
       title: 'Katalog & Üretim',
+      badgeColor: 'bg-emerald-500',
       items: [
         { name: 'Ürünler', icon: '🍔', path: '/dashboard/urunler' },
         { name: 'Hammaddeler', icon: '🧪', path: '/dashboard/hammaddeler' },
         { name: 'Stok Takibi', icon: '📦', path: '/dashboard/stok' },
         { name: 'Üretim Reçeteleri', icon: '🥣', path: '/dashboard/yari-mamuller' },
-        { name: 'Tedarikçiler', icon: '🏢', path: '/dashboard/tedarikciler' },
+        { name: 'Tedarikçiler', icon: '🏢', path: '/dashboard/tedarikciler' }
       ]
     },
     {
       title: 'Finans & Kasa',
+      badgeColor: 'bg-blue-500',
       items: [
         { name: 'Finans ve Hesaplar', icon: '🏦', path: '/dashboard/finans' },
         { name: 'Kasa Sayımı', icon: '🏧', path: '/dashboard/kasa/sayim' },
         { name: 'Giderler', icon: '💸', path: '/dashboard/giderler' },
         { name: 'Yatırımlar', icon: '📈', path: '/dashboard/yatirimlar' },
-        { name: 'Fiyat Motoru', icon: '⚙️', path: '/dashboard/fiyat-motoru' },
+        { name: 'Fiyat Motoru', icon: '⚙️', path: '/dashboard/fiyat-motoru' }
       ]
     },
     {
       title: 'Yönetim',
+      badgeColor: 'bg-purple-500',
       items: [
         { name: 'Raporlar', icon: '📊', path: '/dashboard/raporlar' },
         { name: 'İşlem Geçmişi', icon: '🕵️‍♂️', path: '/dashboard/islem-gecmisi' },
-        { name: 'Ayarlar', icon: '⚙️', path: '/dashboard/ayarlar' },
+        { name: 'Ayarlar', icon: '⚙️', path: '/dashboard/ayarlar' }
       ]
     }
   ]
 
+  const userInitial = userName ? userName[0].toUpperCase() : 'U'
+
   return (
-    <div className="w-64 bg-stone-900 border-r border-stone-800 flex flex-col h-full shadow-2xl md:shadow-none">
-      <div className="p-6 border-b border-stone-800 flex items-center justify-between">
-        <div className="flex items-center gap-3 w-full">
+    <aside className="w-64 bg-stone-900/95 border-r border-stone-800/80 backdrop-blur-2xl flex flex-col h-full shadow-2xl md:shadow-none select-none">
+      {/* ──────────────── BRAND HEADER ──────────────── */}
+      <div className="p-5 border-b border-stone-800/80 bg-stone-950/60 flex items-center justify-between">
+        <div className="flex items-center gap-3 w-full min-w-0">
           {loadingSettings ? (
-            <div className="w-10 h-10 rounded-lg bg-stone-800 animate-pulse shrink-0 border border-stone-700/50" />
+            <div className="w-10 h-10 rounded-2xl bg-stone-800 animate-pulse shrink-0 border border-stone-700/50" />
           ) : businessLogo ? (
-            <img src={businessLogo} alt="Logo" className="w-10 h-10 rounded-lg object-contain bg-white/5 p-1 shrink-0 border border-stone-700/50" />
+            <div className="w-10 h-10 rounded-2xl bg-stone-950 border border-amber-500/30 p-1 shrink-0 flex items-center justify-center shadow-inner shadow-amber-500/10">
+              <img src={businessLogo} alt="Logo" className="w-full h-full object-contain" />
+            </div>
           ) : (
-            <div className="text-3xl">☕</div>
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl shrink-0 font-extrabold shadow-inner">
+              ☕
+            </div>
           )}
           <div className="min-w-0 flex-1">
             {loadingSettings ? (
@@ -103,48 +114,67 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
               </div>
             ) : (
               <>
-                <h1 className="font-bold text-amber-500 text-lg truncate" title={businessName}>{businessName}</h1>
-                <p className="text-stone-500 text-xs">Restoran Zekası</p>
+                <h1
+                  className="font-extrabold text-amber-400 text-sm sm:text-base truncate tracking-tight"
+                  title={businessName}
+                >
+                  {businessName}
+                </h1>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <p className="text-stone-400 text-[10px] uppercase font-bold tracking-wider">
+                    Restoran Zekası
+                  </p>
+                </div>
               </>
             )}
           </div>
         </div>
+
         {onCloseMobile && (
-          <button 
+          <button
             onClick={onCloseMobile}
-            className="md:hidden text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 transition-colors"
+            className="md:hidden text-stone-400 hover:text-white p-1.5 rounded-xl hover:bg-stone-800/80 border border-stone-700/50 transition-colors ml-2"
           >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         )}
       </div>
-      
-      <nav id="tour-sidebar-nav" className="flex-1 p-4 space-y-6 overflow-y-auto">
+
+      {/* ──────────────── NAVIGATION MENU ──────────────── */}
+      <nav id="tour-sidebar-nav" className="flex-1 p-3.5 space-y-5 overflow-y-auto scrollbar-none">
         {menuGroups.map((group, groupIndex) => (
-          <div key={groupIndex}>
-            <div className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-3 px-4">
-              {group.title}
+          <div key={groupIndex} className="space-y-1">
+            <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-stone-500 uppercase tracking-widest px-3 py-1">
+              <span className={`w-1.5 h-1.5 rounded-full ${group.badgeColor}`} />
+              <span>{group.title}</span>
             </div>
+
             <div className="space-y-1">
               {group.items.map(item => {
                 const isActive = pathname === item.path
                 return (
-                  <Link 
-                    key={item.path} 
+                  <Link
+                    key={item.path}
                     href={item.path}
                     onClick={() => {
-                      if (onCloseMobile) onCloseMobile();
+                      if (onCloseMobile) onCloseMobile()
                     }}
-                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${
-                      isActive 
-                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
-                        : 'text-stone-400 hover:bg-stone-800 hover:text-white border border-transparent'
+                    className={`group relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all active:scale-[0.98] ${
+                      isActive
+                        ? 'bg-gradient-to-r from-amber-500/20 to-amber-600/5 text-amber-400 border border-amber-500/30 shadow-md shadow-amber-500/10'
+                        : 'text-stone-400 hover:bg-stone-800/50 hover:text-stone-100 border border-transparent'
                     }`}
                   >
-                    <span className="text-xl">{item.icon}</span>
-                    <span className="font-medium">{item.name}</span>
+                    {/* Active Vertical Glow Line */}
+                    {isActive && (
+                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-amber-500 rounded-r-full shadow-sm shadow-amber-400" />
+                    )}
+
+                    <span className="text-lg transition-transform group-hover:scale-110">{item.icon}</span>
+                    <span className="truncate">{item.name}</span>
                   </Link>
                 )
               })}
@@ -152,43 +182,64 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
           </div>
         ))}
       </nav>
-      
-      <div className="p-4 border-t border-stone-800 relative mt-auto">
+
+      {/* ──────────────── USER PROFILE FOOTER ──────────────── */}
+      <div className="p-3.5 border-t border-stone-800/80 bg-stone-950/60 relative mt-auto">
         {showProfileMenu && (
-          <div className="absolute bottom-full left-4 right-4 mb-2 bg-stone-800 border border-stone-700 rounded-xl shadow-2xl overflow-hidden z-50">
-             <Link 
-               href="/dashboard/ayarlar?tab=profil" 
-               onClick={() => { setShowProfileMenu(false); if (onCloseMobile) onCloseMobile(); }}
-               className="flex items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors border-b border-stone-700/50"
-             >
-                <span className="text-lg">👤</span> Profilim
-             </Link>
-             <Link 
-               href="/dashboard/ayarlar?tab=genel" 
-               onClick={() => { setShowProfileMenu(false); if (onCloseMobile) onCloseMobile(); }}
-               className="flex items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors border-b border-stone-700/50"
-             >
-                <span className="text-lg">⚙️</span> Hesap Ayarları
-             </Link>
-             <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left font-bold">
-                <span className="text-lg">🚪</span> Çıkış Yap
-             </button>
+          <div className="absolute bottom-full left-3.5 right-3.5 mb-2 bg-stone-900/95 border border-stone-800 rounded-2xl shadow-2xl overflow-hidden z-50 backdrop-blur-xl animate-fadeIn">
+            <Link
+              href="/dashboard/ayarlar?tab=profil"
+              onClick={() => {
+                setShowProfileMenu(false)
+                if (onCloseMobile) onCloseMobile()
+              }}
+              className="flex items-center gap-3 px-4 py-3 text-xs sm:text-sm text-stone-300 hover:bg-stone-800/60 hover:text-amber-400 transition-colors border-b border-stone-800/80 font-bold"
+            >
+              <span className="text-base">👤</span> Profilim
+            </Link>
+            <Link
+              href="/dashboard/ayarlar?tab=genel"
+              onClick={() => {
+                setShowProfileMenu(false)
+                if (onCloseMobile) onCloseMobile()
+              }}
+              className="flex items-center gap-3 px-4 py-3 text-xs sm:text-sm text-stone-300 hover:bg-stone-800/60 hover:text-amber-400 transition-colors border-b border-stone-800/80 font-bold"
+            >
+              <span className="text-base">⚙️</span> Hesap Ayarları
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 text-xs sm:text-sm text-rose-400 hover:bg-rose-500/10 transition-colors text-left font-extrabold"
+            >
+              <span className="text-base">🚪</span> Çıkış Yap
+            </button>
           </div>
         )}
-        <button 
+
+        <button
           id="tour-sidebar-profile"
           onClick={() => setShowProfileMenu(!showProfileMenu)}
-          className="w-full bg-stone-950 rounded-lg p-3 text-left border border-stone-800 hover:border-amber-500/50 hover:bg-stone-900 transition-colors flex items-center justify-between group"
+          className="w-full bg-stone-900/90 rounded-2xl p-2.5 text-left border border-stone-800/80 hover:border-amber-500/40 hover:bg-stone-900 transition-all flex items-center justify-between group active:scale-[0.98] shadow-inner"
         >
-          <div>
-            <p className="text-xs text-stone-500 mb-0.5 group-hover:text-amber-500/70 transition-colors">{userRole}</p>
-            <p className="text-sm font-bold text-stone-300 group-hover:text-amber-400 transition-colors truncate max-w-[150px]">{userName}</p>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0">
+              {userInitial}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-stone-500 group-hover:text-amber-400/80 transition-colors uppercase tracking-wider">
+                {userRole}
+              </p>
+              <p className="text-xs font-black text-stone-200 group-hover:text-amber-400 transition-colors truncate max-w-[130px]">
+                {userName}
+              </p>
+            </div>
           </div>
-          <span className="text-stone-600 group-hover:text-amber-500 transition-colors text-xs">
-             {showProfileMenu ? '▼' : '▲'}
+
+          <span className="text-stone-500 group-hover:text-amber-400 transition-colors text-xs p-1">
+            {showProfileMenu ? '▼' : '▲'}
           </span>
         </button>
       </div>
-    </div>
+    </aside>
   )
 }
