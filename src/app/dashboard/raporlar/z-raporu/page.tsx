@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
@@ -588,7 +589,7 @@ export default function ZRaporuYukle() {
                                 <h3 className="font-bold mb-4">Önizleme</h3>
                                 <div className="flex justify-center mb-6">
                                     {imageUrl && fileType === 'image' && (
-                                        <img src={imageUrl} alt="Z Raporu" className="max-h-96 mx-auto rounded-lg object-contain" />
+                                        <Image src={imageUrl} alt="Z Raporu" width={400} height={384} className="max-h-96 mx-auto rounded-lg object-contain" />
                                     )}
                                     {imageUrl && fileType === 'pdf' && (
                                         <div className="py-12 text-center">

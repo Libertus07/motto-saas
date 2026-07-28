@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { formatCurrency, formatDate } from '@/lib/format'
@@ -473,9 +474,11 @@ export default function IslemGecmisi() {
                                     val.includes('supabase.co'))
                                 ) {
                                   return (
-                                    <img
+                                    <Image
                                       src={val}
                                       alt="preview"
+                                      width={200}
+                                      height={64}
                                       className="h-16 w-auto rounded-lg object-contain bg-stone-900 p-1 border border-stone-700 shadow-sm"
                                     />
                                   )
@@ -575,9 +578,11 @@ export default function IslemGecmisi() {
                               ) {
                                 return (
                                   <div className="mt-1">
-                                    <img
+                                    <Image
                                       src={v}
                                       alt="preview"
+                                      width={200}
+                                      height={96}
                                       className="max-h-24 w-auto rounded-lg object-contain border border-stone-700 bg-stone-900 p-1"
                                     />
                                   </div>

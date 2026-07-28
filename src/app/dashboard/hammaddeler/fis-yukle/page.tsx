@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
@@ -388,7 +389,7 @@ export default function FisYukle() {
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 />
                                 {image && fileType === 'image' && (
-                                    <img src={image} alt="Fiş" className="max-h-96 mx-auto rounded-lg object-contain" />
+                                    <Image src={image} alt="Fiş" width={400} height={384} className="max-h-96 mx-auto rounded-lg object-contain" />
                                 )}
                                 {image && fileType === 'pdf' && (
                                     <div className="py-12">
@@ -432,10 +433,10 @@ export default function FisYukle() {
                             />
                             
                             {image && image.startsWith('http') && (
-                                <div className="mt-4">
-                                   <img src={image} alt="URL Önizleme" className="max-h-96 mx-auto rounded-lg object-contain" onError={() => setError('URL\'den resim yüklenemedi, linki kontrol edin.')} />
-                                </div>
-                            )}
+                                 <div className="mt-4">
+                                    <Image src={image} alt="URL Önizleme" width={400} height={384} className="max-h-96 mx-auto rounded-lg object-contain" onError={() => setError('URL\'den resim yüklenemedi, linki kontrol edin.')} />
+                                 </div>
+                             )}
                         </div>
 
                         {(image || fileText) && (

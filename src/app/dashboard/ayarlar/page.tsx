@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
@@ -654,7 +655,7 @@ function GenelTab({
         <div className="flex items-center gap-6">
           <div className="w-24 h-24 rounded-2xl bg-stone-950 border-2 border-dashed border-stone-800 flex items-center justify-center overflow-hidden shrink-0 relative p-2">
             {s.business_logo ? (
-              <img src={s.business_logo} alt="Logo" className="w-full h-full object-contain" />
+              <Image src={s.business_logo} alt="Logo" width={96} height={96} className="w-full h-full object-contain" />
             ) : (
               <span className="text-3xl">🏢</span>
             )}

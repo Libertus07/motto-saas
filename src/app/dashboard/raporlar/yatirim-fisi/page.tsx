@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
@@ -264,7 +265,7 @@ export default function YatirimFisiYukle() {
                                 <h3 className="font-bold mb-4">Önizleme</h3>
                                 <div className="flex justify-center mb-6">
                                     {fileType === 'image' && (
-                                        <img src={imageUrl} alt="Yatırım Belgesi" className="max-h-96 mx-auto rounded-lg object-contain" />
+                                        <Image src={imageUrl} alt="Yatırım Belgesi" width={400} height={384} className="max-h-96 mx-auto rounded-lg object-contain" />
                                     )}
                                     {fileType === 'pdf' && (
                                         <div className="py-12 text-center">
