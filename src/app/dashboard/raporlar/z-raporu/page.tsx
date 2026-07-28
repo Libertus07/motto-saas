@@ -8,6 +8,7 @@ import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency } from "@/lib/format";
 import { ImagePreprocessModal } from '@/components/ui/ImagePreprocessModal'
+import { dataUrlToFile } from '@/lib/imagePreprocess'
 
 type Product = {
     id: string
@@ -985,6 +986,10 @@ export default function ZRaporuYukle() {
                     setFileText(null)
                     setImageUrl(res.dataUrl)
                     setFileType('image')
+                    // Convert optimized dataUrl to File so Supabase Storage uploads the enhanced, cropped image!
+                    const fileName = preprocessFile ? `processed-${preprocessFile.name}` : `processed-zreport-${Date.now()}.jpg`
+                    const processedFileObj = dataUrlToFile(res.dataUrl, fileName)
+                    setSelectedFile(processedFileObj)
                 }}
             />
         </div>

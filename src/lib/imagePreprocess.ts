@@ -1,5 +1,5 @@
 /**
- * Motto SaaS - İstemci Tarafı Akıllı Görsel Ön İşleme Engine'i
+ * Motto SaaS - İstemci Tarafı Akıllı Görsel Ön İşleme Engine'i (v2 Ultra-Premium)
  */
 
 export interface PreprocessResult {
@@ -7,7 +7,11 @@ export interface PreprocessResult {
   sizeBytes: number
   width: number
   height: number
+  readinessScore: number
+  readinessLabel: string
 }
+
+export type FilterPreset = 'original' | 'enhanced' | 'bw'
 
 export interface PreprocessOptions {
   maxWidth?: number
@@ -15,7 +19,9 @@ export interface PreprocessOptions {
   cropThreshold?: number
   rotationAngle?: number // 0, 90, 180, 270
   doCrop?: boolean
-  doEnhance?: boolean
+  preset?: FilterPreset
+  brightness?: number // -50 to +50
+  contrast?: number   // 0.5 to 2.5
 }
 
 const DEFAULTS: Required<PreprocessOptions> = {
@@ -24,7 +30,23 @@ const DEFAULTS: Required<PreprocessOptions> = {
   cropThreshold: 150,
   rotationAngle: 0,
   doCrop: true,
-  doEnhance: true
+  preset: 'enhanced',
+  brightness: 0,
+  contrast: 1.0
+}
+
+/** Convert Base64 dataUrl into a standard File object for Supabase Storage. */
+export function dataUrlToFile(dataUrl: string, filename: string): File {
+  const arr = dataUrl.split(',')
+  const mimeMatch = arr[0].match(/:(.*?);/)
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+  const bstr = atob(arr[1])
+  let n = bstr.length
+  const u8arr = new Uint8Array(n)
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n)
+  }
+  return new File([u8arr], filename, { type: mime })
 }
 
 /** Load a File into a canvas, respecting EXIF orientation. */
@@ -122,13 +144,43 @@ export function autoCrop(canvas: HTMLCanvasElement, threshold: number): HTMLCanv
   return out
 }
 
-/** Boost contrast and brightness for faint thermal print. */
-export function enhance(canvas: HTMLCanvasElement): HTMLCanvasElement {
+/** CamScanner-style Black & White Thermal Scanner thresholding filter. */
+export function applyBwThreshold(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const ctx = canvas.getContext('2d')!
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const d = imgData.data
-  const contrast = 1.18
-  const brightness = 6
+  
+  // Calculate average luminance for adaptive threshold
+  let sumLuma = 0
+  for (let i = 0; i < d.length; i += 4) {
+    sumLuma += d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114
+  }
+  const avgLuma = sumLuma / (d.length / 4)
+  const threshold = Math.min(210, Math.max(120, avgLuma * 0.92))
+
+  for (let i = 0; i < d.length; i += 4) {
+    const luma = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114
+    const val = luma < threshold ? 0 : 255
+    d[i] = val
+    d[i + 1] = val
+    d[i + 2] = val
+  }
+  ctx.putImageData(imgData, 0, 0)
+  return canvas
+}
+
+/** Boost contrast and brightness for faint thermal print. */
+export function enhance(
+  canvas: HTMLCanvasElement,
+  userBrightness: number = 0,
+  userContrast: number = 1.0
+): HTMLCanvasElement {
+  const ctx = canvas.getContext('2d')!
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const d = imgData.data
+  const contrast = 1.18 * userContrast
+  const brightness = 6 + userBrightness
+
   for (let i = 0; i < d.length; i += 4) {
     for (let c = 0; c < 3; c++) {
       let v = d[i + c]
@@ -150,6 +202,36 @@ export function resizeToMaxWidth(canvas: HTMLCanvasElement, maxWidth: number): H
   return out
 }
 
+/** Calculate AI OCR Readiness Score (0-100%). */
+export function calculateAiReadinessScore(canvas: HTMLCanvasElement): { score: number; label: string } {
+  const ctx = canvas.getContext('2d')!
+  const w = canvas.width
+  const h = canvas.height
+  const imgData = ctx.getImageData(0, 0, w, h)
+  const d = imgData.data
+
+  let contrastSum = 0
+  let sampleCount = 0
+
+  // Measure local variance / contrast
+  for (let i = 0; i < d.length - 16; i += 32) {
+    const luma1 = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114
+    const luma2 = d[i + 16] * 0.299 + d[i + 17] * 0.587 + d[i + 18] * 0.114
+    contrastSum += Math.abs(luma1 - luma2)
+    sampleCount++
+  }
+
+  const avgContrast = sampleCount > 0 ? contrastSum / sampleCount : 0
+  let rawScore = Math.min(100, Math.round(avgContrast * 2.8 + 50))
+  if (w < 800) rawScore = Math.max(30, rawScore - 15)
+
+  let label = '🟢 Mükemmel Netlik - Yapay zeka fişi kusursuz okuyacak'
+  if (rawScore < 60) label = '🔴 Düşük Netlik - Lütfen "Termal B&W" modunu açın'
+  else if (rawScore < 80) label = '🟡 Orta Netlik - Kontrast artırılması önerilir'
+
+  return { score: rawScore, label }
+}
+
 /** Preprocess receipt photo with options. */
 export async function preprocessReceiptImage(
   file: File,
@@ -167,14 +249,25 @@ export async function preprocessReceiptImage(
     canvas = autoCrop(canvas, opts.cropThreshold)
   }
 
-  if (opts.doEnhance) {
-    canvas = enhance(canvas)
+  if (opts.preset === 'bw') {
+    canvas = applyBwThreshold(canvas)
+  } else if (opts.preset === 'enhanced') {
+    canvas = enhance(canvas, opts.brightness, opts.contrast)
   }
 
   canvas = resizeToMaxWidth(canvas, opts.maxWidth)
 
+  const { score: readinessScore, label: readinessLabel } = calculateAiReadinessScore(canvas)
+
   const dataUrl = canvas.toDataURL('image/jpeg', opts.quality)
   const sizeBytes = Math.round((dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75)
 
-  return { dataUrl, sizeBytes, width: canvas.width, height: canvas.height }
+  return {
+    dataUrl,
+    sizeBytes,
+    width: canvas.width,
+    height: canvas.height,
+    readinessScore,
+    readinessLabel
+  }
 }

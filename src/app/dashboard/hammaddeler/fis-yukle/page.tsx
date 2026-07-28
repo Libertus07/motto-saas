@@ -9,6 +9,7 @@ import { devLog, devError } from '@/lib/debug';
 import { formatCurrency } from "@/lib/format";
 import { useNotification } from '@/components/NotificationProvider'
 import { ImagePreprocessModal } from '@/components/ui/ImagePreprocessModal'
+import { dataUrlToFile } from '@/lib/imagePreprocess'
 
 type ParsedItem = {
     name: string
@@ -799,6 +800,10 @@ export default function FisYukle() {
                     setFileText(null)
                     setImage(res.dataUrl)
                     setFileType('image')
+                    // Convert optimized dataUrl to File so Supabase Storage uploads the enhanced, cropped image!
+                    const fileName = preprocessFile ? `processed-${preprocessFile.name}` : `processed-receipt-${Date.now()}.jpg`
+                    const processedFileObj = dataUrlToFile(res.dataUrl, fileName)
+                    setSelectedFile(processedFileObj)
                 }}
             />
         </div>
