@@ -38,7 +38,7 @@ export default function YatirimlarPage() {
         if (!file) return
 
         if (file.size > 3 * 1024 * 1024) {
-            alert('Seçilen dosya çok büyük. Lütfen 3 MB altı bir dosya seçin veya kırparak tekrar deneyin.')
+            showAlert('Seçilen dosya çok büyük. Lütfen 3 MB altı bir dosya seçin veya kırparak tekrar deneyin.', 'warning')
             return
         }
 

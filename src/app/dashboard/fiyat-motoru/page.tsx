@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useAppTour } from '@/hooks/useAppTour'
 import { formatCurrency } from '@/lib/format'
+import { useNotification } from '@/components/NotificationProvider'
 import {
   ComposedChart,
   Line,
@@ -80,6 +81,7 @@ export default function FiyatMotoru() {
 
   const supabase = createClient()
   const router = useRouter()
+  const { showAlert } = useNotification()
 
   useEffect(() => {
     fetchData()
@@ -190,13 +192,13 @@ export default function FiyatMotoru() {
           )
         )
         logActivity('Fiyat Motoru', 'GUNCELLEME', `${updates.length} ürünün hesaplanan maliyeti güncellendi.`)
-        alert(`${updates.length} ürünün maliyeti veritabanına kaydedildi!`)
+        showAlert(`${updates.length} ürünün maliyeti veritabanına kaydedildi!`, 'success')
       } else {
-        alert('Tüm maliyetler zaten güncel.')
+        showAlert('Tüm maliyetler zaten güncel.', 'info')
       }
     } catch (error) {
       console.error(error)
-      alert('Maliyetler kaydedilirken bir hata oluştu.')
+      showAlert('Maliyetler kaydedilirken bir hata oluştu.', 'error')
     } finally {
       setSaving(false)
     }
