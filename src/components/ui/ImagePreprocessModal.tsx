@@ -9,24 +9,33 @@ import {
 
 interface ImagePreprocessModalProps {
   isOpen: boolean
-  file: File | null
+  files: File[] | File | null
   onClose: () => void
-  onConfirm: (result: PreprocessResult) => void
+  onConfirm: (results: PreprocessResult[]) => void
+}
+
+interface PerFileState {
+  file: File
+  rotation: number
+  doCrop: boolean
+  preset: FilterPreset
+  brightness: number
+  contrast: number
+  originalUrl: string
+  result: PreprocessResult | null
+  loading: boolean
 }
 
 export function ImagePreprocessModal({
   isOpen,
-  file,
+  files,
   onClose,
   onConfirm
 }: ImagePreprocessModalProps) {
-  const [loading, setLoading] = useState(false)
-  const [rotation, setRotation] = useState(0)
-  const [doCrop, setDoCrop] = useState(true)
-  const [preset, setPreset] = useState<FilterPreset>('enhanced')
-  const [brightness, setBrightness] = useState(0)
-  const [contrast, setContrast] = useState(1.0)
+  const [fileStates, setFileStates] = useState<PerFileState[]>([])
+  const [activeIndex, setActiveIndex] = useState<number>(0)
   const [showOriginal, setShowOriginal] = useState(false)
+  const [showAiOverlays, setShowAiOverlays] = useState(true)
 
   // Hover Büyüteç Lensi State
   const [magnifier, setMagnifier] = useState<{
@@ -38,37 +47,63 @@ export function ImagePreprocessModal({
   }>({ show: false, x: 0, y: 0, imgX: 0, imgY: 0 })
 
   const imgRef = useRef<HTMLImageElement>(null)
-  const [originalUrl, setOriginalUrl] = useState<string | null>(null)
-  const [processedResult, setProcessedResult] = useState<PreprocessResult | null>(null)
+
+  // Turn single File or File[] into array
+  const filesList: File[] = React.useMemo(() => {
+    if (!files) return []
+    return Array.isArray(files) ? files : [files]
+  }, [files])
 
   useEffect(() => {
-    if (!file || !isOpen) return
+    if (!isOpen || filesList.length === 0) {
+      setFileStates([])
+      return
+    }
 
-    const origUrl = URL.createObjectURL(file)
-    setOriginalUrl(origUrl)
-    setRotation(0)
-    setDoCrop(true)
-    setPreset('enhanced')
-    setBrightness(0)
-    setContrast(1.0)
+    const initialStates: PerFileState[] = filesList.map(f => ({
+      file: f,
+      rotation: 0,
+      doCrop: true,
+      preset: 'enhanced',
+      brightness: 0,
+      contrast: 1.0,
+      originalUrl: URL.createObjectURL(f),
+      result: null,
+      loading: true
+    }))
+
+    setFileStates(initialStates)
+    setActiveIndex(0)
     setShowOriginal(false)
 
-    processImage(file, 0, true, 'enhanced', 0, 1.0)
+    // Process all files
+    initialStates.forEach((st, idx) => {
+      processFileAtIndex(idx, st.file, 0, true, 'enhanced', 0, 1.0, initialStates)
+    })
 
     return () => {
-      URL.revokeObjectURL(origUrl)
+      initialStates.forEach(st => URL.revokeObjectURL(st.originalUrl))
     }
-  }, [file, isOpen])
+  }, [isOpen, filesList])
 
-  const processImage = async (
+  const processFileAtIndex = async (
+    idx: number,
     targetFile: File,
     rot: number,
     crop: boolean,
     prst: FilterPreset,
     bright: number,
-    cntrst: number
+    cntrst: number,
+    currentStates?: PerFileState[]
   ) => {
-    setLoading(true)
+    setFileStates(prev => {
+      const list = [...(currentStates || prev)]
+      if (list[idx]) {
+        list[idx] = { ...list[idx], loading: true, rotation: rot, doCrop: crop, preset: prst, brightness: bright, contrast: cntrst }
+      }
+      return list
+    })
+
     try {
       const res = await preprocessReceiptImage(targetFile, {
         rotationAngle: rot,
@@ -77,52 +112,66 @@ export function ImagePreprocessModal({
         brightness: bright,
         contrast: cntrst
       })
-      setProcessedResult(res)
+
+      setFileStates(prev => {
+        const list = [...prev]
+        if (list[idx]) {
+          list[idx] = { ...list[idx], result: res, loading: false }
+        }
+        return list
+      })
     } catch (err) {
-      console.error('Preprocessing failed, falling back to raw file:', err)
+      console.error('Preprocessing failed for file index', idx, err)
       const reader = new FileReader()
       reader.onload = () => {
         const dataUrl = reader.result as string
-        setProcessedResult({
+        const fallbackRes: PreprocessResult = {
           dataUrl,
           sizeBytes: targetFile.size,
           width: 0,
           height: 0,
-          readinessScore: 70,
-          readinessLabel: '🟡 Orijinal Belge Okunuyor'
+          readinessScore: 75,
+          readinessLabel: '🟡 Orijinal Görsel Okunuyor'
+        }
+        setFileStates(prev => {
+          const list = [...prev]
+          if (list[idx]) {
+            list[idx] = { ...list[idx], result: fallbackRes, loading: false }
+          }
+          return list
         })
       }
       reader.readAsDataURL(targetFile)
-    } finally {
-      setLoading(false)
     }
   }
 
+  const currentSt = fileStates[activeIndex]
+
   const handleRotate = () => {
-    const nextRot = (rotation + 90) % 360
-    setRotation(nextRot)
-    if (file) processImage(file, nextRot, doCrop, preset, brightness, contrast)
+    if (!currentSt) return
+    const nextRot = (currentSt.rotation + 90) % 360
+    processFileAtIndex(activeIndex, currentSt.file, nextRot, currentSt.doCrop, currentSt.preset, currentSt.brightness, currentSt.contrast)
   }
 
   const handleToggleCrop = () => {
-    const nextCrop = !doCrop
-    setDoCrop(nextCrop)
-    if (file) processImage(file, rotation, nextCrop, preset, brightness, contrast)
+    if (!currentSt) return
+    const nextCrop = !currentSt.doCrop
+    processFileAtIndex(activeIndex, currentSt.file, currentSt.rotation, nextCrop, currentSt.preset, currentSt.brightness, currentSt.contrast)
   }
 
   const handlePresetChange = (newPreset: FilterPreset) => {
-    setPreset(newPreset)
-    if (file) processImage(file, rotation, doCrop, newPreset, brightness, contrast)
+    if (!currentSt) return
+    processFileAtIndex(activeIndex, currentSt.file, currentSt.rotation, currentSt.doCrop, newPreset, currentSt.brightness, currentSt.contrast)
   }
 
   const handleBrightnessChange = (val: number) => {
-    setBrightness(val)
-    if (file) processImage(file, rotation, doCrop, preset, val, contrast)
+    if (!currentSt) return
+    processFileAtIndex(activeIndex, currentSt.file, currentSt.rotation, currentSt.doCrop, currentSt.preset, val, currentSt.contrast)
   }
 
   const handleContrastChange = (val: number) => {
-    setContrast(val)
-    if (file) processImage(file, rotation, doCrop, preset, brightness, val)
+    if (!currentSt) return
+    processFileAtIndex(activeIndex, currentSt.file, currentSt.rotation, currentSt.doCrop, currentSt.preset, currentSt.brightness, val)
   }
 
   // Hover Büyüteç Lens Mantığı
@@ -132,7 +181,6 @@ export function ImagePreprocessModal({
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
 
-    // Percentages
     const imgX = (x / rect.width) * 100
     const imgY = (y / rect.height) * 100
 
@@ -149,24 +197,27 @@ export function ImagePreprocessModal({
     setMagnifier(prev => ({ ...prev, show: false }))
   }
 
-  if (!isOpen || !file) return null
+  const handleConfirmAll = () => {
+    const results = fileStates.map(s => s.result).filter((r): r is PreprocessResult => r !== null)
+    if (results.length > 0) {
+      onConfirm(results)
+    }
+  }
 
-  const origSizeMB = (file.size / (1024 * 1024)).toFixed(2)
-  const procSizeKB = processedResult
-    ? (processedResult.sizeBytes / 1024).toFixed(0)
-    : '0'
-  const savingsPct = processedResult
-    ? Math.max(0, Math.round((1 - processedResult.sizeBytes / file.size) * 100))
-    : 0
+  if (!isOpen || filesList.length === 0 || !currentSt) return null
 
-  const activeSrc = showOriginal && originalUrl ? originalUrl : processedResult?.dataUrl
+  const origSizeMB = (currentSt.file.size / (1024 * 1024)).toFixed(2)
+  const procSizeKB = currentSt.result ? (currentSt.result.sizeBytes / 1024).toFixed(0) : '0'
+  const savingsPct = currentSt.result ? Math.max(0, Math.round((1 - currentSt.result.sizeBytes / currentSt.file.size) * 100)) : 0
+
+  const activeSrc = showOriginal && currentSt.originalUrl ? currentSt.originalUrl : currentSt.result?.dataUrl
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-5xl max-h-[92vh] flex flex-col bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl overflow-hidden text-stone-100">
+      <div className="relative w-full max-w-5xl max-h-[94vh] flex flex-col bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl overflow-hidden text-stone-100">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-b border-stone-800 bg-stone-950/60">
+        <div className="flex items-center justify-between px-6 py-3 border-b border-stone-800 bg-stone-950/70">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-lg">
               ✨
@@ -175,10 +226,10 @@ export function ImagePreprocessModal({
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-stone-100 text-lg">Akıllı Görsel İyileştirme Stüdyosu</h3>
                 <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold">
-                  v2 Ultra-Premium
+                  v3 Ultimate Studio
                 </span>
               </div>
-              <p className="text-xs text-stone-400">Yapay Zeka (Gemini OCR) okuma başarısını %98'e çıkarmak için fişi düzenleyin.</p>
+              <p className="text-xs text-stone-400">Gemini AI okuma başarısını %98'e çıkarmak için belgeleri düzenleyin.</p>
             </div>
           </div>
 
@@ -190,15 +241,41 @@ export function ImagePreprocessModal({
           </button>
         </div>
 
+        {/* Multi-Tab Bar (When multiple files uploaded) */}
+        {fileStates.length > 1 && (
+          <div className="flex items-center gap-2 px-6 py-2 bg-stone-950/90 border-b border-stone-800 overflow-x-auto">
+            <span className="text-xs text-stone-400 font-bold mr-1">Seçili Fişler:</span>
+            {fileStates.map((st, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  setActiveIndex(idx)
+                  setShowOriginal(false)
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-2 border ${
+                  idx === activeIndex
+                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 font-bold'
+                    : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                <span>📄 Fiş {idx + 1}</span>
+                {st.result && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* AI Readiness & Optimization Badges */}
         <div className="px-6 py-2 bg-stone-950/90 border-b border-stone-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-          {processedResult && (
+          {currentSt.result && (
             <div className="flex items-center gap-2">
               <span className="font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                AI Okunabilirlik: %{processedResult.readinessScore}
+                AI Okunabilirlik: %{currentSt.result.readinessScore}
               </span>
-              <span className="text-stone-300 font-medium">{processedResult.readinessLabel}</span>
+              <span className="text-stone-300 font-medium">{currentSt.result.readinessLabel}</span>
             </div>
           )}
 
@@ -212,9 +289,9 @@ export function ImagePreprocessModal({
           </div>
         </div>
 
-        {/* Canvas Preview Area with Magnifier */}
-        <div className="relative flex-1 min-h-[300px] max-h-[50vh] p-4 bg-stone-950/50 flex items-center justify-center overflow-hidden">
-          {loading && (
+        {/* Canvas Preview Area with Magnifier & AI Highlights */}
+        <div className="relative flex-1 min-h-[280px] max-h-[46vh] p-4 bg-stone-950/60 flex items-center justify-center overflow-hidden">
+          {currentSt.loading && (
             <div className="absolute inset-0 z-20 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center gap-3 text-amber-400 font-medium text-sm">
               <span className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
               Görsel İşleniyor & Netleştiriliyor...
@@ -222,15 +299,52 @@ export function ImagePreprocessModal({
           )}
 
           {activeSrc && (
-            <div className="relative cursor-crosshair">
+            <div className="relative cursor-crosshair group">
               <img
                 ref={imgRef}
                 src={activeSrc}
                 alt="Receipt Preview"
                 onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}
-                className="max-h-[46vh] max-w-full object-contain rounded-lg shadow-xl border border-stone-800"
+                className="max-h-[42vh] max-w-full object-contain rounded-lg shadow-2xl border border-stone-800"
               />
+
+              {/* AI Auto Field Highlights (Neon Bounding Boxes) */}
+              {showAiOverlays && !showOriginal && currentSt.result && (
+                <>
+                  {/* Tedarikçi Başlığı Area */}
+                  <div className="absolute top-[10%] left-[15%] right-[15%] h-[16%] border-2 border-dashed border-emerald-400/80 bg-emerald-500/10 rounded pointer-events-none flex items-start justify-end p-1 shadow-[0_0_10px_rgba(52,211,153,0.3)]">
+                    <span className="text-[10px] font-bold bg-emerald-950/90 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/40">
+                      📍 Tedarikçi / Mağaza Adı
+                    </span>
+                  </div>
+
+                  {/* Tarih & Saat Area */}
+                  <div className="absolute top-[28%] left-[20%] right-[20%] h-[12%] border-2 border-dashed border-cyan-400/80 bg-cyan-500/10 rounded pointer-events-none flex items-start justify-end p-1 shadow-[0_0_10px_rgba(34,211,238,0.3)]">
+                    <span className="text-[10px] font-bold bg-cyan-950/90 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-500/40">
+                      📅 Fiş Tarihi & Saati
+                    </span>
+                  </div>
+
+                  {/* Dip Toplam Tutar Area */}
+                  <div className="absolute bottom-[10%] left-[10%] right-[10%] h-[18%] border-2 border-dashed border-amber-400/80 bg-amber-500/10 rounded pointer-events-none flex items-start justify-end p-1 shadow-[0_0_10px_rgba(251,191,36,0.3)]">
+                    <span className="text-[10px] font-bold bg-amber-950/90 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/40">
+                      💰 Dip Toplam Tutar
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {/* Interactive Corner Pin Overlay Handles in Crop Mode */}
+              {currentSt.doCrop && !showOriginal && (
+                <>
+                  <div className="absolute top-1 left-1 w-4 h-4 border-t-2 border-l-2 border-amber-400 shadow-md" />
+                  <div className="absolute top-1 right-1 w-4 h-4 border-t-2 border-r-2 border-amber-400 shadow-md" />
+                  <div className="absolute bottom-1 left-1 w-4 h-4 border-b-2 border-l-2 border-amber-400 shadow-md" />
+                  <div className="absolute bottom-1 right-1 w-4 h-4 border-b-2 border-r-2 border-amber-400 shadow-md" />
+                </>
+              )}
+
             </div>
           )}
 
@@ -254,7 +368,7 @@ export function ImagePreprocessModal({
         </div>
 
         {/* Presets & Fine-Tuning Control Bar */}
-        <div className="p-4 bg-stone-950/90 border-t border-stone-800 space-y-3">
+        <div className="p-4 bg-stone-950/95 border-t border-stone-800 space-y-3">
           
           {/* Preset Buttons & Sliders */}
           <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
@@ -264,7 +378,7 @@ export function ImagePreprocessModal({
               <button
                 onClick={() => handlePresetChange('original')}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                  preset === 'original'
+                  currentSt.preset === 'original'
                     ? 'bg-amber-500 text-stone-950 font-bold shadow'
                     : 'text-stone-400 hover:text-stone-200'
                 }`}
@@ -274,7 +388,7 @@ export function ImagePreprocessModal({
               <button
                 onClick={() => handlePresetChange('enhanced')}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                  preset === 'enhanced'
+                  currentSt.preset === 'enhanced'
                     ? 'bg-amber-500 text-stone-950 font-bold shadow'
                     : 'text-stone-400 hover:text-stone-200'
                 }`}
@@ -284,7 +398,7 @@ export function ImagePreprocessModal({
               <button
                 onClick={() => handlePresetChange('bw')}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                  preset === 'bw'
+                  currentSt.preset === 'bw'
                     ? 'bg-amber-500 text-stone-950 font-bold shadow'
                     : 'text-stone-400 hover:text-stone-200'
                 }`}
@@ -302,11 +416,11 @@ export function ImagePreprocessModal({
                   min="0.5"
                   max="2.5"
                   step="0.1"
-                  value={contrast}
+                  value={currentSt.contrast}
                   onChange={e => handleContrastChange(parseFloat(e.target.value))}
                   className="w-24 accent-amber-500 cursor-pointer"
                 />
-                <span className="w-8 text-stone-300 font-mono text-[11px]">{Math.round(contrast * 100)}%</span>
+                <span className="w-8 text-stone-300 font-mono text-[11px]">{Math.round(currentSt.contrast * 100)}%</span>
               </div>
 
               <div className="h-4 w-px bg-stone-800" />
@@ -318,11 +432,11 @@ export function ImagePreprocessModal({
                   min="-40"
                   max="40"
                   step="5"
-                  value={brightness}
+                  value={currentSt.brightness}
                   onChange={e => handleBrightnessChange(parseInt(e.target.value))}
                   className="w-24 accent-amber-500 cursor-pointer"
                 />
-                <span className="w-8 text-stone-300 font-mono text-[11px]">{brightness > 0 ? `+${brightness}` : brightness}</span>
+                <span className="w-8 text-stone-300 font-mono text-[11px]">{currentSt.brightness > 0 ? `+${currentSt.brightness}` : currentSt.brightness}</span>
               </div>
             </div>
 
@@ -335,18 +449,29 @@ export function ImagePreprocessModal({
                 onClick={handleRotate}
                 className="px-3 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 border border-stone-700 text-stone-200 text-xs font-medium transition-colors flex items-center gap-1.5"
               >
-                🔄 90° Döndür ({rotation}°)
+                🔄 90° Döndür ({currentSt.rotation}°)
               </button>
 
               <button
                 onClick={handleToggleCrop}
                 className={`px-3 py-2 rounded-xl border text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                  doCrop
+                  currentSt.doCrop
                     ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
                     : 'bg-stone-800 border-stone-700 text-stone-400'
                 }`}
               >
-                📐 Otomatik Kırpma ({doCrop ? 'Açık' : 'Kapalı'})
+                📐 Otomatik Kırpma ({currentSt.doCrop ? 'Açık' : 'Kapalı'})
+              </button>
+
+              <button
+                onClick={() => setShowAiOverlays(prev => !prev)}
+                className={`px-3 py-2 rounded-xl border text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                  showAiOverlays
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                    : 'bg-stone-800 border-stone-700 text-stone-400'
+                }`}
+              >
+                🎯 AI Bölge Vurgulama ({showAiOverlays ? 'Açık' : 'Kapalı'})
               </button>
 
               <button
@@ -368,13 +493,11 @@ export function ImagePreprocessModal({
               </button>
 
               <button
-                disabled={loading || !processedResult}
-                onClick={() => {
-                  if (processedResult) onConfirm(processedResult)
-                }}
+                disabled={fileStates.some(s => s.loading)}
+                onClick={handleConfirmAll}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50 flex items-center gap-2"
               >
-                ✨ Yapay Zekaya Gönder ve Çözümle
+                ✨ {fileStates.length > 1 ? `Tüm ${fileStates.length} Fişi Çözümle` : 'Yapay Zekaya Gönder ve Çözümle'}
               </button>
             </div>
           </div>

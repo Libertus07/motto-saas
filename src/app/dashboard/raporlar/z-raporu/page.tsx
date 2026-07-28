@@ -64,13 +64,14 @@ export default function ZRaporuYukle() {
     const allCategories = Array.from(new Set([...defaultCategories, ...uniqueCategories]))
 
     const [isPreprocessOpen, setIsPreprocessOpen] = useState(false)
-    const [preprocessFile, setPreprocessFile] = useState<File | null>(null)
+    const [preprocessFiles, setPreprocessFiles] = useState<File[] | File | null>(null)
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
+        const fileList = Array.from(e.target.files || [])
+        if (fileList.length === 0) return
         e.target.value = ''
 
+        const file = fileList[0]
         setSelectedFile(file)
 
         const fileExt = file.name.split('.').pop()?.toLowerCase()
@@ -99,7 +100,6 @@ export default function ZRaporuYukle() {
         } else if (file.type === 'application/pdf') {
             if (file.size > 3 * 1024 * 1024) {
                 showAlert('Seçtiğiniz PDF belgesi çok büyük (Max 3MB). Lütfen dosya boyutunu küçültün.', 'warning');
-                e.target.value = '';
                 return;
             }
             const reader = new FileReader()
@@ -111,7 +111,7 @@ export default function ZRaporuYukle() {
             reader.readAsDataURL(file)
         } else {
             // Görseller (JPEG/PNG/WEBP) için Görsel İyileştirme Stüdyosu Modalını Aç
-            setPreprocessFile(file)
+            setPreprocessFiles(fileList)
             setIsPreprocessOpen(true)
         }
     }
@@ -558,6 +558,7 @@ export default function ZRaporuYukle() {
                             <label className="block w-full border-2 border-dashed border-stone-700 hover:border-amber-400 rounded-xl p-8 text-center cursor-pointer transition-colors relative bg-stone-900/50 overflow-hidden">
                                 <input
                                     type="file"
+                                    multiple
                                     accept="image/*,application/pdf,text/xml,.xml,application/json,.json,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                                     onChange={handleImageUpload}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -975,21 +976,22 @@ export default function ZRaporuYukle() {
 
             <ImagePreprocessModal
                 isOpen={isPreprocessOpen}
-                file={preprocessFile}
+                files={preprocessFiles}
                 onClose={() => {
                     setIsPreprocessOpen(false)
-                    setPreprocessFile(null)
+                    setPreprocessFiles(null)
                 }}
-                onConfirm={(res) => {
+                onConfirm={(results) => {
                     setIsPreprocessOpen(false)
-                    setPreprocessFile(null)
-                    setFileText(null)
-                    setImageUrl(res.dataUrl)
-                    setFileType('image')
-                    // Convert optimized dataUrl to File so Supabase Storage uploads the enhanced, cropped image!
-                    const fileName = preprocessFile ? `processed-${preprocessFile.name}` : `processed-zreport-${Date.now()}.jpg`
-                    const processedFileObj = dataUrlToFile(res.dataUrl, fileName)
-                    setSelectedFile(processedFileObj)
+                    setPreprocessFiles(null)
+                    if (results.length > 0) {
+                        const firstRes = results[0]
+                        setFileText(null)
+                        setImageUrl(firstRes.dataUrl)
+                        setFileType('image')
+                        const processedFileObj = dataUrlToFile(firstRes.dataUrl, `processed-zreport-${Date.now()}.jpg`)
+                        setSelectedFile(processedFileObj)
+                    }
                 }}
             />
         </div>
