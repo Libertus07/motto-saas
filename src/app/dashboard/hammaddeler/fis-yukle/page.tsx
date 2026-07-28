@@ -76,6 +76,7 @@ export default function FisYukle() {
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
+        e.target.value = ''
 
         setSelectedFile(file)
 
@@ -112,9 +113,13 @@ export default function FisYukle() {
             reader.onload = () => {
                 setFileText(null)
                 setImage(reader.result as string)
-                setFileType(file.type === 'application/pdf' ? 'pdf' : 'image')
+                setFileType('pdf')
             }
             reader.readAsDataURL(file)
+        } else {
+            // Görseller (JPEG/PNG/WEBP) için Görsel İyileştirme Stüdyosu Modalını Aç
+            setPreprocessFile(file)
+            setIsPreprocessOpen(true)
         }
     }
 

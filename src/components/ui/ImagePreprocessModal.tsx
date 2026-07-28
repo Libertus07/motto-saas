@@ -58,7 +58,19 @@ export function ImagePreprocessModal({
       })
       setProcessedResult(res)
     } catch (err) {
-      console.error('Preprocessing failed:', err)
+      console.error('Preprocessing failed, falling back to raw file:', err)
+      // Fallback: Read raw image using FileReader
+      const reader = new FileReader()
+      reader.onload = () => {
+        const dataUrl = reader.result as string
+        setProcessedResult({
+          dataUrl,
+          sizeBytes: targetFile.size,
+          width: 0,
+          height: 0
+        })
+      }
+      reader.readAsDataURL(targetFile)
     } finally {
       setLoading(false)
     }
