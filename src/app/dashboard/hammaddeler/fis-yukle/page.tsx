@@ -70,21 +70,52 @@ export default function FisYukle() {
         }
     }, [step, parsedSupplier?.name])
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
         setSelectedFile(file)
 
-        // Vercel 4.5MB request body limit => ~3.3MB file size max.
-        // We set a 3MB safe limit.
+        const fileExt = file.name.split('.').pop()?.toLowerCase()
+
+        // Fotoğraflar (xml/json/xlsx dışındaki her şey) için: önce tarayıcıda
+        // otomatik kırp + netleştir + sıkıştır. Bu hem Gemini'nin okumasını
+        // kolaylaştırır hem de telefon fotoğraflarını Vercel'in 3MB limitinin
+        // altına indirir.
+        if (fileExt !== 'xml' && fileExt !== 'json' && fileExt !== 'xlsx' && fileExt !== 'xls' && file.type !== 'application/pdf') {
+            try {
+                setLoading(true)
+                const { preprocessReceiptImage } = await import('@/lib/imagePreprocess')
+                const { dataUrl, sizeBytes } = await preprocessReceiptImage(file)
+                setLoading(false)
+
+                if (sizeBytes > 3 * 1024 * 1024) {
+                    showAlert('Fotoğraf işlendikten sonra bile çok büyük kaldı. Lütfen belgeyi tek başına, daha yakından çekip tekrar dener misin?', 'warning');
+                    e.target.value = '';
+                    return;
+                }
+
+                setFileText(null)
+                setImage(dataUrl)
+                setFileType(file.type === 'application/pdf' ? 'pdf' : 'image')
+                return
+            } catch (err) {
+                setLoading(false)
+                devError('Görsel ön işleme başarısız, orijinal dosyaya devam ediliyor', err)
+                if (file.size > 3 * 1024 * 1024) {
+                    showAlert('Seçtiğiniz belge çok büyük (Max 3MB). Sunucu limitlerine takılmamak için lütfen dosya boyutunu küçültün veya ekran görüntüsü (fotoğraf) kırparak yükleyin.', 'warning');
+                    e.target.value = '';
+                    return;
+                }
+            }
+        }
+
         if (file.size > 3 * 1024 * 1024) {
             showAlert('Seçtiğiniz belge çok büyük (Max 3MB). Sunucu limitlerine takılmamak için lütfen dosya boyutunu küçültün veya ekran görüntüsü (fotoğraf) kırparak yükleyin.', 'warning');
             e.target.value = '';
             return;
         }
 
-        const fileExt = file.name.split('.').pop()?.toLowerCase()
         if (fileExt === 'xml' || fileExt === 'json') {
             const reader = new FileReader()
             reader.onload = () => {
