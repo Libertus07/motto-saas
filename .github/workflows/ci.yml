@@ -29,8 +29,14 @@ jobs:
       - name: Install Dependencies
         run: npm install --legacy-peer-deps
 
+      - name: Run ESLint
+        run: npm run lint
+
       - name: Run Unit Tests
         run: npx vitest run
 
       - name: Type Check (TSC)
         run: npx tsc --noEmit
+
+      - name: Production Build Verification (Next.js)
+        run: npx next build --webpack

@@ -453,7 +453,7 @@ export default function ZRaporuYukle() {
             // 2. Stoktan Düşüm (Sadece eşleşen ürünler için BOM hesapla)
             const matchedSales = parsedData.items.filter(i => i.matchedProductId)
             
-            let stockDeductions: Record<string, number> = {}
+            const stockDeductions: Record<string, number> = {}
             if (matchedSales.length > 0) {
                 // Tüm ürün reçetelerini çek
                 const { data: prodIngs } = await supabase.from('product_ingredients')

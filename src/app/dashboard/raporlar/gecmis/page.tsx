@@ -147,7 +147,7 @@ export default function GecmisRaporlar() {
             monthGroups[monthKey].totalItems += day.totalItems
         })
 
-        let result = Object.values(monthGroups)
+        const result = Object.values(monthGroups)
 
         // Günleri Sıralama (Her ayın kendi içindeki günleri)
         result.forEach(month => {

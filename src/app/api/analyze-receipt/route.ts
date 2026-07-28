@@ -95,7 +95,7 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown veya 
   ]
 }`;
 
-        let contentParts: any[] = [prompt];
+        const contentParts: any[] = [prompt];
 
         if (image) {
             contentParts.push({

@@ -77,7 +77,7 @@ Yanıtı SADECE aşağıdaki formatta saf JSON olarak dön (markdown kullanma). 
     "notes": "Belge hakkında önemli özet bilgi"
 }`;
 
-        let contentParts: any[] = [prompt];
+        const contentParts: any[] = [prompt];
 
         if (image) {
             contentParts.push({
