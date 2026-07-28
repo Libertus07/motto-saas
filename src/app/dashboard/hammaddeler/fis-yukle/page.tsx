@@ -8,6 +8,7 @@ import { logActivity } from '@/lib/logger'
 import { devLog, devError } from '@/lib/debug';
 import { formatCurrency } from "@/lib/format";
 import { useNotification } from '@/components/NotificationProvider'
+import { ImagePreprocessModal } from '@/components/ui/ImagePreprocessModal'
 
 type ParsedItem = {
     name: string
@@ -44,6 +45,8 @@ export default function FisYukle() {
     const [suppliers, setSuppliers] = useState<{id: string, name: string}[]>([])
     const [step, setStep] = useState<'upload' | 'review' | 'done'>('upload')
     const [error, setError] = useState('')
+    const [isPreprocessOpen, setIsPreprocessOpen] = useState(false)
+    const [preprocessFile, setPreprocessFile] = useState<File | null>(null)
     const { showAlert, showConfirm } = useNotification()
     const supabase = createClient()
     const router = useRouter()
@@ -76,14 +79,6 @@ export default function FisYukle() {
 
         setSelectedFile(file)
 
-        // Vercel 4.5MB request body limit => ~3.3MB file size max.
-        // We set a 3MB safe limit.
-        if (file.size > 3 * 1024 * 1024) {
-            showAlert('Seçtiğiniz belge çok büyük (Max 3MB). Sunucu limitlerine takılmamak için lütfen dosya boyutunu küçültün veya ekran görüntüsü (fotoğraf) kırparak yükleyin.', 'warning');
-            e.target.value = '';
-            return;
-        }
-
         const fileExt = file.name.split('.').pop()?.toLowerCase()
         if (fileExt === 'xml' || fileExt === 'json') {
             const reader = new FileReader()
@@ -107,7 +102,12 @@ export default function FisYukle() {
                 setFileType('json') // AI'a json olarak gönderiyoruz
             }
             reader.readAsArrayBuffer(file)
-        } else {
+        } else if (file.type === 'application/pdf') {
+            if (file.size > 3 * 1024 * 1024) {
+                showAlert('Seçtiğiniz PDF belgesi çok büyük (Max 3MB). Lütfen dosya boyutunu küçültün.', 'warning');
+                e.target.value = '';
+                return;
+            }
             const reader = new FileReader()
             reader.onload = () => {
                 setFileText(null)
@@ -780,6 +780,22 @@ export default function FisYukle() {
                     </div>
                 )}
             </main>
+
+            <ImagePreprocessModal
+                isOpen={isPreprocessOpen}
+                file={preprocessFile}
+                onClose={() => {
+                    setIsPreprocessOpen(false)
+                    setPreprocessFile(null)
+                }}
+                onConfirm={(res) => {
+                    setIsPreprocessOpen(false)
+                    setPreprocessFile(null)
+                    setFileText(null)
+                    setImage(res.dataUrl)
+                    setFileType('image')
+                }}
+            />
         </div>
     )
 }

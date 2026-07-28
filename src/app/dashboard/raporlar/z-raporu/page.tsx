@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency } from "@/lib/format";
+import { ImagePreprocessModal } from '@/components/ui/ImagePreprocessModal'
 
 type Product = {
     id: string
@@ -61,17 +62,12 @@ export default function ZRaporuYukle() {
     const defaultCategories = ['Sıcak İçecek', 'Soğuk İçecek', 'Tatlı', 'Yemek', 'Genel']
     const allCategories = Array.from(new Set([...defaultCategories, ...uniqueCategories]))
 
+    const [isPreprocessOpen, setIsPreprocessOpen] = useState(false)
+    const [preprocessFile, setPreprocessFile] = useState<File | null>(null)
+
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-        
-        // Vercel 4.5MB request body limit => ~3.3MB file size max.
-        // We set a 3MB safe limit.
-        if (file.size > 3 * 1024 * 1024) {
-            showAlert('Seçtiğiniz belge çok büyük (Max 3MB). Sunucu limitlerine takılmamak için lütfen dosya boyutunu küçültün veya ekran görüntüsü (fotoğraf) kırparak yükleyin.', 'warning');
-            e.target.value = '';
-            return;
-        }
 
         setSelectedFile(file)
 
@@ -98,14 +94,23 @@ export default function ZRaporuYukle() {
                 setFileType('json')
             }
             reader.readAsArrayBuffer(file)
-        } else {
+        } else if (file.type === 'application/pdf') {
+            if (file.size > 3 * 1024 * 1024) {
+                showAlert('Seçtiğiniz PDF belgesi çok büyük (Max 3MB). Lütfen dosya boyutunu küçültün.', 'warning');
+                e.target.value = '';
+                return;
+            }
             const reader = new FileReader()
             reader.onload = () => {
                 setFileText(null)
                 setImageUrl(reader.result as string)
-                setFileType(file.type === 'application/pdf' ? 'pdf' : 'image')
+                setFileType('pdf')
             }
             reader.readAsDataURL(file)
+        } else {
+            // Görseller (JPEG/PNG/WEBP) için Görsel İyileştirme Stüdyosu Modalını Aç
+            setPreprocessFile(file)
+            setIsPreprocessOpen(true)
         }
     }
 
@@ -965,6 +970,22 @@ export default function ZRaporuYukle() {
                     </div>
                 </div>
             )}
+
+            <ImagePreprocessModal
+                isOpen={isPreprocessOpen}
+                file={preprocessFile}
+                onClose={() => {
+                    setIsPreprocessOpen(false)
+                    setPreprocessFile(null)
+                }}
+                onConfirm={(res) => {
+                    setIsPreprocessOpen(false)
+                    setPreprocessFile(null)
+                    setFileText(null)
+                    setImageUrl(res.dataUrl)
+                    setFileType('image')
+                }}
+            />
         </div>
     )
 }
