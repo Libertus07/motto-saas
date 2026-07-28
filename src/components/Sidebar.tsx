@@ -100,7 +100,7 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
             <div className="w-10 h-10 rounded-2xl bg-stone-800 animate-pulse shrink-0 border border-stone-700/50" />
           ) : businessLogo ? (
             <div className="w-10 h-10 rounded-2xl bg-stone-950 border border-amber-500/30 p-1 shrink-0 flex items-center justify-center shadow-inner shadow-amber-500/10">
-              <Image src={businessLogo} alt="Logo" width={40} height={40} className="w-full h-full object-contain" />
+              <Image src={businessLogo} alt="Logo" width={40} height={40} unoptimized className="w-full h-full object-contain" onError={() => setBusinessLogo('')} />
             </div>
           ) : (
             <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl shrink-0 font-extrabold shadow-inner">
