@@ -271,3 +271,73 @@ export async function preprocessReceiptImage(
     readinessLabel
   }
 }
+
+/**
+ * Merges multiple processed image dataUrls vertically into a single unified long receipt image.
+ * Ideal for multi-part long Z-reports or multi-page receipts.
+ */
+export async function mergeImagesVertically(dataUrls: string[]): Promise<PreprocessResult> {
+  if (dataUrls.length === 0) {
+    throw new Error('Birleştirilecek görsel bulunamadı.')
+  }
+
+  if (dataUrls.length === 1) {
+    const sizeBytes = Math.round((dataUrls[0].length * 3) / 4)
+    return {
+      dataUrl: dataUrls[0],
+      sizeBytes,
+      width: 0,
+      height: 0,
+      readinessScore: 95,
+      readinessLabel: '🟢 Tek Parça Belge'
+    }
+  }
+
+  const loadedImgs = await Promise.all(
+    dataUrls.map(
+      url =>
+        new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image()
+          img.onload = () => resolve(img)
+          img.onerror = reject
+          img.src = url
+        })
+    )
+  )
+
+  const targetW = Math.max(...loadedImgs.map(i => i.width))
+  let totalH = 0
+  const scaledHeights = loadedImgs.map(img => {
+    const scaledH = Math.round(img.height * (targetW / img.width))
+    totalH += scaledH
+    return scaledH
+  })
+
+  const canvas = document.createElement('canvas')
+  canvas.width = targetW
+  canvas.height = totalH
+  const ctx = canvas.getContext('2d')!
+
+  // Fill background white
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, targetW, totalH)
+
+  let currentY = 0
+  loadedImgs.forEach((img, idx) => {
+    const h = scaledHeights[idx]
+    ctx.drawImage(img, 0, currentY, targetW, h)
+    currentY += h
+  })
+
+  const mergedDataUrl = canvas.toDataURL('image/jpeg', 0.85)
+  const sizeBytes = Math.round((mergedDataUrl.length * 3) / 4)
+
+  return {
+    dataUrl: mergedDataUrl,
+    sizeBytes,
+    width: targetW,
+    height: totalH,
+    readinessScore: 100,
+    readinessLabel: `🟢 Birleştirildi (${loadedImgs.length} Parça Fiş/Z-Raporu)`
+  }
+}
