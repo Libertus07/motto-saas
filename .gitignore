@@ -32,13 +32,13 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 scripts/debug/*.js
 
 # AI Tools
@@ -46,7 +46,3 @@ scripts/debug/*.js
 CLAUDE.md
 graphify-out/
 query_graph.py
-
-# MCP Crash Workaround
-*.csv
-public/*.svg
