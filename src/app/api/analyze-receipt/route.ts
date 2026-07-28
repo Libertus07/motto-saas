@@ -2,25 +2,7 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
 import { devLog, devError } from '@/lib/debug';
-
-function isSafeImageUrl(url: string): boolean {
-    try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== 'https:') return false;
-        const host = parsed.hostname;
-        if (
-            host === 'localhost' ||
-            host.startsWith('127.') ||
-            host.startsWith('10.') ||
-            host.startsWith('192.168.') ||
-            host.startsWith('169.254.') ||
-            /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
-        ) return false;
-        return true;
-    } catch {
-        return false;
-    }
-}
+import { isSafeImageUrl } from '@/lib/ai-security';
 
 export async function POST(req: Request) {
     try {

@@ -7,6 +7,7 @@ CREATE OR REPLACE FUNCTION public.set_default_organization()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
     default_org UUID;

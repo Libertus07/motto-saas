@@ -15,7 +15,7 @@ const parseTRNumber = (val: string | undefined, fallback: number) => {
 
 export async function GET() {
     try {
-        const user = await requireUser()
+        const { user } = await requireUser()
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

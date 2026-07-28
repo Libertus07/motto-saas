@@ -3,18 +3,39 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
 import { devLog, devError } from '@/lib/debug';
 
+import { z } from 'zod';
+
+const AutoCategorizeSchema = z.object({
+  materials: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      category: z.string().optional().nullable()
+    })
+  ).min(1, 'Hammadde listesi boş.').max(200, 'Tek seferde en fazla 200 hammadde kategorize edilebilir.'),
+  categories: z.array(z.string()).optional()
+});
+
 export async function POST(req: Request) {
     try {
-        const { user } = await requireUser();
+        const { user, supabase } = await requireUser();
         if (!user) {
             return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 });
         }
 
-        const { materials, categories } = await req.json();
-
-        if (!materials || materials.length === 0) {
-            return NextResponse.json({ error: 'Hammadde listesi boş.' }, { status: 400 });
+        // AI Kota Kontrolü (SEC-104)
+        const { data: allowed } = await supabase.rpc('check_ai_quota');
+        if (!allowed) {
+            return NextResponse.json({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }, { status: 429 });
         }
+
+        const body = await req.json();
+        const parsed = AutoCategorizeSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Geçersiz veri formatı.' }, { status: 400 });
+        }
+
+        const { materials, categories } = parsed.data;
 
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {

@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { batch_id } = body
+    const { batch_id, organization_id } = body
 
     if (!batch_id) {
       return NextResponse.json({ error: 'Batch ID gerekli' }, { status: 400 })
@@ -18,7 +18,8 @@ export async function POST(req: Request) {
 
     // 1. Z-Raporunu Atomik Olarak Sil
     const { data, error } = await supabase.rpc('delete_z_report_transaction', {
-      p_batch_id: batch_id
+      p_batch_id: batch_id,
+      p_organization_id: organization_id || null
     })
 
     if (error) {
