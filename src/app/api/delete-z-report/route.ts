@@ -16,10 +16,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Batch ID gerekli' }, { status: 400 })
     }
 
+    let targetOrgId = organization_id
+    if (!targetOrgId) {
+      const { data: memberOrg } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .limit(1)
+        .single()
+      targetOrgId = memberOrg?.organization_id || null
+    }
+
+    if (!targetOrgId) {
+      return NextResponse.json({ error: 'Aktif organizasyon kimliği bulunamadı' }, { status: 400 })
+    }
+
     // 1. Z-Raporunu Atomik Olarak Sil
     const { data, error } = await supabase.rpc('delete_z_report_transaction', {
       p_batch_id: batch_id,
-      p_organization_id: organization_id || null
+      p_organization_id: targetOrgId
     })
 
     if (error) {

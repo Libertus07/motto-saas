@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
+import { OrganizationSwitcher } from '@/components/OrganizationSwitcher'
 
 export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
   const pathname = usePathname()
@@ -116,17 +117,12 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
             ) : (
               <>
                 <h1
-                  className="font-extrabold text-amber-400 text-sm sm:text-base truncate tracking-tight"
+                  className="font-extrabold text-amber-400 text-sm sm:text-base truncate tracking-tight mb-1"
                   title={businessName}
                 >
                   {businessName}
                 </h1>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <p className="text-stone-400 text-[10px] uppercase font-bold tracking-wider">
-                    Restoran Zekası
-                  </p>
-                </div>
+                <OrganizationSwitcher />
               </>
             )}
           </div>
