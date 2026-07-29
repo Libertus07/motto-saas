@@ -8,8 +8,13 @@ import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency } from "@/lib/format";
-import { ImagePreprocessModal } from '@/components/ui/ImagePreprocessModal'
+import dynamic from 'next/dynamic'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
+
+const ImagePreprocessModal = dynamic(
+  () => import('@/components/ui/ImagePreprocessModal').then(mod => mod.ImagePreprocessModal),
+  { ssr: false }
+)
 
 type Product = {
     id: string

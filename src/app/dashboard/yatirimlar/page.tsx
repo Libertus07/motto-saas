@@ -11,14 +11,35 @@ import { EnhancedInvestment } from '@/features/investments/types'
 import { useInvestmentsData } from '@/features/investments/hooks/useInvestmentsData'
 import { useInvestmentsUI } from '@/features/investments/hooks/useInvestmentsUI'
 
+import dynamic from 'next/dynamic'
+
 // Components
 import { InvestmentsList } from '@/features/investments/components/InvestmentsList'
-import { BuyInvestmentModal } from '@/features/investments/components/BuyInvestmentModal'
-import { RentIncomeModal } from '@/features/investments/components/RentIncomeModal'
-import { UpdateValueModal } from '@/features/investments/components/UpdateValueModal'
-import { EditInvestmentModal } from '@/features/investments/components/EditInvestmentModal'
-import { DocumentPreviewModal } from '@/features/investments/components/DocumentPreviewModal'
-import { NotePreviewModal } from '@/features/investments/components/NotePreviewModal'
+
+const BuyInvestmentModal = dynamic(
+  () => import('@/features/investments/components/BuyInvestmentModal').then(mod => mod.BuyInvestmentModal),
+  { ssr: false }
+)
+const RentIncomeModal = dynamic(
+  () => import('@/features/investments/components/RentIncomeModal').then(mod => mod.RentIncomeModal),
+  { ssr: false }
+)
+const UpdateValueModal = dynamic(
+  () => import('@/features/investments/components/UpdateValueModal').then(mod => mod.UpdateValueModal),
+  { ssr: false }
+)
+const EditInvestmentModal = dynamic(
+  () => import('@/features/investments/components/EditInvestmentModal').then(mod => mod.EditInvestmentModal),
+  { ssr: false }
+)
+const DocumentPreviewModal = dynamic(
+  () => import('@/features/investments/components/DocumentPreviewModal').then(mod => mod.DocumentPreviewModal),
+  { ssr: false }
+)
+const NotePreviewModal = dynamic(
+  () => import('@/features/investments/components/NotePreviewModal').then(mod => mod.NotePreviewModal),
+  { ssr: false }
+)
 import { useAppTour } from '@/hooks/useAppTour'
 
 export default function YatirimlarPage() {

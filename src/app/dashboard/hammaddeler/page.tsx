@@ -6,8 +6,16 @@ import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { formatDate, formatCurrency } from '@/lib/format'
-import { MaterialHistoryModal } from '@/features/materials/components/MaterialHistoryModal'
-import { MaterialAutoCatModal } from '@/features/materials/components/MaterialAutoCatModal'
+import dynamic from 'next/dynamic'
+
+const MaterialHistoryModal = dynamic(
+  () => import('@/features/materials/components/MaterialHistoryModal').then(mod => mod.MaterialHistoryModal),
+  { ssr: false }
+)
+const MaterialAutoCatModal = dynamic(
+  () => import('@/features/materials/components/MaterialAutoCatModal').then(mod => mod.MaterialAutoCatModal),
+  { ssr: false }
+)
 import { useAppTour } from '@/hooks/useAppTour'
 
 type Material = {

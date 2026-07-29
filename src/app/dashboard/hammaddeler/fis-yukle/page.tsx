@@ -7,10 +7,15 @@ import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { devLog, devError } from '@/lib/debug';
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/lib/format"
 import { useNotification } from '@/components/NotificationProvider'
-import { ImagePreprocessModal } from '@/components/ui/ImagePreprocessModal'
+import dynamic from 'next/dynamic'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
+
+const ImagePreprocessModal = dynamic(
+  () => import('@/components/ui/ImagePreprocessModal').then(mod => mod.ImagePreprocessModal),
+  { ssr: false }
+)
 
 type ParsedItem = {
     name: string
