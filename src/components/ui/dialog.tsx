@@ -20,6 +20,9 @@ export function Dialog({
   children,
   className
 }: DialogProps) {
+  const titleId = React.useId()
+  const descId = React.useId()
+
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
@@ -37,9 +40,6 @@ export function Dialog({
   }, [isOpen, onClose])
 
   if (!isOpen) return null
-
-  const titleId = React.useId()
-  const descId = React.useId()
 
   return (
     <div

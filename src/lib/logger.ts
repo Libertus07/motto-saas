@@ -10,7 +10,7 @@ export async function logActivity(
   moduleName: string,
   actionType: LogAction,
   description: string,
-  details?: any
+  details?: Record<string, unknown> | unknown
 ) {
   try {
     const supabase = await createServerSupabase()
@@ -41,7 +41,7 @@ export async function logActivity(
     let safeDetails = {}
     try {
       if (details) safeDetails = JSON.parse(JSON.stringify(details))
-    } catch (e) {
+    } catch {
       safeDetails = { error: 'Detaylar dönüştürülemedi' }
     }
 
@@ -53,7 +53,7 @@ export async function logActivity(
       }
     }
 
-    const logPayload: any = {
+    const logPayload: Record<string, unknown> = {
       module: moduleName,
       action_type: actionType,
       description,
@@ -70,7 +70,8 @@ export async function logActivity(
     if (error) {
       devError('Loglama tablosuna eklenemedi:', JSON.stringify(error, null, 2))
     }
-  } catch (error: any) {
-    devError('Loglama kritik hatası:', error?.message || error)
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error)
+    devError('Loglama kritik hatası:', msg)
   }
 }

@@ -1,4 +1,5 @@
-import { Investment, InvestmentTransaction } from '@/types/database';
+import type { Investment, InvestmentTransaction } from '@/types/database';
+export type { Investment, InvestmentTransaction };
 
 export type Account = {
     id: string

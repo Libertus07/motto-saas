@@ -93,16 +93,6 @@ export function ImagePreprocessModal({
     }
   }, [isOpen, filesList])
 
-  // Automatically trigger vertical merge whenever fileStates finished processing
-  useEffect(() => {
-    if (fileStates.length > 1 && shouldMerge) {
-      const allDone = fileStates.every(s => !s.loading && s.result !== null)
-      if (allDone) {
-        triggerMerge(fileStates)
-      }
-    }
-  }, [fileStates, shouldMerge])
-
   const triggerMerge = async (currentList: PerFileState[]) => {
     const urls = currentList.map(s => s.result?.dataUrl).filter((u): u is string => !!u)
     if (urls.length < 2) return
@@ -117,6 +107,16 @@ export function ImagePreprocessModal({
       setIsMerging(false)
     }
   }
+
+  // Automatically trigger vertical merge whenever fileStates finished processing
+  useEffect(() => {
+    if (fileStates.length > 1 && shouldMerge) {
+      const allDone = fileStates.every(s => !s.loading && s.result !== null)
+      if (allDone) {
+        triggerMerge(fileStates)
+      }
+    }
+  }, [fileStates, shouldMerge])
 
   const processFileAtIndex = async (
     idx: number,
