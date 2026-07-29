@@ -44,12 +44,21 @@ export async function POST(req: Request) {
         } else {
             devError('Receipt RPC (2-param) warning:', rpcErr1)
             const { error: rpcErr2 } = await supabase.rpc('delete_receipt_transaction', { 
-                p_batch_id: batch_id
+                p_batch_id: batch_id,
+                p_user_id: user.id
             })
             if (!rpcErr2) {
                 rpcSuccess = true
             } else {
-                devError('Receipt RPC (1-param) warning:', rpcErr2)
+                devError('Receipt RPC (p_user_id) warning:', rpcErr2)
+                const { error: rpcErr3 } = await supabase.rpc('delete_receipt_transaction', { 
+                    p_batch_id: batch_id
+                })
+                if (!rpcErr3) {
+                    rpcSuccess = true
+                } else {
+                    devError('Receipt RPC (1-param) warning:', rpcErr3)
+                }
             }
         }
 

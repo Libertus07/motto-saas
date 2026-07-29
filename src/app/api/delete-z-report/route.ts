@@ -44,14 +44,24 @@ export async function POST(req: Request) {
       rpcSuccess = true
     } else {
       devError('RPC (2-param) warning:', rpcErr1)
-      // B. 1-Param RPC Dene
+      // B. (p_batch_id, p_user_id) RPC Dene
       const { error: rpcErr2 } = await supabase.rpc('delete_z_report_transaction', {
-        p_batch_id: batch_id
+        p_batch_id: batch_id,
+        p_user_id: user.id
       })
       if (!rpcErr2) {
         rpcSuccess = true
       } else {
-        devError('RPC (1-param) warning:', rpcErr2)
+        devError('RPC (p_user_id) warning:', rpcErr2)
+        // C. 1-Param RPC Dene
+        const { error: rpcErr3 } = await supabase.rpc('delete_z_report_transaction', {
+          p_batch_id: batch_id
+        })
+        if (!rpcErr3) {
+          rpcSuccess = true
+        } else {
+          devError('RPC (1-param) warning:', rpcErr3)
+        }
       }
     }
 
