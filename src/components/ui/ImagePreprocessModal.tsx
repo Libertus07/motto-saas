@@ -256,18 +256,23 @@ export function ImagePreprocessModal({
     : currentSt?.result?.dataUrl
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title-studio"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200"
+    >
       <div className="relative w-full max-w-5xl max-h-[94vh] flex flex-col bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl overflow-hidden text-stone-100">
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-stone-800 bg-stone-950/70">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-lg">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-lg" aria-hidden="true">
               ✨
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-stone-100 text-lg">Akıllı Görsel İyileştirme Stüdyosu</h3>
+                <h3 id="modal-title-studio" className="font-semibold text-stone-100 text-lg">Akıllı Görsel İyileştirme Stüdyosu</h3>
                 <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold">
                   v3 Ultimate Studio
                 </span>
@@ -278,7 +283,8 @@ export function ImagePreprocessModal({
 
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-stone-200 transition-colors flex items-center justify-center"
+            aria-label="Modali Kapat"
+            className="w-8 h-8 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-stone-200 transition-colors flex items-center justify-center font-bold"
           >
             ✕
           </button>

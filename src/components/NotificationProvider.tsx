@@ -77,7 +77,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     <NotificationContext.Provider value={{ showAlert, showConfirm }}>
       {children}
       {modalState.isOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-fade-in">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="notification-modal-title"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-fade-in"
+        >
           {/* Backdrop */}
           <div 
             className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-all"
@@ -95,7 +100,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
             {/* Header / Title */}
             <div className="flex items-center gap-3.5 mb-4 mt-2">
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl font-bold ${
+              <div
+                aria-hidden="true"
+                className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl font-bold ${
                 modalState.severity === 'success' ? 'bg-emerald-500/10 text-emerald-400' :
                 modalState.severity === 'error' ? 'bg-red-500/10 text-red-400' :
                 modalState.severity === 'warning' ? 'bg-amber-500/10 text-amber-400' : 'bg-purple-500/10 text-purple-400'
@@ -105,7 +112,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                 {modalState.severity === 'warning' && '⚠️'}
                 {modalState.severity === 'info' && 'i'}
               </div>
-              <h3 className="font-bold text-lg leading-tight tracking-wide">{modalState.title}</h3>
+              <h3 id="notification-modal-title" className="font-bold text-lg leading-tight tracking-wide">{modalState.title}</h3>
             </div>
 
             {/* Message Body */}

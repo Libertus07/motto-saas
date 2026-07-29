@@ -13,8 +13,10 @@
   --color-success: #10b981;
   --color-danger: #ef4444;
   --color-warning: #f59e0b;
+  --color-info: #3b82f6;
   --color-surface-dark: #0c0a09;
   --color-card-dark: #1c1917;
+  --color-border-dark: #292524;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

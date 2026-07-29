@@ -135,9 +135,10 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
         {onCloseMobile && (
           <button
             onClick={onCloseMobile}
+            aria-label="Menüyü kapat"
             className="md:hidden text-stone-400 hover:text-white p-1.5 rounded-xl hover:bg-stone-800/80 border border-stone-700/50 transition-colors ml-2"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -145,11 +146,11 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
       </div>
 
       {/* ──────────────── NAVIGATION MENU ──────────────── */}
-      <nav id="tour-sidebar-nav" className="flex-1 p-3.5 space-y-5 overflow-y-auto scrollbar-none">
+      <nav id="tour-sidebar-nav" aria-label="Ana Navigasyon" className="flex-1 p-3.5 space-y-5 overflow-y-auto scrollbar-none">
         {menuGroups.map((group, groupIndex) => (
           <div key={groupIndex} className="space-y-1">
             <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-stone-500 uppercase tracking-widest px-3 py-1">
-              <span className={`w-1.5 h-1.5 rounded-full ${group.badgeColor}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${group.badgeColor}`} aria-hidden="true" />
               <span>{group.title}</span>
             </div>
 
@@ -160,6 +161,7 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
                   <Link
                     key={item.path}
                     href={item.path}
+                    aria-current={isActive ? 'page' : undefined}
                     onClick={() => {
                       if (onCloseMobile) onCloseMobile()
                     }}
@@ -171,10 +173,10 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
                   >
                     {/* Active Vertical Glow Line */}
                     {isActive && (
-                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-amber-500 rounded-r-full shadow-sm shadow-amber-400" />
+                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-amber-500 rounded-r-full shadow-sm shadow-amber-400" aria-hidden="true" />
                     )}
 
-                    <span className="text-lg transition-transform group-hover:scale-110">{item.icon}</span>
+                    <span className="text-lg transition-transform group-hover:scale-110" aria-hidden="true">{item.icon}</span>
                     <span className="truncate">{item.name}</span>
                   </Link>
                 )
@@ -196,7 +198,7 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
               }}
               className="flex items-center gap-3 px-4 py-3 text-xs sm:text-sm text-stone-300 hover:bg-stone-800/60 hover:text-amber-400 transition-colors border-b border-stone-800/80 font-bold"
             >
-              <span className="text-base">👤</span> Profilim
+              <span className="text-base" aria-hidden="true">👤</span> Profilim
             </Link>
             <Link
               href="/dashboard/ayarlar?tab=genel"
@@ -206,19 +208,21 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
               }}
               className="flex items-center gap-3 px-4 py-3 text-xs sm:text-sm text-stone-300 hover:bg-stone-800/60 hover:text-amber-400 transition-colors border-b border-stone-800/80 font-bold"
             >
-              <span className="text-base">⚙️</span> Hesap Ayarları
+              <span className="text-base" aria-hidden="true">⚙️</span> Hesap Ayarları
             </Link>
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-3 text-xs sm:text-sm text-rose-400 hover:bg-rose-500/10 transition-colors text-left font-extrabold"
             >
-              <span className="text-base">🚪</span> Çıkış Yap
+              <span className="text-base" aria-hidden="true">🚪</span> Çıkış Yap
             </button>
           </div>
         )}
 
         <button
           id="tour-sidebar-profile"
+          aria-label="Profil menüsünü aç"
+          aria-expanded={showProfileMenu}
           onClick={() => setShowProfileMenu(!showProfileMenu)}
           className="w-full bg-stone-900/90 rounded-2xl p-2.5 text-left border border-stone-800/80 hover:border-amber-500/40 hover:bg-stone-900 transition-all flex items-center justify-between group active:scale-[0.98] shadow-inner"
         >
@@ -236,7 +240,7 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
             </div>
           </div>
 
-          <span className="text-stone-500 group-hover:text-amber-400 transition-colors text-xs p-1">
+          <span className="text-stone-500 group-hover:text-amber-400 transition-colors text-xs p-1" aria-hidden="true">
             {showProfileMenu ? '▼' : '▲'}
           </span>
         </button>
