@@ -337,9 +337,14 @@ export default function ZRaporuYukle() {
                 }
                 
                 // Kullanıcı onayladı, eski Z-Raporunu sil (Rollback)
-                const { error: delError } = await supabase.rpc('delete_z_report_transaction', { p_batch_id: dupData[0].batch_id, p_user_id: user?.id })
-                if (delError) {
-                    await showAlert("Eski Z-Raporu silinirken hata oluştu: " + delError.message, 'error')
+                const delRes = await fetch('/api/delete-z-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ batch_id: dupData[0].batch_id })
+                })
+                const delData = await delRes.json()
+                if (delData.error) {
+                    await showAlert("Eski Z-Raporu silinirken hata oluştu: " + delData.error, 'error')
                     setLoading(false)
                     return
                 }

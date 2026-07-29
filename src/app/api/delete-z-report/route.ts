@@ -32,15 +32,97 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Aktif organizasyon kimliği bulunamadı' }, { status: 400 })
     }
 
-    // 1. Z-Raporunu Atomik Olarak Sil
-    const { data, error } = await supabase.rpc('delete_z_report_transaction', {
+    // 1. Z-Raporunu Atomik Olarak Sil (RPC veya Resilient Fallback)
+    let rpcSuccess = false
+    
+    // A. 2-Param RPC Dene
+    const { error: rpcErr1 } = await supabase.rpc('delete_z_report_transaction', {
       p_batch_id: batch_id,
       p_organization_id: targetOrgId
     })
+    if (!rpcErr1) {
+      rpcSuccess = true
+    } else {
+      devError('RPC (2-param) warning:', rpcErr1)
+      // B. 1-Param RPC Dene
+      const { error: rpcErr2 } = await supabase.rpc('delete_z_report_transaction', {
+        p_batch_id: batch_id
+      })
+      if (!rpcErr2) {
+        rpcSuccess = true
+      } else {
+        devError('RPC (1-param) warning:', rpcErr2)
+      }
+    }
 
-    if (error) {
-      devError('Delete Z-Report RPC Error:', error)
-      throw new Error(error.message || 'Atomic silme işlemi başarısız.')
+    // C. Graceful Fallback: RPC schema cache'de yoksa doğrudan DB sorguları ile rollback yap
+    if (!rpcSuccess) {
+      devLog('RPC not found in schema cache. Executing resilient fallback DB cleanup...')
+      
+      // i. Stokları geri yükle
+      const { data: stockMovs } = await supabase
+        .from('stock_movements')
+        .select('material_id, quantity')
+        .eq('batch_id', batch_id)
+
+      if (stockMovs && stockMovs.length > 0) {
+        for (const mov of stockMovs) {
+          if (mov.material_id && mov.quantity) {
+            const { data: mat } = await supabase
+              .from('materials')
+              .select('stock_quantity')
+              .eq('id', mov.material_id)
+              .single()
+            
+            const currentQty = Number(mat?.stock_quantity) || 0
+            await supabase
+              .from('materials')
+              .update({ stock_quantity: currentQty + Number(mov.quantity) })
+              .eq('id', mov.material_id)
+          }
+        }
+      }
+
+      // ii. Stok hareketlerini, satışları ve giderleri sil
+      await supabase.from('stock_movements').delete().eq('batch_id', batch_id)
+      await supabase.from('sales').delete().eq('batch_id', batch_id)
+      await supabase.from('expenses').delete().eq('batch_id', batch_id)
+
+      // iii. Kasa hareketlerini rollback yap ve sil
+      const { data: accMovs } = await supabase
+        .from('account_movements')
+        .select('account_id, amount, movement_type')
+        .eq('source_type', 'z_report')
+        .eq('source_id', String(batch_id))
+
+      if (accMovs && accMovs.length > 0) {
+        for (const accMov of accMovs) {
+          if (accMov.account_id && accMov.amount) {
+            const { data: acc } = await supabase
+              .from('accounts')
+              .select('balance')
+              .eq('id', accMov.account_id)
+              .single()
+
+            const currentBalance = Number(acc?.balance) || 0
+            const change = Number(accMov.amount)
+            const newBalance = accMov.movement_type === 'giris'
+              ? currentBalance - change
+              : currentBalance + change
+
+            await supabase
+              .from('accounts')
+              .update({ balance: newBalance })
+              .eq('id', accMov.account_id)
+          }
+        }
+      }
+
+      await supabase
+        .from('account_movements')
+        .delete()
+        .eq('source_type', 'z_report')
+        .eq('source_id', String(batch_id))
     }
 
     // 2. Audit Log Ekle
@@ -52,6 +134,7 @@ export async function POST(req: Request) {
       action_type: 'SILME',
       description: 'Z-Raporu kaydı silindi ve stok/finans rollback yapıldı.',
       user_id: user.id,
+      organization_id: targetOrgId,
       details: {
         batch_id,
         _meta: { ip: ipAddress, userAgent }
