@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useMemo, Fragment } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency } from '@/lib/format'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 type Material = { id: string; name: string; unit: string; price_per_unit: number }
 type SubRecipe = { id: string; name: string; yield_quantity: number; yield_unit: string; wastage_percent: number; cost_per_yield?: number }
@@ -54,16 +55,12 @@ export default function Urunler() {
   const [recipeItems, setRecipeItems] = useState<ProductIngredient[]>([])
 
   const supabase = createClient()
-  const router = useRouter()
 
   const defaultCategories = ['Sıcak Kahveler', 'Soğuk Kahveler', 'Tatlılar', 'Çaylar', 'Kutu İçecekler', 'Diğer']
   const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)))
   const allCategories = Array.from(new Set([...defaultCategories, ...uniqueCategories]))
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const fetchData = async () => {
     setLoading(true)
     const { data: mats } = await supabase.from('materials').select('*').order('name')
@@ -120,6 +117,11 @@ export default function Urunler() {
     }
     setLoading(false)
   }
+
+  useEffect(() => {
+    fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ─── Accordion Toggle ──────────────────────────────────────
   const toggleCategory = (cat: string) => {
@@ -205,16 +207,16 @@ export default function Urunler() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       const suggestions = (data.suggestions || [])
-        .map((s: any) => {
+        .map((s: { id: string, suggested_category: string }) => {
           const prod = products.find(p => p.id === s.id)
           return { id: s.id, name: prod?.name || s.id, current: prod?.category || 'Diğer', suggested: s.suggested_category }
         })
-        .filter((s: any) => s.suggested !== s.current)
+        .filter((s: { suggested: string, current: string }) => s.suggested !== s.current)
 
       setAutoCatSuggestions(suggestions)
       setAutoCatModalOpen(true)
-    } catch (e: any) {
-      await showAlert('Hata: ' + e.message, 'error')
+    } catch (e: unknown) {
+      await showAlert('Hata: ' + (e as Error).message, 'error')
     }
     setAutoCatLoading(false)
   }
@@ -368,7 +370,7 @@ export default function Urunler() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       if (data.ingredients && Array.isArray(data.ingredients)) {
-        const newItems: ProductIngredient[] = data.ingredients.map((ing: any) => ({
+        const newItems: ProductIngredient[] = data.ingredients.map((ing: { type: string, id: string, quantity: number }) => ({
           type: ing.type || 'material',
           item_id: ing.id,
           quantity: Number(ing.quantity) || 0
@@ -385,8 +387,8 @@ export default function Urunler() {
         }
         setRecipeItems(newItems)
       }
-    } catch (err: any) {
-      await showAlert(err.message, 'error')
+    } catch (err: unknown) {
+      await showAlert((err as Error).message, 'error')
     }
     setIsBuildingAiRecipe(false)
   }
@@ -499,68 +501,73 @@ export default function Urunler() {
                     'Değişiklik bekleniyor'
                   )}
                 </span>
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     setBulkEditMode(false)
                     setChangedIds(new Set())
                   }}
-                  className="bg-stone-800 hover:bg-stone-700 text-stone-300 px-3 py-1.5 rounded-lg text-xs font-semibold border border-stone-700 transition-colors"
+                  className="border-stone-700 bg-stone-800 text-stone-300 hover:bg-stone-700 hover:text-white"
                 >
                   İptal
-                </button>
-                <button
+                </Button>
+                <Button
+                  size="sm"
                   onClick={handleBulkSave}
                   disabled={bulkSaving || changedIds.size === 0}
-                  className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-950 font-bold px-4 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-all active:scale-95"
+                  className="bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold shadow-md shadow-amber-500/20"
                 >
                   {bulkSaving ? (
                     <>
-                      <span className="w-3.5 h-3.5 border-2 border-stone-950 border-t-transparent rounded-full animate-spin" />
+                      <span className="w-3.5 h-3.5 border-2 border-stone-950 border-t-transparent rounded-full animate-spin mr-2" />
                       Kaydediliyor...
                     </>
                   ) : (
                     <>✓ Tümünü Kaydet</>
                   )}
-                </button>
+                </Button>
               </div>
             ) : (
               <>
-                <button
+                <Button
+                  variant="outline"
                   onClick={enterBulkEdit}
-                  className="bg-stone-900 hover:bg-stone-800 text-stone-200 font-medium px-3.5 py-2 rounded-xl text-xs sm:text-sm border border-stone-800 flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
+                  className="bg-stone-900 border-stone-800 text-stone-200 hover:bg-stone-800 shadow-sm"
                 >
-                  <span>✏️</span>
-                  <span>Hızlı Düzenle</span>
-                </button>
+                  <span className="mr-2">✏️</span>
+                  Hızlı Düzenle
+                </Button>
 
-                <button
+                <Button
+                  variant="outline"
                   onClick={handleAutoCategorize}
                   disabled={autoCatLoading}
-                  className="bg-violet-950/60 hover:bg-violet-900/80 text-violet-300 hover:text-violet-200 font-semibold px-3.5 py-2 rounded-xl text-xs sm:text-sm border border-violet-800/40 flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
+                  className="bg-violet-950/60 border-violet-800/40 text-violet-300 hover:bg-violet-900/80 hover:text-violet-200 shadow-sm"
                 >
                   {autoCatLoading ? (
                     <>
-                      <span className="w-3.5 h-3.5 border-2 border-violet-400/30 border-t-violet-400 rounded-full animate-spin" />
-                      <span>Analiz...</span>
+                      <span className="w-3.5 h-3.5 border-2 border-violet-400/30 border-t-violet-400 rounded-full animate-spin mr-2" />
+                      Analiz...
                     </>
                   ) : (
                     <>
-                      <span>🤖</span>
-                      <span>AI Kategorize</span>
+                      <span className="mr-2">🤖</span>
+                      AI Kategorize
                     </>
                   )}
-                </button>
+                </Button>
 
-                <button
+                <Button
                   onClick={() => {
                     resetForm()
                     setShowModal(true)
                   }}
-                  className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-extrabold px-4 py-2 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 shadow-lg shadow-amber-500/20 transition-all active:scale-95"
+                  className="bg-amber-500 hover:bg-amber-600 text-stone-950 font-extrabold shadow-lg shadow-amber-500/20"
                 >
-                  <span>➕</span>
-                  <span>Yeni Ürün Ekle</span>
-                </button>
+                  <span className="mr-2">➕</span>
+                  Yeni Ürün Ekle
+                </Button>
               </>
             )}
           </div>
@@ -625,12 +632,12 @@ export default function Urunler() {
           {/* Search Input */}
           <div className="flex-1 relative">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">🔍</span>
-            <input
+            <Input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Ürün adı ile hızlı ara..."
-              className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-9 pr-4 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500/50 transition-colors placeholder:text-stone-600"
+              className="pl-9 pr-8"
             />
             {search && (
               <button
@@ -659,7 +666,7 @@ export default function Urunler() {
 
             <select
               value={sortBy}
-              onChange={e => setSortBy(e.target.value as any)}
+              onChange={e => setSortBy(e.target.value as 'name' | 'price_desc' | 'price_asc' | 'margin_desc' | 'sales_desc')}
               className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-300 text-xs focus:outline-none focus:border-amber-500/50 cursor-pointer"
             >
               <option value="name">İsme Göre (A-Z)</option>
@@ -689,7 +696,7 @@ export default function Urunler() {
             <div className="text-5xl mb-3">📋</div>
             <h3 className="text-lg font-bold text-stone-300 mb-1">Aramanıza Uygun Ürün Bulunamadı</h3>
             <p className="text-xs text-stone-400 max-w-sm mx-auto">
-              Arama filtrenizi temizleyerek veya "+ Yeni Ürün Ekle" butonunu kullanarak yeni ürün tanımlayabilirsiniz.
+              Arama filtrenizi temizleyerek veya &quot;+ Yeni Ürün Ekle&quot; butonunu kullanarak yeni ürün tanımlayabilirsiniz.
             </p>
           </div>
         ) : (

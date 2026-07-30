@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { useOrganization } from '@/context/OrganizationContext'
 import { formatCurrency, formatDate } from '@/lib/format'
 
 type Supplier = {
@@ -50,6 +51,7 @@ type GroupedReceipt = {
 
 export default function Tedarikciler() {
   const { showAlert, showConfirm } = useNotification()
+  const { activeOrg } = useOrganization()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
@@ -244,7 +246,7 @@ export default function Tedarikciler() {
         const response = await fetch('/api/delete-receipt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ batch_id: trx.batch_id })
+          body: JSON.stringify({ batch_id: trx.batch_id, organization_id: activeOrg?.id })
         })
 
         const data = await response.json()

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { useOrganization } from '@/context/OrganizationContext'
 import { devLog, devError } from '@/lib/debug';
 import { formatCurrency, formatDate } from "@/lib/format";
 import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
@@ -56,6 +57,7 @@ type GroupedMonth = {
 
 export default function TedarikciGecmisi() {
     const { showAlert, showConfirm } = useNotification()
+    const { activeOrg } = useOrganization()
     const [allReceipts, setAllReceipts] = useState<GroupedReceipt[]>([])
     const [loading, setLoading] = useState(true)
     const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -254,7 +256,7 @@ export default function TedarikciGecmisi() {
             const res = await fetch('/api/delete-receipt', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ batch_id: group.batchId })
+                body: JSON.stringify({ batch_id: group.batchId, organization_id: activeOrg?.id })
             })
             
             const data = await res.json()

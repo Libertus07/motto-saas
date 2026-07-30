@@ -291,6 +291,7 @@ function ProfilTab() {
         setCurrentEmail(user.email || '')
       }
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleUpdateEmail = async () => {
@@ -631,7 +632,7 @@ function GenelTab({
     const fileExt = file.name.split('.').pop()
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
 
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('motto_assets')
       .upload(`logos/${fileName}`, file, { upsert: true })
 
@@ -1030,13 +1031,7 @@ function EkipTab() {
   )
 }
 
-function EntegrasyonlarTab({
-  s,
-  set
-}: {
-  s: Settings
-  set: (k: keyof Settings, v: Settings[keyof Settings]) => void
-}) {
+function EntegrasyonlarTab() {
   const integrations = [
     { name: 'Paraşüt', description: 'Muhasebe yazılımı entegrasyonu', icon: '📑', tag: 'Yakında' },
     { name: 'Logo', description: 'ERP entegrasyonu', icon: '🔗', tag: 'Yakında' },
@@ -1110,6 +1105,7 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   useEffect(() => {
     const t = setTimeout(onDone, 2500)
     return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return (
     <div className="fixed bottom-6 right-6 bg-stone-900 border border-stone-800 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 z-50 animate-fadeIn backdrop-blur-md">
@@ -1121,7 +1117,6 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Ayarlar() {
-  const { showAlert } = useNotification()
   const [activeTab, setActiveTab] = useState<Tab>('genel')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -1137,10 +1132,10 @@ export default function Ayarlar() {
       const params = new URLSearchParams(window.location.search)
       const tab = params.get('tab') as Tab
       if (tab && ['genel', 'profil', 'finansal', 'bildirimler', 'ekip', 'entegrasyonlar'].includes(tab)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setActiveTab(tab)
       }
     }
-    fetchSettings()
   }, [])
 
   const fetchSettings = async () => {
@@ -1152,7 +1147,7 @@ export default function Ayarlar() {
         const key = row.key as keyof Settings
         if (key === 'material_categories') {
           const cats = Array.isArray(row.value) ? row.value : JSON.parse(row.value || '[]')
-          ;(merged as any)[key] = cats
+          ;(merged as Record<string, unknown>)[key] = cats
           setCategories(cats)
         } else if (
           key === 'notify_critical_stock' ||
@@ -1160,9 +1155,9 @@ export default function Ayarlar() {
           key === 'notify_daily_revenue' ||
           key === 'notify_supplier_price'
         ) {
-          ;(merged as any)[key] = row.value === true || row.value === 'true'
+          ;(merged as Record<string, unknown>)[key] = row.value === true || row.value === 'true'
         } else {
-          ;(merged as any)[key] = row.value
+          ;(merged as Record<string, unknown>)[key] = row.value
         }
       })
       setSettings(merged)
@@ -1170,6 +1165,12 @@ export default function Ayarlar() {
     }
     setLoading(false)
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchSettings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }))
@@ -1181,7 +1182,7 @@ export default function Ayarlar() {
 
     const changes: string[] = []
     for (const [key, value] of entries) {
-      const initialVal = (initialSettings as any)[key]
+      const initialVal = (initialSettings as Record<string, unknown>)[key]
       if (value !== initialVal) {
         const label = SETTINGS_LABELS[key] || key
         const formatVal = (v: string | boolean | string[]) =>
@@ -1353,7 +1354,7 @@ export default function Ayarlar() {
               <BildirimlerTab s={settings} set={set} onSave={handleSave} saving={saving} />
             )}
             {activeTab === 'ekip' && <EkipTab />}
-            {activeTab === 'entegrasyonlar' && <EntegrasyonlarTab s={settings} set={set} />}
+            {activeTab === 'entegrasyonlar' && <EntegrasyonlarTab />}
           </>
         )}
       </main>

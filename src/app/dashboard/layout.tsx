@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import { useAppTour } from '@/hooks/useAppTour'
 import { OrganizationProvider } from '@/context/OrganizationContext'
+import { Toaster } from '@/components/ui/sonner'
 
 export default function DashboardLayout({
   children,
@@ -89,6 +90,7 @@ export default function DashboardLayout({
           </div>
         </div>
       </div>
+      <Toaster position="top-right" richColors />
     </OrganizationProvider>
   )
 }
