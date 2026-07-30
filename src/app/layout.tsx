@@ -1,9 +1,9 @@
 
-import { Outfit } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
-const outfit = Outfit({
-  variable: "--font-outfit",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -33,7 +33,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${outfit.variable} font-sans h-full antialiased`}
+      className={`${inter.variable} font-sans h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider
