@@ -15,7 +15,7 @@ import { ReportsTab } from '@/features/pricing/components/tabs/ReportsTab'
 export default function FiyatMotoruPage() {
   const [activeTab, setActiveTab] = useState<'sales' | 'results' | 'reports'>('sales')
   const [saving, setSaving] = useState(false)
-  const { showNotification } = useNotification()
+  const { showAlert } = useNotification()
 
   const { products, setProducts, expenses, loading, realSalesMeta, settings, setSettings } = usePricingData()
   
@@ -48,10 +48,10 @@ export default function FiyatMotoruPage() {
         return c ? { ...p, calculated_cost: c.totalCost } : p
       }))
       
-      showNotification('success', 'Başarılı', 'Birim maliyetler ürün kartlarına kaydedildi.')
+      showAlert('Birim maliyetler ürün kartlarına kaydedildi.', 'success')
     } catch (err: any) {
       console.error('Kaydetme hatası:', err)
-      showNotification('error', 'Hata', 'Kaydetme işlemi başarısız oldu.')
+      showAlert('Kaydetme işlemi başarısız oldu.', 'error')
     } finally {
       setSaving(false)
     }
