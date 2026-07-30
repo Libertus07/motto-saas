@@ -57,7 +57,7 @@ export default function KasaSayimPage() {
     const [countedMealCard, setCountedMealCard] = useState<number | ''>('')
 
     // Kasiyer Düzeltme Modülü
-    const [adjustmentType, setAdjustmentType] = useState<'none' | 'cash_to_credit' | 'credit_to_cash'>('none')
+    const [adjustmentType, setAdjustmentType] = useState<'none' | 'cash_to_credit' | 'credit_to_cash' | 'overcharged_pos_cash_refund'>('none')
     const [adjustmentAmount, setAdjustmentAmount] = useState<number | ''>('')
     const [adjustmentNote, setAdjustmentNote] = useState('')
 
@@ -222,6 +222,9 @@ export default function KasaSayimPage() {
     } else if (adjustmentType === 'credit_to_cash') {
         adjCash = adjAmount;
         adjCredit = -adjAmount;
+    } else if (adjustmentType === 'overcharged_pos_cash_refund') {
+        adjCash = -adjAmount;
+        adjCredit = 0;
     }
 
     const expectedNetCash = isMovementFound ? expectedCashRaw - expectedExpenses + adjCash : 0
@@ -259,7 +262,7 @@ export default function KasaSayimPage() {
                 credit_card_variance: isMovementFound ? creditVariance : 0,
                 meal_card_variance: 0,
                 status,
-                notes: `Toplam Satış: ${expectedSales} TL, Toplam Gider: ${expectedExpenses} TL${adjustmentType !== 'none' && adjAmount > 0 ? ` | Düzeltme: ${adjustmentType === 'cash_to_credit' ? 'Nakit yerine Kart çekilmiş' : 'Kart yerine Nakit alınmış'} (${adjAmount} TL)` : ''}${adjustmentNote ? ' | Açıklama: ' + adjustmentNote : ''}`,
+                notes: `Toplam Satış: ${expectedSales} TL, Toplam Gider: ${expectedExpenses} TL${adjustmentType !== 'none' && adjAmount > 0 ? ` | Düzeltme: ${adjustmentType === 'cash_to_credit' ? 'Nakit yerine Kart çekilmiş' : adjustmentType === 'credit_to_cash' ? 'Kart yerine Nakit alınmış' : 'Fazla POS çekimi, Nakit iade verilmiş'} (${adjAmount} TL)` : ''}${adjustmentNote ? ' | Açıklama: ' + adjustmentNote : ''}`,
                 is_movement_found: isMovementFound
             }
 
@@ -628,6 +631,7 @@ export default function KasaSayimPage() {
                                                     <option value="none">Düzeltme Yok</option>
                                                     <option value="cash_to_credit">Nakit Girilmiş ➔ POS Olacak</option>
                                                     <option value="credit_to_cash">POS Girilmiş ➔ Nakit Olacak</option>
+                                                    <option value="overcharged_pos_cash_refund">Fazla POS Çekimi ➔ Nakit İade Edildi</option>
                                                 </select>
                                             </div>
 
