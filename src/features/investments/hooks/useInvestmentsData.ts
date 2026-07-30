@@ -6,9 +6,11 @@ import { devError } from '@/lib/debug'
 import { Investment, InvestmentTransaction } from '@/types/database'
 import { Account, Rates, BuyFormState, EditFormState, RentFormState, ValueFormState } from '../types'
 import { deleteInvestmentTransactionWithRefund } from '@/lib/investment-transactions'
+import { useOrganization } from '@/context/OrganizationContext'
 
 export function useInvestmentsData() {
     const { showAlert, showConfirm } = useNotification()
+    const { activeOrg } = useOrganization()
     const supabase = createClient()
 
     const [accounts, setAccounts] = useState<Account[]>([])
@@ -31,19 +33,20 @@ export function useInvestmentsData() {
     }, [])
 
     const fetchData = useCallback(async () => {
+        if (!activeOrg) return;
         setLoading(true)
-        const { data: invData } = await supabase.from('investments').select('*').order('created_at')
+        const { data: invData } = await supabase.from('investments').select('*').eq('organization_id', activeOrg.id).order('created_at')
         setInvestments(invData || [])
 
-        const { data: txData } = await supabase.from('investment_transactions').select('*').order('created_at', { ascending: false })
+        const { data: txData } = await supabase.from('investment_transactions').select('*').eq('organization_id', activeOrg.id).order('created_at', { ascending: false })
         setTransactions(txData || [])
 
-        const { data: accData } = await supabase.from('accounts').select('*').order('created_at')
+        const { data: accData } = await supabase.from('accounts').select('*').eq('organization_id', activeOrg.id).order('created_at')
         if (accData) {
             setAccounts(accData)
         }
         setLoading(false)
-    }, [supabase])
+    }, [supabase, activeOrg?.id])
 
     useEffect(() => {
         fetchData()
@@ -133,7 +136,8 @@ export function useInvestmentsData() {
                 p_account_id: form.account_id,
                 p_notes: form.notes || null,
                 p_purchase_date: form.purchase_date || new Date().toISOString().split('T')[0],
-                p_document_url: form.document_url || null
+                p_document_url: form.document_url || null,
+                p_organization_id: activeOrg?.id
             });
 
             if (rpcError) throw rpcError;
@@ -201,7 +205,8 @@ export function useInvestmentsData() {
             const { error } = await supabase.rpc('process_investment_rent', {
                 p_investment_id: investmentId,
                 p_account_id: form.account_id,
-                p_amount: amount
+                p_amount: amount,
+                p_organization_id: activeOrg?.id
             })
 
             if (error) throw new Error(error.message)

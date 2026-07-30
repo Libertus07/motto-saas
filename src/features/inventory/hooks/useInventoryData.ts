@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { Material, Movement, MovementFormState, InlineFormState } from '../types'
+import { useOrganization } from '@/context/OrganizationContext'
 
 export function useInventoryData(
     showAlert: (msg: string, type: 'success' | 'error' | 'warning' | 'info', title?: string) => Promise<void>,
@@ -10,6 +11,7 @@ export function useInventoryData(
     const [materials, setMaterials] = useState<Material[]>([])
     const [movements, setMovements] = useState<Movement[]>([])
     const [loading, setLoading] = useState(true)
+    const { activeOrg } = useOrganization()
 
     // Sayım Takip State
     const [inventoryCountDay, setInventoryCountDay] = useState<number>(1)
@@ -18,13 +20,15 @@ export function useInventoryData(
     const supabase = createClient()
 
     const fetchData = useCallback(async () => {
+        if (!activeOrg) return;
         setLoading(true)
         const [{ data: mats }, { data: movs }, { data: settingsData }] = await Promise.all([
-            supabase.from('materials').select('*').order('name'),
+            supabase.from('materials').select('*').eq('organization_id', activeOrg.id).order('name'),
             supabase.from('stock_movements')
                 .select('*, materials(name, unit)')
+                .eq('organization_id', activeOrg.id)
                 .order('created_at', { ascending: false }),
-            supabase.from('settings').select('key, value').in('key', ['inventory_count_day', 'last_inventory_count_date'])
+            supabase.from('settings').select('key, value').eq('organization_id', activeOrg.id).in('key', ['inventory_count_day', 'last_inventory_count_date'])
         ])
         setMaterials(mats || [])
         setMovements(movs || [])
@@ -37,11 +41,11 @@ export function useInventoryData(
             if (lastDate && lastDate.value) setLastCountDate(new Date(lastDate.value))
         }
         setLoading(false)
-    }, [])
+    }, [activeOrg?.id])
 
     useEffect(() => {
         fetchData()
-    }, [fetchData])
+    }, [fetchData, activeOrg?.id])
 
     const handleMovement = async (form: MovementFormState, onSuccess: () => void) => {
         if (!form.material_id || !form.quantity) return
@@ -73,7 +77,8 @@ export function useInventoryData(
             p_movement_type: form.movement_type,
             p_quantity: quantity,
             p_unit_price: unitPrice,
-            p_note: form.note || null
+            p_note: form.note || null,
+            p_organization_id: activeOrg?.id
         })
 
         if (movementError) {
@@ -124,7 +129,8 @@ export function useInventoryData(
             p_movement_type: inlineMovementType,
             p_quantity: quantity,
             p_unit_price: unitPrice,
-            p_note: inlineForm.note || (inlineMovementType === 'giris' ? 'Hızlı Giriş' : 'Hızlı Çıkış')
+            p_note: inlineForm.note || (inlineMovementType === 'giris' ? 'Hızlı Giriş' : 'Hızlı Çıkış'),
+            p_organization_id: activeOrg?.id
         })
 
         if (movementError) {
@@ -190,7 +196,8 @@ export function useInventoryData(
             p_items: pendingAdjustments.map(item => ({
                 material_id: item.materialId,
                 counted_quantity: item.sayimQty
-            }))
+            })),
+            p_organization_id: activeOrg?.id
         })
 
         if (countError) {

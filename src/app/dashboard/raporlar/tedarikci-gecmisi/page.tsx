@@ -75,10 +75,14 @@ export default function TedarikciGecmisi() {
     const router = useRouter()
 
     useEffect(() => {
-        fetchReceipts()
-    }, [])
+        if (activeOrg?.id) {
+            fetchReceipts()
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeOrg?.id])
 
     const fetchReceipts = async () => {
+        if (!activeOrg) return;
         setLoading(true)
         const { data, error } = await supabase
             .from('stock_movements')
@@ -100,6 +104,7 @@ export default function TedarikciGecmisi() {
             `)
             .or('note.ilike.Yapay Zeka Fiş Yükleme%,note.ilike.Yapay zeka ile fiş okuma%')
             .in('movement_type', ['giris', 'IN'])
+            .eq('organization_id', activeOrg.id)
             .order('created_at', { ascending: false })
 
         if (error) {
@@ -148,6 +153,7 @@ export default function TedarikciGecmisi() {
             .from('stock_movements')
             .select('document_url')
             .eq('batch_id', batchId)
+            .eq('organization_id', activeOrg?.id)
             .not('document_url', 'is', null)
             .limit(1)
             .single()

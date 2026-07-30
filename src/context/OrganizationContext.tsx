@@ -76,7 +76,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const setActiveOrg = (org: OrganizationItem) => {
     setActiveOrgState(org)
     localStorage.setItem('motto_active_org_id', org.id)
-    window.location.reload()
   }
 
   return (

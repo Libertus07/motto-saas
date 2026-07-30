@@ -58,13 +58,14 @@ export default function ZRaporuYukle() {
 
     useEffect(() => {
         const fetchProductsAndAccounts = async () => {
-            const { data: prodData } = await supabase.from('products').select('id, name, category')
+            if (!activeOrg) return;
+            const { data: prodData } = await supabase.from('products').select('id, name, category').eq('organization_id', activeOrg.id)
             setProducts(prodData || [])
-            const { data: accData } = await supabase.from('accounts').select('id, name, type')
+            const { data: accData } = await supabase.from('accounts').select('id, name, type').eq('organization_id', activeOrg.id)
             setAccounts(accData || [])
         }
         fetchProductsAndAccounts()
-    }, [])
+    }, [activeOrg?.id])
 
     const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)))
     // Default kategoriler eğer sistemde hiç yoksa diye
@@ -245,7 +246,8 @@ export default function ZRaporuYukle() {
                 name: newProductModal.name,
                 category: newProductModal.category,
                 sale_price: newProductModal.price,
-                user_id: user?.id
+                user_id: user?.id,
+                organization_id: activeOrg?.id
             }).select('*').single()
 
             if (error) throw error
@@ -325,6 +327,7 @@ export default function ZRaporuYukle() {
                 .from('sales')
                 .select('batch_id')
                 .eq('sale_date', reportDate)
+                .eq('organization_id', activeOrg?.id)
                 .not('batch_id', 'is', null)
                 .limit(1)
 
@@ -376,7 +379,8 @@ export default function ZRaporuYukle() {
                 quantity: item.quantity,
                 unit_price: item.quantity > 0 ? Number((item.total_price / item.quantity).toFixed(2)) : 0,
                 total_price: item.total_price,
-                document_url: uploadedUrl
+                document_url: uploadedUrl,
+                organization_id: activeOrg?.id
             }))
 
             const { error: salesError } = await supabase.from('sales').insert(salesInserts)
@@ -400,7 +404,8 @@ export default function ZRaporuYukle() {
                     category: exp.category || 'Genel',
                     amount: exp.amount,
                     period: 'Günlük',
-                    expense_date: reportDate
+                    expense_date: reportDate,
+                    organization_id: activeOrg?.id
                 }))
                 const { error: expError } = await supabase.from('expenses').insert(expenseInserts)
                 if (expError) throw expError
@@ -419,7 +424,8 @@ export default function ZRaporuYukle() {
                         amount: parsedData.payment_methods.cash,
                         description: `${reportDate} Z-Raporu Nakit Hasılat`,
                         source_type: 'z_report',
-                        source_id: batchId
+                        source_id: batchId,
+                        organization_id: activeOrg?.id
                     })
                 }
 
@@ -430,7 +436,8 @@ export default function ZRaporuYukle() {
                         amount: parsedData.payment_methods.credit_card,
                         description: `${reportDate} Z-Raporu Kredi Kartı Hasılat`,
                         source_type: 'z_report',
-                        source_id: batchId
+                        source_id: batchId,
+                        organization_id: activeOrg?.id
                     })
                 }
 
@@ -444,7 +451,8 @@ export default function ZRaporuYukle() {
                             amount: totalExpense,
                             description: `${reportDate} Z-Raporu Kasadan Giderler`,
                             source_type: 'z_report',
-                            source_id: batchId
+                            source_id: batchId,
+                            organization_id: activeOrg?.id
                         })
                     }
                 }
@@ -502,7 +510,8 @@ export default function ZRaporuYukle() {
                     material_id: matId,
                     movement_type: 'cikis',
                     quantity: qty,
-                    note: `Z Raporu Otomatik Düşümü (${reportDate})`
+                    note: `Z Raporu Otomatik Düşümü (${reportDate})`,
+                    organization_id: activeOrg?.id
                 }))
 
                 if (movementInserts.length > 0) {

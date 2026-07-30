@@ -10,6 +10,7 @@ import { devLog, devError } from '@/lib/debug';
 import { formatCurrency, formatDate } from "@/lib/format";
 import { deleteInvestmentTransactionWithRefund } from '@/lib/investment-transactions'
 import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
+import { useOrganization } from '@/context/OrganizationContext'
 
 type InvestmentTransaction = {
     id: string
@@ -42,15 +43,20 @@ export default function YatirimGecmisi() {
     const [selectedMonth, setSelectedMonth] = useState<string>('all')
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const { showAlert, showConfirm } = useNotification()
+    const { activeOrg } = useOrganization()
     
     const supabase = createClient()
     const router = useRouter()
 
     useEffect(() => {
-        fetchInvestments()
-    }, [])
+        if (activeOrg?.id) {
+            fetchInvestments()
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeOrg?.id])
 
     const fetchInvestments = async () => {
+        if (!activeOrg) return;
         setLoading(true)
         const { data, error } = await supabase
             .from('investment_transactions')
@@ -58,6 +64,7 @@ export default function YatirimGecmisi() {
                 *,
                 investments (name, asset_type)
             `)
+            .eq('organization_id', activeOrg.id)
             .order('transaction_date', { ascending: false })
 
         if (error) {

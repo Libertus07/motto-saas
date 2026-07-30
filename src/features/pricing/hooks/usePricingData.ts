@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Product, Expense, RealSalesMeta, PricingSettings } from '../types'
+import { useOrganization } from '@/context/OrganizationContext'
 
 export function usePricingData() {
   const [products, setProducts] = useState<Product[]>([])
@@ -12,15 +13,17 @@ export function usePricingData() {
     taxRate: 10
   })
 
+  const { activeOrg } = useOrganization()
   const supabase = createClient()
 
   const fetchData = async () => {
+    if (!activeOrg) return;
     setLoading(true)
     const [{ data: prods }, { data: exps }, { data: salesData }, { data: settingsData }] = await Promise.all([
-      supabase.from('products').select('*').order('name'),
-      supabase.from('expenses').select('amount, period, category, expense_date'),
-      supabase.from('sales').select('product_id, quantity, sale_date'),
-      supabase.from('settings').select('*')
+      supabase.from('products').select('*').eq('organization_id', activeOrg.id).order('name'),
+      supabase.from('expenses').select('amount, period, category, expense_date').eq('organization_id', activeOrg.id),
+      supabase.from('sales').select('product_id, quantity, sale_date').eq('organization_id', activeOrg.id),
+      supabase.from('settings').select('*').eq('organization_id', activeOrg.id)
     ])
 
     if (settingsData) {
@@ -41,10 +44,10 @@ export function usePricingData() {
       setRealSalesMeta({ activeDays, salesByProduct })
     }
 
-    const { data: mats } = await supabase.from('materials').select('*')
-    const { data: s_recipes } = await supabase.from('sub_recipes').select('*')
-    const { data: s_recipe_ings } = await supabase.from('sub_recipe_ingredients').select('*')
-    const { data: prod_ings } = await supabase.from('product_ingredients').select('*')
+    const { data: mats } = await supabase.from('materials').select('*').eq('organization_id', activeOrg.id)
+    const { data: s_recipes } = await supabase.from('sub_recipes').select('*').eq('organization_id', activeOrg.id)
+    const { data: s_recipe_ings } = await supabase.from('sub_recipe_ingredients').select('*').eq('organization_id', activeOrg.id)
+    const { data: prod_ings } = await supabase.from('product_ingredients').select('*').eq('organization_id', activeOrg.id)
 
     const processedSubRecipes = (s_recipes || []).map(r => {
       const myIngs = (s_recipe_ings || []).filter(i => i.sub_recipe_id === r.id)
@@ -81,7 +84,7 @@ export function usePricingData() {
   useEffect(() => {
     fetchData()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [activeOrg?.id])
 
   return {
     products,

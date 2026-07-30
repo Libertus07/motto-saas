@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useNotification } from '@/components/NotificationProvider'
+import { useOrganization } from '@/context/OrganizationContext'
 import { devLog, devError } from '@/lib/debug';
 import { formatCurrency } from "@/lib/format";
 
@@ -23,6 +24,7 @@ type Expense = {
 }
 
 export default function Raporlar() {
+    const { activeOrg } = useOrganization()
     const { showAlert } = useNotification()
     const [products, setProducts] = useState<Product[]>([])
     const [expenses, setExpenses] = useState<Expense[]>([])
@@ -44,14 +46,19 @@ export default function Raporlar() {
     const supabase = createClient()
     const router = useRouter()
 
-    useEffect(() => { fetchData() }, [])
+    useEffect(() => {
+        fetchStats()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeOrg?.id])
 
-    const fetchData = async () => {
+    const fetchStats = async () => {
+        if (!activeOrg) return;
+        setLoading(true)
         const [{ data: prods }, { data: exps }, { data: salesData }, { data: settings }] = await Promise.all([
-            supabase.from('products').select('*'),
-            supabase.from('expenses').select('amount, period, category, expense_date'),
-            supabase.from('sales').select('product_id, quantity, total_price'),
-            supabase.from('settings').select('*')
+            supabase.from('products').select('*').eq('organization_id', activeOrg.id),
+            supabase.from('expenses').select('amount, period, category, expense_date').eq('organization_id', activeOrg.id),
+            supabase.from('sales').select('product_id, quantity, total_price').eq('organization_id', activeOrg.id),
+            supabase.from('settings').select('*').eq('organization_id', activeOrg.id)
         ])
         setProducts(prods || [])
         setExpenses(exps || [])

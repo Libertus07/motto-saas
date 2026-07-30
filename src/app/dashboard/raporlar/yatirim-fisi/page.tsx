@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { useOrganization } from '@/context/OrganizationContext'
 import { formatCurrency } from "@/lib/format";
 
 type Account = {
@@ -33,6 +34,7 @@ export default function YatirimFisiYukle() {
     const [loading, setLoading] = useState(false)
     const [analyzing, setAnalyzing] = useState(false)
     const { showAlert, showConfirm } = useNotification()
+    const { activeOrg } = useOrganization()
     
     const [parsedData, setParsedData] = useState<ParsedInvestment | null>(null)
     const [accounts, setAccounts] = useState<Account[]>([])
@@ -43,14 +45,16 @@ export default function YatirimFisiYukle() {
 
     useEffect(() => {
         const fetchAccounts = async () => {
-            const { data } = await supabase.from('accounts').select('id, name, type, balance')
+            if (!activeOrg) return;
+            const { data } = await supabase.from('accounts').select('id, name, type, balance').eq('organization_id', activeOrg.id)
             if (data) {
                 setAccounts(data)
                 if (data.length > 0) setSelectedAccount(data[0].id)
             }
         }
         fetchAccounts()
-    }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeOrg?.id])
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -194,7 +198,8 @@ export default function YatirimFisiYukle() {
                 p_account_id: selectedAccount,
                 p_notes: parsedData.notes || null,
                 p_purchase_date: parsedData.purchase_date,
-                p_document_url: uploadedUrl
+                p_document_url: uploadedUrl,
+                p_organization_id: activeOrg.id
             })
 
             if (rpcError) throw rpcError

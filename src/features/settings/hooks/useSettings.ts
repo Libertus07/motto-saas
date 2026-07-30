@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { Settings, DEFAULT_SETTINGS, SETTINGS_LABELS } from '../types'
+import { useOrganization } from '@/context/OrganizationContext'
 
 export function useSettings() {
   const [loading, setLoading] = useState(true)
@@ -11,11 +12,13 @@ export function useSettings() {
   const [categories, setCategories] = useState<string[]>(DEFAULT_SETTINGS.material_categories)
   const [toast, setToast] = useState('')
 
+  const { activeOrg } = useOrganization()
   const supabase = createClient()
 
   const fetchSettings = useCallback(async () => {
+    if (!activeOrg) return;
     setLoading(true)
-    const { data } = await supabase.from('settings').select('*')
+    const { data } = await supabase.from('settings').select('*').eq('organization_id', activeOrg.id)
     if (data) {
       const merged = { ...DEFAULT_SETTINGS }
       data.forEach(row => {
@@ -43,7 +46,7 @@ export function useSettings() {
 
   useEffect(() => {
     fetchSettings()
-  }, [fetchSettings])
+  }, [fetchSettings, activeOrg?.id])
 
   const setSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }))
@@ -69,7 +72,7 @@ export function useSettings() {
         data: { user }
       } = await supabase.auth.getUser()
       for (const [key, value] of entries) {
-        await supabase.from('settings').upsert({ key, value, user_id: user?.id }, { onConflict: 'key' })
+        await supabase.from('settings').upsert({ key, value, user_id: user?.id, organization_id: activeOrg?.id }, { onConflict: 'organization_id, key' })
       }
       const changeText = changes.join(' | ')
       await logActivity('Ayarlar', 'GUNCELLEME', `Sistem genel ayarları güncellendi.`, { detay: changeText })
@@ -78,10 +81,6 @@ export function useSettings() {
 
     setToast('Ayarlar başarıyla kaydedildi.')
     setSaving(false)
-
-    setTimeout(() => {
-      window.location.reload()
-    }, 1500)
   }
 
   const activeNotificationCount = useMemo(() => {

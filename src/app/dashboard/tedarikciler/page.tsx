@@ -78,12 +78,15 @@ export default function Tedarikciler() {
   const router = useRouter()
 
   useEffect(() => {
+    if (!activeOrg) return;
     fetchSuppliers()
     fetchAccounts()
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOrg?.id])
 
   const fetchAccounts = async () => {
-    const { data } = await supabase.from('accounts').select('*').order('created_at')
+    if (!activeOrg) return;
+    const { data } = await supabase.from('accounts').select('*').eq('organization_id', activeOrg.id).order('created_at')
     if (data && data.length > 0) {
       setAccounts(data)
       setPaymentAccountId(data[0].id)
@@ -91,8 +94,9 @@ export default function Tedarikciler() {
   }
 
   const fetchSuppliers = async () => {
+    if (!activeOrg) return;
     setLoading(true)
-    const { data } = await supabase.from('suppliers').select('*').order('name')
+    const { data } = await supabase.from('suppliers').select('*').eq('organization_id', activeOrg.id).order('name')
     setSuppliers(data || [])
     setLoading(false)
   }
@@ -106,12 +110,14 @@ export default function Tedarikciler() {
         .from('supplier_transactions')
         .select('*')
         .eq('supplier_id', supplier.id)
+        .eq('organization_id', activeOrg?.id)
         .order('transaction_date', { ascending: false })
         .order('created_at', { ascending: false }),
       supabase
         .from('stock_movements')
         .select('id, created_at, quantity, unit_price, batch_id, materials!stock_movements_material_id_fkey(name, unit)')
         .eq('supplier_id', supplier.id)
+        .eq('organization_id', activeOrg?.id)
         .order('created_at', { ascending: false })
     ])
 
@@ -155,6 +161,7 @@ export default function Tedarikciler() {
       .from('stock_movements')
       .select('document_url')
       .eq('batch_id', batchId)
+      .eq('organization_id', activeOrg?.id)
       .not('document_url', 'is', null)
       .limit(1)
       .single()
@@ -179,7 +186,8 @@ export default function Tedarikciler() {
         p_supplier_name: selectedSupplier.name,
         p_amount: amount,
         p_note: paymentNote || 'Manuel Ödeme',
-        p_account_id: paymentAccountId || null
+        p_account_id: paymentAccountId || null,
+        p_organization_id: activeOrg?.id
       })
       if (rpcError) throw rpcError
 
@@ -255,7 +263,8 @@ export default function Tedarikciler() {
         }
       } else {
         const { error: rpcError } = await supabase.rpc('delete_supplier_transaction', {
-          p_transaction_id: trx.id
+          p_transaction_id: trx.id,
+          p_organization_id: activeOrg?.id
         })
         if (rpcError) throw rpcError
       }
@@ -334,7 +343,8 @@ export default function Tedarikciler() {
       .insert({
         name: newSupplier.name,
         contact_info: newSupplier.contact_info,
-        total_debt: 0
+        total_debt: 0,
+        organization_id: activeOrg?.id
       })
       .select()
       .single()

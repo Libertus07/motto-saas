@@ -57,10 +57,13 @@ export default function GecmisRaporlar() {
     const router = useRouter()
 
     useEffect(() => {
-        fetchSales()
-    }, [])
+        if (activeOrg?.id) {
+            fetchSales()
+        }
+    }, [activeOrg?.id])
 
     const fetchSales = async () => {
+        if (!activeOrg) return;
         setLoading(true)
         const { data, error } = await supabase
             .from('sales')
@@ -73,6 +76,7 @@ export default function GecmisRaporlar() {
                 product_id,
                 document_url
             `)
+            .eq('organization_id', activeOrg.id)
             .order('sale_date', { ascending: false })
 
         if (error) {
@@ -81,7 +85,7 @@ export default function GecmisRaporlar() {
             return
         }
 
-        const { data: productsData } = await supabase.from('products').select('id, name')
+        const { data: productsData } = await supabase.from('products').select('id, name').eq('organization_id', activeOrg.id)
         const productMap: Record<string, string> = {}
         if (productsData) {
             productsData.forEach(p => {
