@@ -9,6 +9,7 @@ const inter = Inter({
 
 import type { Metadata, Viewport } from "next";
 import { NotificationProvider } from "@/components/NotificationProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "Motto SaaS - Restoran Zekası",
@@ -35,9 +36,16 @@ export default function RootLayout({
       className={`${inter.variable} font-sans h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <NotificationProvider>
-          {children}
-        </NotificationProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <NotificationProvider>
+            {children}
+          </NotificationProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

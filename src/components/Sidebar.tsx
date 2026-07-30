@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { OrganizationSwitcher } from '@/components/OrganizationSwitcher'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
   const pathname = usePathname()
@@ -138,6 +139,11 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+        )}
+        {!onCloseMobile && (
+          <div className="hidden md:block ml-2">
+            <ThemeToggle />
+          </div>
         )}
       </div>
 
