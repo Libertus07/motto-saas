@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { useOrganization } from '@/context/OrganizationContext'
 import { devLog, devError } from '@/lib/debug';
 import { formatCurrency, formatDate } from "@/lib/format";
 import { HistoryAccordion } from '@/components/ui/HistoryAccordion';
@@ -46,6 +47,7 @@ export default function GecmisRaporlar() {
     const [expandedDate, setExpandedDate] = useState<string | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const { showAlert, showConfirm } = useNotification()
+    const { activeOrg } = useOrganization()
     
     // Filters & Sorting
     const [selectedMonth, setSelectedMonth] = useState<string>('all')
@@ -208,7 +210,7 @@ export default function GecmisRaporlar() {
             const res = await fetch('/api/delete-z-report', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ batch_id: group.batchId })
+                body: JSON.stringify({ batch_id: group.batchId, organization_id: activeOrg?.id })
             })
             
             const data = await res.json()

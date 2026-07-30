@@ -3,6 +3,15 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
 import { devLog, devError } from '@/lib/debug';
 import { isSafeImageUrl } from '@/lib/ai-security';
+import { z } from 'zod';
+
+const InvestmentSchema = z.object({
+  asset_type: z.enum(['gold', 'usd', 'eur', 'real_estate']).default('gold'),
+  quantity: z.number().optional().nullable(),
+  price_per_unit: z.number().optional().nullable(),
+  purchase_date: z.string().optional().nullable(),
+  notes: z.string().optional().nullable()
+});
 
 export async function POST(req: Request) {
     try {
@@ -117,11 +126,15 @@ Yanıtı SADECE aşağıdaki formatta saf JSON olarak dön (markdown kullanma). 
         }
 
         const parsed = JSON.parse(jsonStr);
+        const validated = InvestmentSchema.parse(parsed);
 
-        return NextResponse.json(parsed);
+        return NextResponse.json(validated);
 
     } catch (error: unknown) {
         devError('Investment receipt parsing error:', error);
+        if (error instanceof z.ZodError) {
+            return NextResponse.json({ error: 'Yapay zeka analiz yaparken veri formatı hatalı oldu (' + error.issues[0]?.message + ')' }, { status: 500 });
+        }
         const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
         return NextResponse.json({ error: 'Yapay zeka analiz yaparken bir hata oluştu: ' + message }, { status: 500 });
     }

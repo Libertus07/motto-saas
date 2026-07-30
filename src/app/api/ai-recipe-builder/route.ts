@@ -2,6 +2,18 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
 import { devLog, devError } from '@/lib/debug';
+import { z } from 'zod';
+
+const RecipeIngredientSchema = z.object({
+  id: z.string().optional().nullable(),
+  type: z.string().optional().nullable(),
+  name: z.string().optional().nullable(),
+  quantity: z.number().optional().nullable()
+});
+
+const RecipeBuilderSchema = z.object({
+  ingredients: z.array(RecipeIngredientSchema).default([])
+});
 
 export async function POST(req: Request) {
     try {
@@ -73,11 +85,15 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra markdown (\`\`\`json v
         
         const jsonStr = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(jsonStr);
+        const validated = RecipeBuilderSchema.parse(parsed);
 
-        return NextResponse.json(parsed);
+        return NextResponse.json(validated);
 
     } catch (error: unknown) {
         devError('AI Recipe Builder error:', error);
+        if (error instanceof z.ZodError) {
+            return NextResponse.json({ error: 'Yapay zeka reçete oluştururken veri formatı hatalı oldu (' + error.issues[0]?.message + ')' }, { status: 500 });
+        }
         const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
         return NextResponse.json({ error: 'Yapay zeka reçete oluştururken bir hata oluştu: ' + message }, { status: 500 });
     }

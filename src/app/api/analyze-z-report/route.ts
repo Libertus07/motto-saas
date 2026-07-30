@@ -3,6 +3,33 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
 import { devLog, devError } from '@/lib/debug';
 import { isSafeImageUrl } from '@/lib/ai-security';
+import { z } from 'zod';
+
+const ZReportItemSchema = z.object({
+  product_name: z.string(),
+  quantity: z.number().optional().nullable(),
+  total_price: z.number().optional().nullable()
+});
+
+const ZReportExpenseSchema = z.object({
+  expense_name: z.string(),
+  amount: z.number().optional().nullable()
+});
+
+const ZReportSchema = z.object({
+  date: z.string().optional().nullable(),
+  total_revenue: z.number().optional().nullable(),
+  payment_methods: z.object({
+    cash: z.number().optional().nullable(),
+    credit_card: z.number().optional().nullable(),
+    other: z.number().optional().nullable()
+  }).optional().nullable(),
+  discounts: z.object({
+    total_amount: z.number().optional().nullable()
+  }).optional().nullable(),
+  items: z.array(ZReportItemSchema).default([]),
+  expenses: z.array(ZReportExpenseSchema).default([])
+});
 
 export async function POST(req: Request) {
     try {
@@ -137,11 +164,15 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (\`\`
         }
 
         const parsed = JSON.parse(jsonStr);
+        const validated = ZReportSchema.parse(parsed);
 
-        return NextResponse.json(parsed);
+        return NextResponse.json(validated);
 
     } catch (error: unknown) {
         devError('Z-Report parsing error:', error);
+        if (error instanceof z.ZodError) {
+            return NextResponse.json({ error: 'Yapay zeka Z Raporunu okudu ancak veri formatı hatalı (' + error.issues[0]?.message + ')' }, { status: 500 });
+        }
         const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
         return NextResponse.json({ error: 'Yapay zeka Z Raporunu okurken bir hata oluştu: ' + message }, { status: 500 });
     }

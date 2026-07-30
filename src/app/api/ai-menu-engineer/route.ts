@@ -2,6 +2,19 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
 import { devLog, devError } from '@/lib/debug';
+import { z } from 'zod';
+
+const MenuEngineerRecommendationSchema = z.object({
+  product_name: z.string(),
+  issue: z.string().optional().nullable(),
+  action: z.string().optional().nullable(),
+  impact: z.string().optional().nullable()
+});
+
+const MenuEngineerSchema = z.object({
+  summary: z.string().optional().nullable(),
+  recommendations: z.array(MenuEngineerRecommendationSchema).default([])
+});
 
 export async function POST(req: Request) {
     try {
@@ -67,11 +80,15 @@ Yanıtını SADECE aşağıdaki JSON formatında ver, ekstra markdown (\`\`\`jso
         
         const jsonStr = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(jsonStr);
+        const validated = MenuEngineerSchema.parse(parsed);
 
-        return NextResponse.json(parsed);
+        return NextResponse.json(validated);
 
     } catch (error: unknown) {
         devError('AI Menu Engineer error:', error);
+        if (error instanceof z.ZodError) {
+            return NextResponse.json({ error: 'Yapay zeka analiz yaparken veri formatı hatalı oldu (' + error.issues[0]?.message + ')' }, { status: 500 });
+        }
         const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
         return NextResponse.json({ error: 'Yapay zeka analiz yaparken bir hata oluştu: ' + message }, { status: 500 });
     }

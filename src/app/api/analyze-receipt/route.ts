@@ -3,6 +3,28 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
 import { devLog, devError } from '@/lib/debug';
 import { isSafeImageUrl } from '@/lib/ai-security';
+import { z } from 'zod';
+
+const ReceiptItemSchema = z.object({
+  name: z.string(),
+  category: z.string().optional().nullable(),
+  quantity: z.number().optional().nullable(),
+  unit: z.string().optional().nullable(),
+  boxMultiplier: z.union([z.number(), z.string()]).optional().nullable(),
+  totalPrice: z.number().optional().nullable(),
+  unitPrice: z.number().optional().nullable()
+});
+
+const ReceiptSchema = z.object({
+  supplier_name: z.string().optional().nullable(),
+  supplier_phone: z.string().optional().nullable(),
+  supplier_iban: z.string().optional().nullable(),
+  supplier_address: z.string().optional().nullable(),
+  supplier_stated_debt: z.number().optional().nullable(),
+  invoice_date: z.string().optional().nullable(),
+  total_amount: z.number().optional().nullable(),
+  items: z.array(ReceiptItemSchema).default([])
+});
 
 export async function POST(req: Request) {
     try {
@@ -135,11 +157,15 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown veya 
         }
 
         const parsed = JSON.parse(jsonStr);
+        const validated = ReceiptSchema.parse(parsed);
 
-        return NextResponse.json(parsed);
+        return NextResponse.json(validated);
 
     } catch (error: unknown) {
         devError('Receipt parsing error:', error);
+        if (error instanceof z.ZodError) {
+            return NextResponse.json({ error: 'Yapay zeka fişi okudu ancak veri formatı hatalı (' + error.issues[0]?.message + ')' }, { status: 500 });
+        }
         const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
         return NextResponse.json({ error: 'Yapay zeka fişi okurken bir hata oluştu: ' + message }, { status: 500 });
     }

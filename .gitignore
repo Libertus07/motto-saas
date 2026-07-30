@@ -46,3 +46,11 @@ scripts/debug/*.js
 CLAUDE.md
 graphify-out/
 query_graph.py
+
+# PWA
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map
+public/swe-worker-*.js
+public/swe-worker-*.js.map

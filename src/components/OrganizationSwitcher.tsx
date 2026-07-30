@@ -1,75 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
-
-export interface OrganizationItem {
-  id: string
-  name: string
-  role: string
-}
+import { useState } from 'react'
+import { useOrganization, OrganizationItem } from '@/context/OrganizationContext'
 
 export function OrganizationSwitcher() {
-  const supabase = createClient()
-  const [organizations, setOrganizations] = useState<OrganizationItem[]>([])
-  const [activeOrg, setActiveOrg] = useState<OrganizationItem | null>(null)
+  const { activeOrg, organizations, loading, setActiveOrg } = useOrganization()
   const [isOpen, setIsOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function loadOrganizations() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          setLoading(false)
-          return
-        }
-
-        const { data: members } = await supabase
-          .from('organization_members')
-          .select('organization_id, role, organizations(id, name)')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-
-        if (members && members.length > 0) {
-          const list: OrganizationItem[] = members.map((m: any) => ({
-            id: m.organization_id,
-            name: m.organizations?.name || 'Motto Varsayılan Şube',
-            role: m.role || 'owner'
-          }))
-
-          setOrganizations(list)
-
-          const savedOrgId = localStorage.getItem('motto_active_org_id')
-          const found = list.find(o => o.id === savedOrgId) || list[0]
-          setActiveOrg(found)
-          if (!savedOrgId) {
-            localStorage.setItem('motto_active_org_id', found.id)
-          }
-        } else {
-          // Legacy fallback
-          const defaultOrg: OrganizationItem = {
-            id: '00000000-0000-0000-0000-000000000001',
-            name: 'Motto SaaS (Ana Şube)',
-            role: 'owner'
-          }
-          setOrganizations([defaultOrg])
-          setActiveOrg(defaultOrg)
-        }
-      } catch (err) {
-        console.error('Organization fetch error:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadOrganizations()
-  }, [])
 
   const handleSelectOrg = (org: OrganizationItem) => {
     setActiveOrg(org)
-    localStorage.setItem('motto_active_org_id', org.id)
     setIsOpen(false)
-    window.location.reload()
   }
 
   if (loading) {

@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
+import { useOrganization } from '@/context/OrganizationContext'
 import { formatCurrency } from "@/lib/format";
 import dynamic from 'next/dynamic'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
@@ -37,6 +38,7 @@ type ParsedExpenseItem = {
 
 export default function ZRaporuYukle() {
     const { showAlert, showConfirm } = useNotification()
+    const { activeOrg } = useOrganization()
     const [imageUrl, setImageUrl] = useState<string | null>(null)
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [fileText, setFileText] = useState<string | null>(null)
@@ -340,7 +342,7 @@ export default function ZRaporuYukle() {
                 const delRes = await fetch('/api/delete-z-report', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ batch_id: dupData[0].batch_id })
+                    body: JSON.stringify({ batch_id: dupData[0].batch_id, organization_id: activeOrg?.id })
                 })
                 const delData = await delRes.json()
                 if (delData.error) {
