@@ -140,11 +140,9 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
             </svg>
           </button>
         )}
-        {!onCloseMobile && (
-          <div className="hidden md:block ml-2">
-            <ThemeToggle />
-          </div>
-        )}
+        <div className="hidden md:block ml-2">
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* ──────────────── NAVIGATION MENU ──────────────── */}
