@@ -4,7 +4,34 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency } from "@/lib/format"
+
+interface RecentReconciliation {
+    id: string
+    date: string
+    counted_cash: number
+    counted_credit_card: number
+    counted_meal_card: number
+    expected_cash: number
+    expected_credit_card: number
+    cash_variance: number
+    credit_card_variance: number
+    status: string
+    notes?: string
+    created_at: string
+}
+
+const DENOMINATIONS = [
+    { value: 200, label: '200 ₺ Banknot', icon: '💵', type: 'note' },
+    { value: 100, label: '100 ₺ Banknot', icon: '💵', type: 'note' },
+    { value: 50, label: '50 ₺ Banknot', icon: '💵', type: 'note' },
+    { value: 20, label: '20 ₺ Banknot', icon: '💵', type: 'note' },
+    { value: 10, label: '10 ₺ Banknot', icon: '💵', type: 'note' },
+    { value: 5, label: '5 ₺ Banknot', icon: '💵', type: 'note' },
+    { value: 1, label: '1 ₺ Madeni', icon: '🪙', type: 'coin' },
+    { value: 0.5, label: '0.50 ₺ (50 Krş)', icon: '🪙', type: 'coin' },
+    { value: 0.25, label: '0.25 ₺ (25 Krş)', icon: '🪙', type: 'coin' },
+]
 
 export default function KasaSayimPage() {
     const supabase = createClient()
@@ -16,6 +43,7 @@ export default function KasaSayimPage() {
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState(false)
 
+    // Sistem Beklentisi State'leri
     const [expectedSales, setExpectedSales] = useState(0)
     const [expectedExpenses, setExpectedExpenses] = useState(0)
     const [expectedDiscounts, setExpectedDiscounts] = useState(0)
@@ -23,17 +51,30 @@ export default function KasaSayimPage() {
     const [expectedCashRaw, setExpectedCashRaw] = useState(0)
     const [expectedCreditRaw, setExpectedCreditRaw] = useState(0)
 
+    // Sayım Girişleri State'leri
     const [countedCash, setCountedCash] = useState<number | ''>('')
     const [countedCreditCard, setCountedCreditCard] = useState<number | ''>('')
     const [countedMealCard, setCountedMealCard] = useState<number | ''>('')
+
+    // Kasiyer Düzeltme Modülü
     const [adjustmentType, setAdjustmentType] = useState<'none' | 'cash_to_credit' | 'credit_to_cash'>('none')
     const [adjustmentAmount, setAdjustmentAmount] = useState<number | ''>('')
     const [adjustmentNote, setAdjustmentNote] = useState('')
 
+    // Banknot/Bozuk Para Sayım Asistanı State'i
+    const [showDenomCalculator, setShowDenomCalculator] = useState(false)
+    const [denomCounts, setDenomCounts] = useState<Record<number, number>>({
+        200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 1: 0, 0.5: 0, 0.25: 0
+    })
+
+    // Geçmiş Mutabakatlar & Aktif Mutabakat State'i
     const [existingReconciliation, setExistingReconciliation] = useState<any>(null)
+    const [recentReconciliations, setRecentReconciliations] = useState<RecentReconciliation[]>([])
+    const [activeTab, setActiveTab] = useState<'count' | 'history'>('count')
 
     useEffect(() => {
         fetchExpectedTotals()
+        fetchRecentHistory()
     }, [date])
 
     const fetchExpectedTotals = async () => {
@@ -88,7 +129,7 @@ export default function KasaSayimPage() {
             // 4. Günün Ödeme Yöntemi Dağılımını Getir (Z-Raporu hareketleri)
             let totalExpectedCash = 0;
             let totalExpectedCredit = 0;
-            let finalExpectedSales = totalSales; // Varsayılan olarak ürün toplamı
+            let finalExpectedSales = totalSales;
 
             if (validBatchIds.length > 0) {
                 const { data: movementsData, error: movError } = await supabase
@@ -108,15 +149,12 @@ export default function KasaSayimPage() {
                         }
                     })
 
-                    // Eğer fişte gerçek tahsilat tutarları varsa, gerçek satışı tahsilatların toplamı kabul et
-                    // (Çünkü fişteki ürünlerin toplamı; KDV, yuvarlama, küsurat veya bahşiş sebebiyle tahsilattan farklı olabilir)
                     if (totalExpectedCash > 0 || totalExpectedCredit > 0) {
                         finalExpectedSales = totalExpectedCash + totalExpectedCredit;
                     }
                 }
             }
 
-            // Kasa Net Nakit Beklentisi (Giren Nakit - Giderler)
             setExpectedSales(finalExpectedSales)
             setExpectedExpenses(totalExpenses)
             setExpectedDiscounts(totalDiscounts)
@@ -129,6 +167,45 @@ export default function KasaSayimPage() {
         } finally {
             setLoading(false)
         }
+    }
+
+    const fetchRecentHistory = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('cash_reconciliations')
+                .select('*')
+                .order('date', { ascending: false })
+                .limit(10)
+
+            if (!error && data) {
+                setRecentReconciliations(data)
+            }
+        } catch (e) {
+            console.error('Geçmiş mutabakatlar yüklenemedi:', e)
+        }
+    }
+
+    // Para Sayma Asistanı Hesaplama
+    const handleDenomChange = (val: number, count: number) => {
+        const next = { ...denomCounts, [val]: Math.max(0, count) }
+        setDenomCounts(next)
+        
+        const total = Object.entries(next).reduce((sum, [denom, qty]) => {
+            return sum + (Number(denom) * qty)
+        }, 0)
+
+        setCountedCash(total > 0 ? Number(total.toFixed(2)) : '')
+    }
+
+    const clearDenomCalculator = () => {
+        setDenomCounts({ 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 1: 0, 0.5: 0, 0.25: 0 })
+    }
+
+    // Tarih Değiştirici Yardımcıları
+    const handleStepDate = (days: number) => {
+        const currentDate = new Date(date)
+        currentDate.setDate(currentDate.getDate() + days)
+        setDate(currentDate.toISOString().split('T')[0])
     }
 
     const countedTotal = (Number(countedCash) || 0) + (Number(countedCreditCard) || 0) + (Number(countedMealCard) || 0)
@@ -178,7 +255,7 @@ export default function KasaSayimPage() {
                 expected_cash: expectedNetCash,
                 expected_credit_card: expectedNetCredit,
                 expected_meal_card: 0,
-                cash_variance: isMovementFound ? cashVariance : variance, // Ayrımsa sadece nakit, değilse genel fark
+                cash_variance: isMovementFound ? cashVariance : variance,
                 credit_card_variance: isMovementFound ? creditVariance : 0,
                 meal_card_variance: 0,
                 status,
@@ -186,7 +263,6 @@ export default function KasaSayimPage() {
                 is_movement_found: isMovementFound
             }
 
-            // ATOMIC İŞLEM: Tüm silme, ekleme ve hesap güncellemeleri PostgreSQL'de tek seferde yapılır
             const { data: rpcResult, error: rpcError } = await supabase.rpc('process_cash_reconciliation', { payload })
 
             if (rpcError) {
@@ -215,12 +291,12 @@ export default function KasaSayimPage() {
                 details = `Nakit Sayım: ${countedCash || 0} ₺ | POS Sayım: ${countedCreditCard || 0} ₺ | Fark: ${variance > 0 ? '+' : ''}${variance} ₺`;
             }
 
-            // İşlem geçmişine kaydet
             await logActivity('Kasa', existingReconciliation ? 'GUNCELLEME' : 'EKLEME', `${date} tarihli kasa sayımı ${existingReconciliation ? 'güncellendi' : 'kaydedildi'}.`, { detay: details })
 
             setSuccess(true)
             setTimeout(() => setSuccess(false), 3000)
-            fetchExpectedTotals() // Yenile
+            fetchExpectedTotals()
+            fetchRecentHistory()
         } catch (err: any) {
             setError(err.message || 'Kaydetme sırasında hata oluştu')
         } finally {
@@ -229,278 +305,527 @@ export default function KasaSayimPage() {
     }
 
     const getVarianceBadge = () => {
-        if (variance > 0) return <span className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-sm font-bold border border-emerald-500/30">+ {formatCurrency(variance)} Fazla</span>
-        if (variance < 0) return <span className="bg-rose-500/20 text-rose-400 px-3 py-1 rounded-full text-sm font-bold border border-rose-500/30">- {formatCurrency(Math.abs(variance))} Açık</span>
-        return <span className="bg-amber-500/20 text-amber-400 px-3 py-1 rounded-full text-sm font-bold border border-amber-500/30">✓ Kasa Denk</span>
+        if (variance > 0) return <span className="bg-emerald-500/20 text-emerald-400 px-3.5 py-1.5 rounded-full text-xs font-bold border border-emerald-500/30 shadow-lg shadow-emerald-500/10 flex items-center gap-1.5">+ {formatCurrency(variance)} Kasa Fazlası</span>
+        if (variance < 0) return <span className="bg-rose-500/20 text-rose-400 px-3.5 py-1.5 rounded-full text-xs font-bold border border-rose-500/30 shadow-lg shadow-rose-500/10 flex items-center gap-1.5">- {formatCurrency(Math.abs(variance))} Kasa Açığı</span>
+        return <span className="bg-amber-500/20 text-amber-400 px-3.5 py-1.5 rounded-full text-xs font-bold border border-amber-500/30 shadow-lg shadow-amber-500/10 flex items-center gap-1.5">✓ Kasa Birebir Denk</span>
     }
 
+    const denomSumTotal = Object.entries(denomCounts).reduce((sum, [d, q]) => sum + (Number(d) * q), 0)
+
     return (
-        <div className="min-h-full bg-stone-950 text-white p-6 pb-20">
-            <header className="max-w-4xl mx-auto flex items-center justify-between mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-amber-400 flex items-center gap-3">
-                        🏧 Kasa Sayımı ve Mutabakat
-                    </h1>
-                    <p className="text-stone-400 mt-2">Gün sonu kasanızdaki gerçek parayı (Kör Sayım) girerek sistemle eşleştirin.</p>
-                </div>
-                <input 
-                    type="date" 
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="bg-stone-900 border border-stone-800 rounded-xl px-4 py-3 text-stone-200 focus:outline-none focus:border-amber-500 transition-colors shadow-inner font-bold text-lg cursor-pointer"
-                />
-            </header>
+        <div className="min-h-screen bg-stone-950 text-white p-4 sm:p-6 lg:p-8 pb-24">
+            <div className="max-w-6xl mx-auto space-y-6">
 
-            <main className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Sol Kolon: Kör Sayım Formu */}
-                <div className="bg-stone-900 border border-stone-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-bl-full -z-10" />
-                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                        <span className="text-amber-500">1.</span> Fiziki Sayım Değerleri
-                    </h2>
+                {/* Header & Date Controls */}
+                <header className="bg-stone-900/80 backdrop-blur-xl border border-stone-800/80 rounded-3xl p-6 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
                     
-                    <div className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-medium text-stone-400 mb-2">Çekmecedeki Nakit (TL)</label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 font-bold">₺</span>
-                                <input 
-                                    type="number" 
-                                    value={countedCash}
-                                    onChange={(e) => setCountedCash(e.target.value === '' ? '' : Number(e.target.value))}
-                                    placeholder="0.00"
-                                    className="w-full bg-stone-950 border border-stone-800 rounded-xl py-4 pl-10 pr-4 text-white text-xl font-bold focus:outline-none focus:border-amber-500 transition-all placeholder-stone-700"
-                                />
+                    <div className="space-y-1 z-10">
+                        <div className="flex items-center gap-3">
+                            <span className="p-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-2xl text-2xl">
+                                🏧
+                            </span>
+                            <div>
+                                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
+                                    Kasa Sayımı & Mutabakat
+                                </h1>
+                                <p className="text-stone-400 text-xs sm:text-sm mt-0.5">
+                                    Fiziki kör sayım değerlerini girerek sistem kayıtlarıyla anlık eşleştirin.
+                                </p>
                             </div>
                         </div>
+                    </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-stone-400 mb-2">POS Cihazı Kredi Kartı Gün Sonu (TL)</label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 font-bold">₺</span>
-                                <input 
-                                    type="number" 
-                                    value={countedCreditCard}
-                                    onChange={(e) => setCountedCreditCard(e.target.value === '' ? '' : Number(e.target.value))}
-                                    placeholder="0.00"
-                                    className="w-full bg-stone-950 border border-stone-800 rounded-xl py-4 pl-10 pr-4 text-white text-xl font-bold focus:outline-none focus:border-amber-500 transition-all placeholder-stone-700"
-                                />
-                            </div>
+                    <div className="flex flex-wrap items-center gap-2.5 z-10">
+                        {/* Tarih Navigasyonu */}
+                        <div className="flex items-center bg-stone-950 border border-stone-800/90 rounded-2xl p-1 shadow-inner">
+                            <button
+                                onClick={() => handleStepDate(-1)}
+                                className="px-3 py-2 text-stone-400 hover:text-amber-400 hover:bg-stone-900 rounded-xl transition-all font-bold text-xs flex items-center gap-1"
+                                title="Önceki Gün"
+                            >
+                                ◀ Dün
+                            </button>
+                            <input 
+                                type="date" 
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
+                                className="bg-transparent text-amber-400 font-bold text-xs sm:text-sm px-2 text-center focus:outline-none cursor-pointer"
+                            />
+                            <button
+                                onClick={() => handleStepDate(1)}
+                                className="px-3 py-2 text-stone-400 hover:text-amber-400 hover:bg-stone-900 rounded-xl transition-all font-bold text-xs flex items-center gap-1"
+                                title="Sonraki Gün"
+                            >
+                                Bugün ▶
+                            </button>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-stone-400 mb-2">Yemek Kartları / Diğer (TL)</label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 font-bold">₺</span>
-                                <input 
-                                    type="number" 
-                                    value={countedMealCard}
-                                    onChange={(e) => setCountedMealCard(e.target.value === '' ? '' : Number(e.target.value))}
-                                    placeholder="0.00"
-                                    className="w-full bg-stone-950 border border-stone-800 rounded-xl py-4 pl-10 pr-4 text-white text-xl font-bold focus:outline-none focus:border-amber-500 transition-all placeholder-stone-700"
-                                />
-                            </div>
+                        {/* Mutabakat Durum Rozeti */}
+                        <div className="px-4 py-2.5 rounded-2xl border bg-stone-950/80 border-stone-800 text-xs font-bold flex items-center gap-2">
+                            {existingReconciliation ? (
+                                <>
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                    <span className="text-emerald-400">Mutabakat Kayıtlı</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                                    <span className="text-amber-400">Kör Sayım Bekleniyor</span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </header>
+
+                {/* Tab Navigator */}
+                <div className="flex gap-2 border-b border-stone-800/80 pb-2">
+                    <button
+                        onClick={() => setActiveTab('count')}
+                        className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+                            activeTab === 'count'
+                                ? 'bg-amber-500 text-stone-950 shadow-lg shadow-amber-500/20'
+                                : 'bg-stone-900/60 text-stone-400 hover:bg-stone-900 hover:text-white border border-stone-800/60'
+                        }`}
+                    >
+                        🧮 Gün Sonu Kör Sayımı
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+                            activeTab === 'history'
+                                ? 'bg-amber-500 text-stone-950 shadow-lg shadow-amber-500/20'
+                                : 'bg-stone-900/60 text-stone-400 hover:bg-stone-900 hover:text-white border border-stone-800/60'
+                        }`}
+                    >
+                        📜 Son Mutabakat Geçmişi ({recentReconciliations.length})
+                    </button>
+                </div>
+
+                {activeTab === 'history' ? (
+                    /* Geçmiş Mutabakatlar Audit Trail Tablosu */
+                    <div className="bg-stone-900/80 backdrop-blur-xl border border-stone-800/80 rounded-3xl p-6 shadow-2xl space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                <span>📜</span> Son Kasa Mutabakat Geçmişi
+                            </h2>
+                            <span className="text-xs text-stone-400">Her gün için yapılan son 10 mutabakat kaydı</span>
                         </div>
 
-                        <div className="pt-6 border-t border-stone-800 mt-2">
-                            <h3 className="text-lg font-bold text-amber-500 mb-4">⚙️ Kasiyer Hatası Düzeltme</h3>
-                            <div className="flex flex-col gap-4 mb-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-stone-400 mb-2">Ne Oldu?</label>
-                                    <select 
-                                        value={adjustmentType}
-                                        onChange={(e) => setAdjustmentType(e.target.value as any)}
-                                        className="w-full bg-stone-950 border border-stone-800 rounded-xl py-3 px-4 text-white font-bold focus:outline-none focus:border-amber-500 transition-all cursor-pointer"
-                                    >
-                                        <option value="none">Sorun Yok</option>
-                                        <option value="cash_to_credit">Nakit Girilmiş ➔ Kart Olacak</option>
-                                        <option value="credit_to_cash">Kart Girilmiş ➔ Nakit Olacak</option>
-                                    </select>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                    <tr className="border-b border-stone-800/80 text-stone-500 uppercase tracking-wider font-bold">
+                                        <th className="py-3 px-4">Tarih</th>
+                                        <th className="py-3 px-4">Sayılan Nakit</th>
+                                        <th className="py-3 px-4">Sayılan POS</th>
+                                        <th className="py-3 px-4">Sayılan Yemek</th>
+                                        <th className="py-3 px-4">Genel Fark</th>
+                                        <th className="py-3 px-4">Durum</th>
+                                        <th className="py-3 px-4 text-right">İşlem</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-stone-800/50">
+                                    {recentReconciliations.map((rec) => {
+                                        const totCounted = rec.counted_cash + rec.counted_credit_card + (rec.counted_meal_card || 0)
+                                        const totExpected = rec.expected_cash + rec.expected_credit_card
+                                        const totDiff = totCounted - totExpected
+
+                                        return (
+                                            <tr key={rec.id} className="hover:bg-stone-800/30 transition-colors">
+                                                <td className="py-3 px-4 font-bold text-stone-200">
+                                                    📅 {rec.date}
+                                                </td>
+                                                <td className="py-3 px-4 font-semibold text-amber-400">
+                                                    {formatCurrency(rec.counted_cash)}
+                                                </td>
+                                                <td className="py-3 px-4 font-semibold text-blue-400">
+                                                    {formatCurrency(rec.counted_credit_card)}
+                                                </td>
+                                                <td className="py-3 px-4 font-semibold text-purple-400">
+                                                    {formatCurrency(rec.counted_meal_card || 0)}
+                                                </td>
+                                                <td className="py-3 px-4 font-bold">
+                                                    <span className={totDiff > 0 ? 'text-emerald-400' : totDiff < 0 ? 'text-rose-400' : 'text-amber-400'}>
+                                                        {totDiff > 0 ? '+ ' : ''}{formatCurrency(totDiff)}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    {rec.status === 'MATCH' ? (
+                                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                                            ✓ Denk
+                                                        </span>
+                                                    ) : rec.status === 'OVERAGE' ? (
+                                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                                            + Fazla
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                                            - Açık
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-4 text-right">
+                                                    <button
+                                                        onClick={() => {
+                                                            setDate(rec.date)
+                                                            setActiveTab('count')
+                                                        }}
+                                                        className="px-3 py-1.5 bg-stone-800 hover:bg-amber-500 hover:text-stone-950 text-stone-300 rounded-xl transition-all font-bold text-[11px]"
+                                                    >
+                                                        Detayı Gör / Düzenle
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : (
+                    /* Ana Sayım Ekranı */
+                    <main className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+                        {/* Sol Kolon (7 Kolon): Fiziki Kör Sayım Formu & Para Sayma Asistanı */}
+                        <div className="lg:col-span-7 space-y-6">
+                            <div className="bg-stone-900/80 backdrop-blur-xl border border-stone-800/80 rounded-3xl p-6 lg:p-8 shadow-2xl relative overflow-hidden space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-xl font-black text-white flex items-center gap-2.5">
+                                        <span className="w-7 h-7 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center text-xs">1</span>
+                                        Fiziki Kör Sayım Girişi
+                                    </h2>
+                                    <span className="text-xs text-stone-500 font-bold uppercase tracking-wider">Gün Sonu Kasa</span>
                                 </div>
-                                {adjustmentType !== 'none' && (
-                                    <div className="animate-fade-in">
-                                        <label className="block text-xs font-medium text-stone-400 mb-2">Tutar (TL)</label>
+
+                                {/* Form İnputları Grid */}
+                                <div className="space-y-5">
+                                    {/* Nakit Kasa */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold text-stone-300 flex items-center gap-1.5">
+                                                <span>💵</span> Çekmecedeki Fiziki Nakit
+                                            </label>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowDenomCalculator(!showDenomCalculator)}
+                                                className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 hover:underline transition-all"
+                                            >
+                                                <span>🧮</span> {showDenomCalculator ? 'Asistanı Kapat' : 'Banknot/Bozuk Para Sayım Asistanı'}
+                                            </button>
+                                        </div>
+
                                         <div className="relative">
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 font-bold">₺</span>
                                             <input 
                                                 type="number" 
-                                                value={adjustmentAmount}
-                                                onChange={(e) => setAdjustmentAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                                                value={countedCash}
+                                                onChange={(e) => setCountedCash(e.target.value === '' ? '' : Number(e.target.value))}
                                                 placeholder="0.00"
-                                                className="w-full bg-stone-950 border border-stone-800 rounded-xl py-3 pl-10 pr-4 text-white font-bold focus:outline-none focus:border-amber-500 transition-all placeholder-stone-700"
+                                                className="w-full bg-stone-950 border border-stone-800/90 rounded-2xl py-3.5 pl-10 pr-4 text-amber-400 text-2xl font-black focus:outline-none focus:border-amber-500 transition-all placeholder-stone-800"
                                             />
                                         </div>
                                     </div>
-                                )}
-                            </div>
-                            <label className="block text-sm font-medium text-stone-400 mb-2">Açıklama (Opsiyonel)</label>
-                            <textarea 
-                                value={adjustmentNote}
-                                onChange={(e) => setAdjustmentNote(e.target.value)}
-                                placeholder="Örn: 190 TL'lik hesap kartla çekildi ama yanlışlıkla nakit girildi..."
-                                className="w-full bg-stone-950 border border-stone-800 rounded-xl p-4 text-stone-300 focus:outline-none focus:border-amber-500 transition-colors h-24 resize-none shadow-inner"
-                            />
-                        </div>
 
-                        <div className="pt-4 border-t border-stone-800">
-                            <div className="flex justify-between items-center text-stone-300">
-                                <span className="font-medium">Sizin Saydığınız Toplam:</span>
-                                <span className="text-2xl font-bold text-white">{formatCurrency(countedTotal)}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                                    {/* Banknot & Bozuk Para Sayım Asistanı Accordion Drawer */}
+                                    {showDenomCalculator && (
+                                        <div className="bg-stone-950/90 border border-amber-500/30 rounded-2xl p-5 space-y-4 animate-fade-in shadow-2xl">
+                                            <div className="flex items-center justify-between border-b border-stone-800/80 pb-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-amber-400 text-lg">🧮</span>
+                                                    <div>
+                                                        <h4 className="text-xs font-bold text-white">Banknot & Bozuk Para Sayım Asistanı</h4>
+                                                        <p className="text-[10px] text-stone-400">Adetleri girin, nakit tutarı otomatik toplansın.</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-xl">
+                                                        Sum: {formatCurrency(denomSumTotal)}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={clearDenomCalculator}
+                                                        className="text-[10px] text-stone-400 hover:text-rose-400 underline font-bold"
+                                                    >
+                                                        Sıfırla
+                                                    </button>
+                                                </div>
+                                            </div>
 
-                {/* Sağ Kolon: Sistem Karşılaştırması */}
-                <div className="space-y-6">
-                    <div className="bg-stone-900 border border-stone-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-bl-full -z-10" />
-                        <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                            <span className="text-emerald-500">2.</span> Sistem Beklentisi
-                        </h2>
-
-                        {loading ? (
-                            <div className="animate-pulse space-y-4">
-                                <div className="h-10 bg-stone-800 rounded-xl w-full"></div>
-                                <div className="h-10 bg-stone-800 rounded-xl w-full"></div>
-                                <div className="h-12 bg-stone-800 rounded-xl w-full mt-6"></div>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {/* Z-Raporu Detayları */}
-                                {isMovementFound ? (
-                                    <>
-                                        <div className="flex justify-between items-center p-3 bg-stone-950/50 rounded-lg border border-stone-800/50">
-                                            <span className="text-stone-400 text-sm">Z-Raporu Nakit</span>
-                                            <span className="font-bold text-stone-300">{formatCurrency(expectedCashRaw)}</span>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                                {DENOMINATIONS.map((d) => (
+                                                    <div key={d.value} className="bg-stone-900/90 border border-stone-800 rounded-xl p-2.5 space-y-1.5">
+                                                        <div className="flex items-center justify-between text-[11px] font-bold text-stone-300">
+                                                            <span className="flex items-center gap-1">
+                                                                <span>{d.icon}</span> {d.value} ₺
+                                                            </span>
+                                                            <span className="text-amber-400 text-[10px]">
+                                                                {(denomCounts[d.value] || 0) * d.value} ₺
+                                                            </span>
+                                                        </div>
+                                                        <input 
+                                                            type="number"
+                                                            min="0"
+                                                            value={denomCounts[d.value] || ''}
+                                                            onChange={(e) => handleDenomChange(d.value, Number(e.target.value))}
+                                                            placeholder="0 adet"
+                                                            className="w-full bg-stone-950 border border-stone-800 rounded-lg py-1.5 px-2 text-white text-xs font-bold focus:outline-none focus:border-amber-500 text-center"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                        <div className="flex justify-between items-center p-3 bg-stone-950/50 rounded-lg border border-stone-800/50">
-                                            <span className="text-stone-400 text-sm">Z-Raporu POS (Kart)</span>
-                                            <span className="font-bold text-stone-300">{formatCurrency(expectedCreditRaw)}</span>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="flex justify-between items-center p-3 bg-stone-950/50 rounded-lg border border-stone-800/50">
-                                        <span className="text-stone-400 text-sm">Günün Toplam Satışı</span>
-                                        <span className="font-bold text-stone-300">{formatCurrency(expectedSales)}</span>
-                                    </div>
-                                )}
-                                
-                                {/* Kasa Giderleri */}
-                                {expectedExpenses > 0 && (
-                                    <div className="flex justify-between items-center p-3 bg-rose-950/20 rounded-lg border border-rose-900/30">
-                                        <span className="text-rose-400/80 text-sm">Kasadan Çıkan (Giderler)</span>
-                                        <span className="font-bold text-rose-400">- {formatCurrency(expectedExpenses)}</span>
-                                    </div>
-                                )}
-                                
-                                {/* İndirim ve İkramlar (Sadece Bilgi Amaçlı, Fiziksel Kasadan Düşmez) */}
-                                {expectedDiscounts > 0 && (
-                                    <div className="flex justify-between items-center p-3 bg-stone-900/30 rounded-lg border border-stone-800/30 opacity-70">
-                                        <div className="flex flex-col">
-                                            <span className="text-stone-400 text-sm">Uygulanan İndirim / İkram</span>
-                                            <span className="text-stone-500 text-[10px]">(Satıştan düşüldü, kasayı etkilemez)</span>
-                                        </div>
-                                        <span className="font-bold text-stone-400">- {formatCurrency(expectedDiscounts)}</span>
-                                    </div>
-                                )}
-
-                                {/* Varsa Düzeltmeler (Kasiyer Hatası) */}
-                                {(adjCash !== 0 || adjCredit !== 0) && (
-                                    <div className="flex flex-col gap-2 p-3 bg-amber-950/20 rounded-lg border border-amber-900/30">
-                                        <span className="text-amber-500/80 text-xs font-bold uppercase tracking-wider mb-1">Düzeltme Etkisi</span>
-                                        {adjCash !== 0 && (
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-amber-400/80 text-sm">Nakit Beklentisine</span>
-                                                <span className="font-bold text-amber-400">{adjCash > 0 ? '+' : ''}{formatCurrency(adjCash)}</span>
-                                            </div>
-                                        )}
-                                        {adjCredit !== 0 && (
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-amber-400/80 text-sm">POS Beklentisine</span>
-                                                <span className="font-bold text-amber-400">{adjCredit > 0 ? '+' : ''}{formatCurrency(adjCredit)}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                
-                                <div className="pt-4 border-t border-stone-800 mt-6">
-                                    {isMovementFound && (
-                                        <>
-                                            <div className="flex justify-between items-center text-stone-400 mb-2">
-                                                <span className="text-sm">Beklenen Net Nakit:</span>
-                                                <span className="font-medium">{formatCurrency(expectedNetCash)}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center text-stone-400 mb-4">
-                                                <span className="text-sm">Beklenen Net POS:</span>
-                                                <span className="font-medium">{formatCurrency(expectedNetCredit)}</span>
-                                            </div>
-                                        </>
                                     )}
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-medium text-stone-300">Kasada Olması Gereken:</span>
-                                        <span className="text-3xl font-bold text-white">{formatCurrency(expectedTotalAdjusted)}</span>
+
+                                    {/* POS Cihazı Kredi Kartı */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-stone-300 flex items-center gap-1.5">
+                                            <span>💳</span> POS Cihazı SLIP Toplamı (Kredi Kartı)
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 font-bold">₺</span>
+                                            <input 
+                                                type="number" 
+                                                value={countedCreditCard}
+                                                onChange={(e) => setCountedCreditCard(e.target.value === '' ? '' : Number(e.target.value))}
+                                                placeholder="0.00"
+                                                className="w-full bg-stone-950 border border-stone-800/90 rounded-2xl py-3.5 pl-10 pr-4 text-blue-400 text-2xl font-black focus:outline-none focus:border-amber-500 transition-all placeholder-stone-800"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Yemek Kartları / Diğer */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-stone-300 flex items-center gap-1.5">
+                                            <span>🎫</span> Yemek Kartları / Diğer (Multinet, Sodexo vs.)
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-500 font-bold">₺</span>
+                                            <input 
+                                                type="number" 
+                                                value={countedMealCard}
+                                                onChange={(e) => setCountedMealCard(e.target.value === '' ? '' : Number(e.target.value))}
+                                                placeholder="0.00"
+                                                className="w-full bg-stone-950 border border-stone-800/90 rounded-2xl py-3.5 pl-10 pr-4 text-purple-400 text-2xl font-black focus:outline-none focus:border-amber-500 transition-all placeholder-stone-800"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Kasiyer Hatası Düzeltme Modülü */}
+                                    <div className="pt-4 border-t border-stone-800/80 space-y-4">
+                                        <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+                                            <span>⚙️</span> Kasiyer Hata Düzeltme Modülü
+                                        </h3>
+                                        
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-stone-400 mb-1.5">Oluşan Durum</label>
+                                                <select 
+                                                    value={adjustmentType}
+                                                    onChange={(e) => setAdjustmentType(e.target.value as any)}
+                                                    className="w-full bg-stone-950 border border-stone-800 rounded-xl py-2.5 px-3 text-white text-xs font-bold focus:outline-none focus:border-amber-500 cursor-pointer"
+                                                >
+                                                    <option value="none">Düzeltme Yok</option>
+                                                    <option value="cash_to_credit">Nakit Girilmiş ➔ POS Olacak</option>
+                                                    <option value="credit_to_cash">POS Girilmiş ➔ Nakit Olacak</option>
+                                                </select>
+                                            </div>
+
+                                            {adjustmentType !== 'none' && (
+                                                <div className="animate-fade-in">
+                                                    <label className="block text-[11px] font-bold text-stone-400 mb-1.5">Düzeltme Tutarı</label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 font-bold text-xs">₺</span>
+                                                        <input 
+                                                            type="number" 
+                                                            value={adjustmentAmount}
+                                                            onChange={(e) => setAdjustmentAmount(e.target.value === '' ? '' : Number(e.target.value))}
+                                                            placeholder="0.00"
+                                                            className="w-full bg-stone-950 border border-stone-800 rounded-xl py-2.5 pl-8 pr-3 text-white text-xs font-bold focus:outline-none focus:border-amber-500"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {adjustmentType !== 'none' && (
+                                            <div className="animate-fade-in">
+                                                <label className="block text-[11px] font-bold text-stone-400 mb-1.5">Düzeltme Açıklama Notu</label>
+                                                <textarea 
+                                                    value={adjustmentNote}
+                                                    onChange={(e) => setAdjustmentNote(e.target.value)}
+                                                    placeholder="Örn: 150 TL tutarındaki adisyon nakit yerine yanlışlıkla kredi kartı girildi..."
+                                                    className="w-full bg-stone-950 border border-stone-800 rounded-xl p-3 text-stone-300 text-xs focus:outline-none focus:border-amber-500 h-20 resize-none"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Sayılan Toplam Özeti */}
+                                    <div className="pt-4 border-t border-stone-800/80 flex items-center justify-between">
+                                        <span className="text-xs font-bold text-stone-400">Sizin Saydığınız Toplam Parasal Büyüklük:</span>
+                                        <span className="text-2xl font-black text-white">{formatCurrency(countedTotal)}</span>
                                     </div>
                                 </div>
                             </div>
-                        )}
-                    </div>
-
-                    {/* Sonuç Alanı */}
-                    <div className={`border rounded-3xl p-8 shadow-2xl transition-all duration-500 ${
-                        variance === 0 
-                            ? 'bg-amber-500/10 border-amber-500/30' 
-                            : variance > 0 
-                                ? 'bg-emerald-500/10 border-emerald-500/30' 
-                                : 'bg-rose-500/10 border-rose-500/30'
-                    }`}>
-                        <h2 className="text-lg font-medium text-stone-300 mb-2 text-center">Mutabakat Sonucu</h2>
-                        <div className="flex flex-col items-center justify-center gap-4">
-                            <div className="text-5xl font-black tracking-tighter">
-                                {variance > 0 ? '+ ' : ''}{formatCurrency(variance)}
-                            </div>
-                            {getVarianceBadge()}
-
-                            {isMovementFound && (
-                                <div className="flex gap-4 mt-4 w-full px-4">
-                                    <div className="flex-1 bg-stone-950 p-4 rounded-xl border border-stone-800 text-center">
-                                        <div className="text-stone-400 text-sm mb-1">POS Farkı</div>
-                                        <div className={`font-bold text-lg ${creditVariance === 0 ? 'text-amber-500' : creditVariance > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                            {creditVariance > 0 ? '+ ' : ''}{formatCurrency(creditVariance)}
-                                        </div>
-                                    </div>
-                                    <div className="flex-1 bg-stone-950 p-4 rounded-xl border border-stone-800 text-center">
-                                        <div className="text-stone-400 text-sm mb-1">Nakit Farkı</div>
-                                        <div className={`font-bold text-lg ${cashVariance === 0 ? 'text-amber-500' : cashVariance > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                            {cashVariance > 0 ? '+ ' : ''}{formatCurrency(cashVariance)}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
                         </div>
 
-                        {error && (
-                            <div className="mt-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-sm text-center">
-                                {error}
-                            </div>
-                        )}
+                        {/* Sağ Kolon (5 Kolon): Sistem Beklentisi & Mutabakat Sonucu */}
+                        <div className="lg:col-span-5 space-y-6">
 
-                        {success && (
-                            <div className="mt-6 p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-sm text-center font-bold">
-                                Kasa Sayımı başarıyla kaydedildi!
-                            </div>
-                        )}
+                            {/* Sistem Beklentisi Kartı */}
+                            <div className="bg-stone-900/80 backdrop-blur-xl border border-stone-800/80 rounded-3xl p-6 lg:p-8 shadow-2xl relative overflow-hidden space-y-5">
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-xl font-black text-white flex items-center gap-2.5">
+                                        <span className="w-7 h-7 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xs">2</span>
+                                        Sistem Beklentisi
+                                    </h2>
+                                    <span className="text-[10px] bg-stone-950 border border-stone-800 text-stone-400 px-2.5 py-1 rounded-full font-bold">
+                                        Otomatik Hesaplama
+                                    </span>
+                                </div>
 
-                        <button
-                            onClick={handleSave}
-                            disabled={saving || loading}
-                            className="w-full mt-8 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-lg py-4 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2 shadow-xl shadow-amber-500/20"
-                        >
-                            {saving ? 'Kaydediliyor...' : existingReconciliation ? 'Mutabakatı Güncelle' : 'Günü Kapat ve Mutabakatı Kaydet'}
-                        </button>
-                    </div>
-                </div>
-            </main>
+                                {loading ? (
+                                    <div className="animate-pulse space-y-3">
+                                        <div className="h-10 bg-stone-800/60 rounded-xl w-full"></div>
+                                        <div className="h-10 bg-stone-800/60 rounded-xl w-full"></div>
+                                        <div className="h-16 bg-stone-800/60 rounded-xl w-full mt-4"></div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3 text-xs">
+                                        {isMovementFound ? (
+                                            <>
+                                                <div className="flex justify-between items-center p-3 bg-stone-950/70 rounded-2xl border border-stone-800/80">
+                                                    <span className="text-stone-400 font-medium">Z-Raporu Nakit Hasılat</span>
+                                                    <span className="font-bold text-amber-400">{formatCurrency(expectedCashRaw)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center p-3 bg-stone-950/70 rounded-2xl border border-stone-800/80">
+                                                    <span className="text-stone-400 font-medium">Z-Raporu POS Hasılat</span>
+                                                    <span className="font-bold text-blue-400">{formatCurrency(expectedCreditRaw)}</span>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="flex justify-between items-center p-3 bg-stone-950/70 rounded-2xl border border-stone-800/80">
+                                                <span className="text-stone-400 font-medium">Günün Toplam Ürün Satışı</span>
+                                                <span className="font-bold text-stone-200">{formatCurrency(expectedSales)}</span>
+                                            </div>
+                                        )}
+
+                                        {expectedExpenses > 0 && (
+                                            <div className="flex justify-between items-center p-3 bg-rose-500/10 rounded-2xl border border-rose-500/20">
+                                                <span className="text-rose-400 font-medium">Kasadan Çıkan (Giderler)</span>
+                                                <span className="font-bold text-rose-400">- {formatCurrency(expectedExpenses)}</span>
+                                            </div>
+                                        )}
+
+                                        {expectedDiscounts > 0 && (
+                                            <div className="flex justify-between items-center p-3 bg-stone-950/40 rounded-2xl border border-stone-800/40 opacity-70">
+                                                <span className="text-stone-400">İndirim & İkramlar</span>
+                                                <span className="font-semibold text-stone-500">- {formatCurrency(expectedDiscounts)}</span>
+                                            </div>
+                                        )}
+
+                                        {(adjCash !== 0 || adjCredit !== 0) && (
+                                            <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 space-y-1.5">
+                                                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">Kasiyer Düzeltme Etkisi</span>
+                                                {adjCash !== 0 && (
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-amber-300">Nakit Beklentisi:</span>
+                                                        <span className="font-bold text-amber-400">{adjCash > 0 ? '+' : ''}{formatCurrency(adjCash)}</span>
+                                                    </div>
+                                                )}
+                                                {adjCredit !== 0 && (
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-amber-300">POS Beklentisi:</span>
+                                                        <span className="font-bold text-amber-400">{adjCredit > 0 ? '+' : ''}{formatCurrency(adjCredit)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div className="pt-3 border-t border-stone-800/80 space-y-2 mt-4">
+                                            {isMovementFound && (
+                                                <>
+                                                    <div className="flex justify-between items-center text-stone-400">
+                                                        <span>Beklenen Net Nakit:</span>
+                                                        <span className="font-bold text-amber-400">{formatCurrency(expectedNetCash)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-stone-400">
+                                                        <span>Beklenen Net POS:</span>
+                                                        <span className="font-bold text-blue-400">{formatCurrency(expectedNetCredit)}</span>
+                                                    </div>
+                                                </>
+                                            )}
+                                            <div className="flex justify-between items-center pt-2 border-t border-stone-800/50">
+                                                <span className="font-bold text-stone-300">Kasada Olması Gereken Toplam:</span>
+                                                <span className="text-2xl font-black text-white">{formatCurrency(expectedTotalAdjusted)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Mutabakat Sonuç Kartı */}
+                            <div className={`border rounded-3xl p-6 lg:p-8 shadow-2xl transition-all space-y-5 ${
+                                variance === 0 
+                                    ? 'bg-amber-500/10 border-amber-500/30 shadow-amber-500/5' 
+                                    : variance > 0 
+                                        ? 'bg-emerald-500/10 border-emerald-500/30 shadow-emerald-500/5' 
+                                        : 'bg-rose-500/10 border-rose-500/30 shadow-rose-500/5'
+                            }`}>
+                                <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider text-center">
+                                    Mutabakat Karşılaştırma Sonucu
+                                </h3>
+
+                                <div className="flex flex-col items-center justify-center gap-3">
+                                    <div className="text-4xl sm:text-5xl font-black tracking-tight">
+                                        {variance > 0 ? '+ ' : ''}{formatCurrency(variance)}
+                                    </div>
+                                    {getVarianceBadge()}
+
+                                    {isMovementFound && (
+                                        <div className="grid grid-cols-2 gap-3 w-full mt-2">
+                                            <div className="bg-stone-950/80 p-3 rounded-2xl border border-stone-800/80 text-center">
+                                                <div className="text-stone-400 text-[11px] font-medium mb-1">Nakit Farkı</div>
+                                                <div className={`font-bold text-sm ${cashVariance === 0 ? 'text-amber-400' : cashVariance > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                    {cashVariance > 0 ? '+ ' : ''}{formatCurrency(cashVariance)}
+                                                </div>
+                                            </div>
+                                            <div className="bg-stone-950/80 p-3 rounded-2xl border border-stone-800/80 text-center">
+                                                <div className="text-stone-400 text-[11px] font-medium mb-1">POS (Kart) Farkı</div>
+                                                <div className={`font-bold text-sm ${creditVariance === 0 ? 'text-amber-400' : creditVariance > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                    {creditVariance > 0 ? '+ ' : ''}{formatCurrency(creditVariance)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {error && (
+                                    <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs text-center font-semibold">
+                                        ⚠️ {error}
+                                    </div>
+                                )}
+
+                                {success && (
+                                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs text-center font-bold">
+                                        ✓ Kasa sayımı ve mutabakat kaydı başarıyla kaydedildi!
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={handleSave}
+                                    disabled={saving || loading}
+                                    className="w-full bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-base py-4 rounded-2xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 shadow-xl shadow-amber-500/20"
+                                >
+                                    {saving ? 'Kaydedildiği...' : existingReconciliation ? '💾 Mutabakatı Güncelle' : '🔒 Günü Kapat ve Mutabakatı Kaydet'}
+                                </button>
+                            </div>
+                        </div>
+
+                    </main>
+                )}
+            </div>
         </div>
     )
 }
