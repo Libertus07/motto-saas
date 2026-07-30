@@ -141,7 +141,14 @@ export default function YatirimFisiYukle() {
         setLoading(true)
 
         try {
-            const acc = accounts.find(a => a.id === selectedAccount)
+            if (!parsedData) return
+            if (!activeOrg) {
+                showAlert('Organizasyon bilgisi bulunamadı', 'error')
+                setLoading(false)
+                return
+            }
+
+            const acc = Object.values(accounts).find(a => a.id === selectedAccount)
             if (!acc) throw new Error("Hesap bulunamadı")
 
             const investmentName = parsedData.name || `${parsedData.quantity} Birim ${parsedData.asset_type.toUpperCase()}`
