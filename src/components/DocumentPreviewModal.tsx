@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 
 type DocumentPreviewModalProps = {
     isOpen: boolean
@@ -147,19 +148,25 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
                     </div>
                 ) : isImage ? (
                     <div className="w-full min-h-full flex flex-col items-center justify-start my-auto">
-                        <img 
-                            src={url} 
-                            alt="Fatura Önizleme" 
-                            className={`rounded-2xl shadow-2xl border border-stone-800/80 transition-all duration-200 ease-out origin-top ${
+                        <div className={`relative ${
                                 viewMode === 'fitWidth' 
-                                    ? 'w-full sm:w-auto sm:max-w-2xl h-auto' 
-                                    : 'max-w-full max-h-[78vh] object-contain'
-                            }`}
-                            style={{
-                                transform: `scale(${zoom})`
-                            }}
-                            draggable={false}
-                        />
+                                    ? 'w-full sm:w-auto sm:max-w-2xl h-[78vh]' 
+                                    : 'w-full h-[78vh]'
+                            }`}>
+                            <Image 
+                                src={url} 
+                                alt="Fatura Önizleme" 
+                                fill
+                                unoptimized
+                                className={`rounded-2xl shadow-2xl border border-stone-800/80 transition-all duration-200 ease-out origin-top ${
+                                    viewMode === 'fitWidth' ? 'object-contain sm:object-cover' : 'object-contain'
+                                }`}
+                                style={{
+                                    transform: `scale(${zoom})`
+                                }}
+                                draggable={false}
+                            />
+                        </div>
                     </div>
                 ) : (
                     <div className="p-8 text-center bg-stone-900/90 border border-stone-800 rounded-3xl max-w-md shadow-2xl backdrop-blur-md my-auto">

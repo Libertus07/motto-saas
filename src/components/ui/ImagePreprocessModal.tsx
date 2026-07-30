@@ -7,6 +7,7 @@ import {
   PreprocessResult,
   FilterPreset
 } from '@/lib/imagePreprocess'
+import Image from 'next/image'
 
 interface ImagePreprocessModalProps {
   isOpen: boolean
@@ -372,14 +373,16 @@ export function ImagePreprocessModal({
           )}
 
           {activeSrc && (
-            <div className="relative cursor-crosshair group my-auto">
-              <img
+            <div className="relative cursor-crosshair group my-auto w-full h-[42vh]">
+              <Image
                 ref={imgRef}
                 src={activeSrc}
                 alt="Receipt Preview"
+                fill
+                unoptimized
                 onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}
-                className="max-h-[42vh] max-w-full object-contain rounded-lg shadow-2xl border border-stone-800"
+                className="object-contain rounded-lg shadow-2xl border border-stone-800"
               />
 
               {/* AI Auto Field Highlights (Neon Bounding Boxes) */}
