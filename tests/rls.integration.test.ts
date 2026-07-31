@@ -12,13 +12,12 @@ describe('Row Level Security (RLS) Multi-Tenant Tests', () => {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'fake-service-key'
 
   // Service client (bypasses RLS) to setup/teardown data
-  const adminClient = createClient(supabaseUrl, serviceRoleKey)
+  const _adminClient = createClient(supabaseUrl, serviceRoleKey)
   
-  let orgA_Id: string
-  let orgB_Id: string
-  let userA_Token: string
-  let userB_Token: string
-  let testRecordId: string
+  let orgA_Id: string | undefined
+  let orgB_Id: string | undefined
+  let userA_Token: string | undefined
+  let userB_Token: string | undefined
 
   beforeAll(async () => {
     // 1. Create two test organizations
@@ -38,7 +37,7 @@ describe('Row Level Security (RLS) Multi-Tenant Tests', () => {
     
     // Create a dummy record belonging to Org A
     // const { data: record } = await adminClient.from('inventory').insert({ name: 'Test Item A', organization_id: orgA_Id }).select().single()
-    // testRecordId = record.id
+    // const testRecordId = record.id
   })
 
   afterAll(async () => {
@@ -48,7 +47,7 @@ describe('Row Level Security (RLS) Multi-Tenant Tests', () => {
   })
 
   it('should allow User A to read Org A data', async () => {
-    if (!userA_Token) return // Skip if no auth
+    if (!userA_Token || !orgA_Id) return // Skip if no auth
 
     const userAClient = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: `Bearer ${userA_Token}` } }
@@ -62,7 +61,7 @@ describe('Row Level Security (RLS) Multi-Tenant Tests', () => {
   })
 
   it('should NOT allow User B to read Org A data', async () => {
-    if (!userB_Token) return // Skip if no auth
+    if (!userB_Token || !orgA_Id) return // Skip if no auth
 
     const userBClient = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: `Bearer ${userB_Token}` } }
@@ -77,7 +76,7 @@ describe('Row Level Security (RLS) Multi-Tenant Tests', () => {
   })
 
   it('should NOT allow User A to update Org B data', async () => {
-    if (!userA_Token) return
+    if (!userA_Token || !orgB_Id) return
 
     const userAClient = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: `Bearer ${userA_Token}` } }
@@ -87,8 +86,10 @@ describe('Row Level Security (RLS) Multi-Tenant Tests', () => {
       .from('inventory')
       .update({ name: 'Hacked by A' })
       .eq('organization_id', orgB_Id)
+      .select('id')
       
     // Should fail or update 0 rows
+    expect(error).toBeNull()
     expect(data?.length || 0).toBe(0)
   })
 })
