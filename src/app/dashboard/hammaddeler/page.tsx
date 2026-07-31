@@ -332,10 +332,11 @@ export default function Hammaddeler() {
       category: 'Diğer',
       unit: 'Kg',
       price_per_unit: '',
-      stock_quantity: '0',
-      critical_stock_level: '0'
+      stock_quantity: '',
+      critical_stock_level: ''
     })
     setEditingId(null)
+    setPkgMultiplier(12)
     setShowModal(false)
   }
 
@@ -417,6 +418,7 @@ export default function Hammaddeler() {
       critical_stock_level: (mat.critical_stock_level || 0).toString()
     })
     setEditingId(mat.id)
+    setPkgMultiplier(12) // Reset multiplier
     setShowModal(true)
   }
 

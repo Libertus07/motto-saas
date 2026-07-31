@@ -757,7 +757,10 @@ export default function FinansPage() {
                                 <span>✍️</span> Manuel Kasa İşlemi Ekle
                             </h3>
                             <button 
-                                onClick={() => setIsModalOpen(false)} 
+                                onClick={() => {
+                                    setIsModalOpen(false)
+                                    setManualForm({ movement_type: 'giris', amount: '', description: '' })
+                                }} 
                                 className="w-8 h-8 rounded-full bg-stone-800 text-stone-400 hover:text-white flex items-center justify-center transition-colors"
                                 aria-label="Kapat"
                             >
