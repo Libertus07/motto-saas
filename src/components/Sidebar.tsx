@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useState, useEffect, useMemo } from 'react'
 import { OrganizationSwitcher } from '@/components/OrganizationSwitcher'
+import { replayAppTour } from '@/hooks/useAppTour'
 
 export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
   const pathname = usePathname()
@@ -184,6 +185,13 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
 
       {/* ──────────────── USER PROFILE FOOTER ──────────────── */}
       <div className="p-3.5 border-t border-stone-800/80 bg-stone-950/60 relative mt-auto">
+        <button
+          type="button"
+          onClick={() => replayAppTour()}
+          className="mb-2.5 w-full rounded-xl border border-stone-700/70 bg-stone-900/80 px-3 py-2 text-left text-xs font-bold text-stone-300 transition-colors hover:border-amber-500/40 hover:text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+        >
+          Uygulama turunu yeniden başlat
+        </button>
         {showProfileMenu && (
           <div className="absolute bottom-full left-3.5 right-3.5 mb-2 bg-stone-900/95 border border-stone-800 rounded-2xl shadow-2xl overflow-hidden z-50 backdrop-blur-xl animate-fadeIn">
             <Link
