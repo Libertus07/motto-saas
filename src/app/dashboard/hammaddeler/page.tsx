@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/format'
 import dynamic from 'next/dynamic'
 import type { AutoCategoryResponse, EditRow, Material, PriceHistory } from '@/features/materials/types'
 import { filterAndSortMaterials, type MaterialSort } from '@/features/materials/utils'
+import { materialTourSteps } from '@/features/materials/tour'
 
 const MaterialHistoryModal = dynamic(
   () => import('@/features/materials/components/MaterialHistoryModal').then((mod) => mod.MaterialHistoryModal),
@@ -511,42 +512,7 @@ export default function Hammaddeler() {
       .filter((g) => g.items.length > 0)
   }, [categories, processedMaterials, categoryFilter])
 
-  // Driver Tour
-  useAppTour(
-    'hammaddeler',
-    [
-      {
-        element: '#tour-mat-add',
-        popover: {
-          title: 'Hammadde Ekle ➕',
-          description: 'Tedarikçinizden aldığınız hammaddeleri sisteme buradan tek tek girebilirsiniz.',
-          side: 'bottom',
-          align: 'end',
-        },
-      },
-      {
-        element: '#tour-mat-bulk-edit',
-        popover: {
-          title: 'Hızlı Düzenleme ⚡',
-          description:
-            'Excel gibi çalışır! Fiyat güncellemelerini veya stok sayımlarını ekrana tıklayarak hızlıca yapıp toplu kaydedebilirsiniz.',
-          side: 'bottom',
-          align: 'center',
-        },
-      },
-      {
-        element: '#tour-mat-autocat',
-        popover: {
-          title: 'Yapay Zeka ile Düzenle 🤖',
-          description:
-            'Yüzlerce hammaddeniz mi var? Yapay zeka asistanımız hepsini saniyeler içinde "Süt Ürünleri", "Paketleme" gibi kategorilere ayırır.',
-          side: 'bottom',
-          align: 'center',
-        },
-      },
-    ],
-    800,
-  )
+  useAppTour('hammaddeler', materialTourSteps, 800)
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 pb-16">
