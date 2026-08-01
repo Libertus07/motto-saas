@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { useAppTour } from '@/hooks/useAppTour'
 import { AutoCategorizeDialog } from '@/features/products/components/AutoCategorizeDialog'
@@ -10,10 +9,12 @@ import { ProductFilters } from '@/features/products/components/ProductFilters'
 import { ProductFormDrawer } from '@/features/products/components/ProductFormDrawer'
 import { ProductMetrics } from '@/features/products/components/ProductMetrics'
 import { ProductPageHeader } from '@/features/products/components/ProductPageHeader'
+import { useProductMutations } from '@/features/products/hooks/useProductMutations'
 import { useProductsData } from '@/features/products/hooks/useProductsData'
 import type {
   Product,
   ProductBulkRow,
+  ProductBulkUpdate,
   ProductCategorySuggestion,
   ProductFormValues,
   ProductIngredient,
@@ -27,6 +28,7 @@ export default function Urunler() {
   useAppTour('urunler', productTourSteps)
   const {
     supabase,
+    organizationId,
     products,
     materials,
     subRecipes,
@@ -34,6 +36,15 @@ export default function Urunler() {
     error: productsError,
     refresh: fetchData,
   } = useProductsData()
+  const {
+    saveProduct,
+    updateProducts,
+    removeProduct,
+    loadProductRecipe,
+    savingProduct,
+    bulkSaving,
+    categorizing: autoCatSaving,
+  } = useProductMutations({ supabase, organizationId, refresh: fetchData })
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isBuildingAiRecipe, setIsBuildingAiRecipe] = useState(false)
@@ -48,13 +59,11 @@ export default function Urunler() {
   const [bulkEditMode, setBulkEditMode] = useState(false)
   const [bulkRows, setBulkRows] = useState<Record<string, ProductBulkRow>>({})
   const [changedIds, setChangedIds] = useState<Set<string>>(new Set())
-  const [bulkSaving, setBulkSaving] = useState(false)
 
   // Auto Categorize
   const [autoCatLoading, setAutoCatLoading] = useState(false)
   const [autoCatSuggestions, setAutoCatSuggestions] = useState<ProductCategorySuggestion[]>([])
   const [autoCatModalOpen, setAutoCatModalOpen] = useState(false)
-  const [autoCatSaving, setAutoCatSaving] = useState(false)
 
   // Form State
   const [form, setForm] = useState<ProductFormValues>({
@@ -120,8 +129,9 @@ export default function Urunler() {
   }
 
   const handleBulkSave = async () => {
-    setBulkSaving(true)
     const bulkDetails: string[] = []
+    const updates: ProductBulkUpdate[] = []
+
     for (const id of [...changedIds]) {
       const row = bulkRows[id]
       const oldProd = products.find((p) => p.id === id)
@@ -129,27 +139,34 @@ export default function Urunler() {
       const newPrice = parseFloat(row.sale_price)
       const oldEst = oldProd?.estimated_monthly_sales || 0
       const newEst = parseInt(row.estimated_monthly_sales)
+
+      if (!Number.isFinite(newPrice) || newPrice < 0 || !Number.isInteger(newEst) || newEst < 0) {
+        await showAlert('Toplu düzenlemede geçersiz fiyat veya satış tahmini bulundu.', 'warning')
+        return
+      }
+
       const changes = []
       if (oldPrice !== newPrice) changes.push(`Fiyat: ${oldPrice}->${newPrice}`)
       if (oldEst !== newEst) changes.push(`Tahmin: ${oldEst}->${newEst}`)
       if (oldProd?.category !== row.category) changes.push(`Kategori: ${oldProd?.category}->${row.category}`)
       if (changes.length > 0) bulkDetails.push(`${oldProd?.name || 'Ürün'} (${changes.join(', ')})`)
 
-      await supabase
-        .from('products')
-        .update({ sale_price: newPrice, estimated_monthly_sales: newEst, category: row.category })
-        .eq('id', id)
+      updates.push({ id, sale_price: newPrice, estimated_monthly_sales: newEst, category: row.category })
     }
-    setBulkEditMode(false)
-    setChangedIds(new Set())
-    setBulkSaving(false)
-    fetchData()
-    logActivity(
-      'Ürünler',
-      'GUNCELLEME',
-      `${changedIds.size} adet ürünün bilgileri (fiyat/kategori) topluca güncellendi.`,
-      bulkDetails.length > 0 ? { detay: bulkDetails.join(' | ') } : undefined,
-    )
+
+    try {
+      await updateProducts(
+        updates,
+        `${updates.length} adet ürünün bilgileri (fiyat/kategori) topluca güncellendi.`,
+        bulkDetails.length > 0 ? { detay: bulkDetails.join(' | ') } : {},
+        'bulk',
+      )
+      setBulkEditMode(false)
+      setChangedIds(new Set())
+      await showAlert(`${updates.length} ürün başarıyla güncellendi.`, 'success')
+    } catch (error: unknown) {
+      await showAlert(`Toplu güncelleme tamamlanamadı: ${(error as Error).message}`, 'error')
+    }
   }
 
   // ─── Auto Categorize ────────────────────────────────────────
@@ -187,19 +204,34 @@ export default function Urunler() {
   }
 
   const handleApplyAutoCat = async (approved: { id: string; suggested: string }[]) => {
-    setAutoCatSaving(true)
-    for (const item of approved) {
-      await supabase.from('products').update({ category: item.suggested }).eq('id', item.id)
+    const suggestionById = new Map(approved.map((item) => [item.id, item.suggested]))
+    const updates = products
+      .filter((product) => suggestionById.has(product.id))
+      .map((product) => ({
+        id: product.id,
+        sale_price: product.sale_price,
+        estimated_monthly_sales: product.estimated_monthly_sales || 0,
+        category: suggestionById.get(product.id) ?? product.category,
+      }))
+
+    if (updates.length === 0) {
+      await showAlert('Uygulanacak kategori önerisi bulunamadı.', 'warning')
+      return
     }
-    setAutoCatModalOpen(false)
-    setAutoCatSuggestions([])
-    setAutoCatSaving(false)
-    fetchData()
-    logActivity(
-      'Ürünler',
-      'GUNCELLEME',
-      `${approved.length} adet ürünün kategorisi yapay zeka ile otomatik güncellendi.`,
-    )
+
+    try {
+      await updateProducts(
+        updates,
+        `${updates.length} adet ürünün kategorisi yapay zeka ile otomatik güncellendi.`,
+        { kaynak: 'ai_auto_categorize', urunler: approved },
+        'categorize',
+      )
+      setAutoCatModalOpen(false)
+      setAutoCatSuggestions([])
+      await showAlert('Kategori önerileri başarıyla uygulandı.', 'success')
+    } catch (error: unknown) {
+      await showAlert(`Kategoriler güncellenemedi: ${(error as Error).message}`, 'error')
+    }
   }
 
   const closeAutoCategorize = () => setAutoCatModalOpen(false)
@@ -246,14 +278,28 @@ export default function Urunler() {
     setRecipeItems((currentItems) => currentItems.filter((_, itemIndex) => itemIndex !== index))
 
   const handleSubmit = async () => {
-    if (!form.name) return
+    if (!form.name.trim()) {
+      await showAlert('Ürün adı zorunludur.', 'warning')
+      return
+    }
+
     const payload = {
-      name: form.name,
-      category: form.category,
+      name: form.name.trim(),
+      category: form.category.trim(),
       sale_price: parseFloat(form.sale_price || '0'),
       estimated_monthly_sales: parseInt(form.estimated_monthly_sales || '0'),
     }
-    let productId = editingId
+
+    if (
+      !Number.isFinite(payload.sale_price) ||
+      payload.sale_price < 0 ||
+      !Number.isInteger(payload.estimated_monthly_sales) ||
+      payload.estimated_monthly_sales < 0
+    ) {
+      await showAlert('Satış fiyatı ve aylık satış tahmini geçerli olmalıdır.', 'warning')
+      return
+    }
+
     let details = ''
 
     if (editingId) {
@@ -266,35 +312,28 @@ export default function Urunler() {
       if (oldProd?.category !== payload.category)
         changes.push(`Kategori: ${oldProd?.category || 'Diğer'} -> ${payload.category}`)
       details = changes.length > 0 ? changes.join(', ') : 'İsim veya reçete güncellendi'
-      await supabase.from('products').update(payload).eq('id', editingId)
-      await supabase.from('product_ingredients').delete().eq('product_id', editingId)
     } else {
       details = `Fiyat: ${payload.sale_price} ₺, Kategori: ${payload.category}`
-      const { data } = await supabase.from('products').insert(payload).select().single()
-      productId = data?.id
     }
 
-    if (productId && recipeItems.length > 0) {
-      const validItems = recipeItems.filter((r) => r.item_id && r.quantity > 0)
-      if (validItems.length > 0) {
-        await supabase.from('product_ingredients').insert(
-          validItems.map((r) => ({
-            product_id: productId,
-            material_id: r.type === 'material' ? r.item_id : null,
-            sub_recipe_id: r.type === 'sub_recipe' ? r.item_id : null,
-            quantity: r.quantity,
-          })),
-        )
-      }
+    const validItems = recipeItems.filter((item) => item.item_id && item.quantity > 0)
+
+    try {
+      await saveProduct({
+        id: editingId,
+        name: payload.name,
+        category: payload.category,
+        salePrice: payload.sale_price,
+        estimatedMonthlySales: payload.estimated_monthly_sales,
+        ingredients: validItems,
+        auditDetails: { detay: details },
+      })
+      const action = editingId ? 'güncellendi' : 'eklendi'
+      resetForm()
+      await showAlert(`${payload.name} başarıyla ${action}.`, 'success')
+    } catch (error: unknown) {
+      await showAlert(`Ürün kaydedilemedi: ${(error as Error).message}`, 'error')
     }
-    resetForm()
-    fetchData()
-    logActivity(
-      'Ürünler',
-      editingId ? 'GUNCELLEME' : 'EKLEME',
-      `${form.name} isimli ürün ${editingId ? 'güncellendi' : 'sisteme eklendi'}.`,
-      { detay: details },
-    )
   }
 
   const handleEdit = async (product: Product) => {
@@ -305,15 +344,13 @@ export default function Urunler() {
       estimated_monthly_sales: (product.estimated_monthly_sales || 0).toString(),
     })
     setEditingId(product.id)
-    const { data } = await supabase.from('product_ingredients').select('*').eq('product_id', product.id)
-    setRecipeItems(
-      data?.map((r) => ({
-        type: r.material_id ? 'material' : 'sub_recipe',
-        item_id: r.material_id || r.sub_recipe_id,
-        quantity: r.quantity,
-      })) || [],
-    )
-    setShowModal(true)
+    try {
+      setRecipeItems(await loadProductRecipe(product.id))
+      setShowModal(true)
+    } catch (error: unknown) {
+      setEditingId(null)
+      await showAlert(`Ürün reçetesi yüklenemedi: ${(error as Error).message}`, 'error')
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -323,9 +360,13 @@ export default function Urunler() {
       'Ürünü Sil 🗑️',
     )
     if (!confirmed) return
-    await supabase.from('products').delete().eq('id', id)
-    fetchData()
-    logActivity('Ürünler', 'SILME', `${productToDelete?.name || 'Bir ürün'} sistemden silindi.`, { productId: id })
+
+    try {
+      await removeProduct(id)
+      await showAlert(`${productToDelete?.name || 'Ürün'} başarıyla silindi.`, 'success')
+    } catch (error: unknown) {
+      await showAlert(`Ürün silinemedi: ${(error as Error).message}`, 'error')
+    }
   }
 
   const handleAiRecipeBuild = async () => {
@@ -485,6 +526,7 @@ export default function Urunler() {
         materials={materials}
         subRecipes={subRecipes}
         isBuildingAiRecipe={isBuildingAiRecipe}
+        saving={savingProduct}
         liveCost={liveCost}
         salePrice={salePrice}
         liveMargin={liveMargin}

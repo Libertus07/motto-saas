@@ -57,6 +57,7 @@ export function useProductsData() {
 
   return {
     supabase,
+    organizationId,
     products,
     materials,
     subRecipes,

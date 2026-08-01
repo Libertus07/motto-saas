@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { describe, expect, it, vi } from 'vitest'
 
-import { buildProductWorkspace } from './product-service'
+import { buildProductWorkspace, bulkUpdateProducts, deleteProduct, saveProductWithRecipe } from './product-service'
 
 describe('buildProductWorkspace', () => {
   it('calculates material, sub-recipe, product costs and recent sales', () => {
@@ -53,5 +54,74 @@ describe('buildProductWorkspace', () => {
     expect(workspace.subRecipes[0].cost_per_yield).toBe(0)
     expect(workspace.products[0].calculated_cost).toBe(0)
     expect(workspace.products[0].actual_sales_30d).toBe(0)
+  })
+})
+
+describe('product mutation service', () => {
+  it('sends product and recipe data through one atomic RPC call', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: 'product-1', error: null })
+    const supabase = { rpc } as unknown as SupabaseClient
+
+    await expect(
+      saveProductWithRecipe(supabase, 'org-1', {
+        name: 'Latte',
+        category: 'Sıcak Kahveler',
+        salePrice: 120,
+        estimatedMonthlySales: 40,
+        ingredients: [{ type: 'material', item_id: 'material-1', quantity: 18 }],
+        auditDetails: { detay: 'Yeni ürün' },
+      }),
+    ).resolves.toBe('product-1')
+
+    expect(rpc).toHaveBeenCalledOnce()
+    expect(rpc).toHaveBeenCalledWith('save_product_with_recipe', {
+      p_organization_id: 'org-1',
+      p_product_id: null,
+      p_name: 'Latte',
+      p_category: 'Sıcak Kahveler',
+      p_sale_price: 120,
+      p_estimated_monthly_sales: 40,
+      p_ingredients: [{ type: 'material', item_id: 'material-1', quantity: 18 }],
+      p_audit_details: { detay: 'Yeni ürün' },
+    })
+  })
+
+  it('uses one RPC call for a batch of product updates', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: 2, error: null })
+    const supabase = { rpc } as unknown as SupabaseClient
+    const updates = [
+      { id: 'p1', sale_price: 10, estimated_monthly_sales: 5, category: 'Kahve' },
+      { id: 'p2', sale_price: 20, estimated_monthly_sales: 6, category: 'Çay' },
+    ]
+
+    await expect(
+      bulkUpdateProducts(supabase, 'org-1', updates, 'İki ürün güncellendi.', { kaynak: 'test' }),
+    ).resolves.toBe(2)
+
+    expect(rpc).toHaveBeenCalledOnce()
+    expect(rpc).toHaveBeenCalledWith('bulk_update_products', {
+      p_organization_id: 'org-1',
+      p_updates: updates,
+      p_description: 'İki ürün güncellendi.',
+      p_audit_details: { kaynak: 'test' },
+    })
+  })
+
+  it('deletes a product through the tenant-scoped RPC', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null })
+    const supabase = { rpc } as unknown as SupabaseClient
+
+    await expect(deleteProduct(supabase, 'org-1', 'product-1')).resolves.toBeUndefined()
+    expect(rpc).toHaveBeenCalledWith('delete_product', {
+      p_organization_id: 'org-1',
+      p_product_id: 'product-1',
+    })
+  })
+
+  it('surfaces database errors instead of reporting a false success', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: 'Yetkisiz işlem' } })
+    const supabase = { rpc } as unknown as SupabaseClient
+
+    await expect(deleteProduct(supabase, 'org-2', 'product-1')).rejects.toThrow('Yetkisiz işlem')
   })
 })

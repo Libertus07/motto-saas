@@ -1,6 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import type { Product, ProductMaterial, SubRecipe } from '@/features/products/types'
+import type {
+  Product,
+  ProductBulkUpdate,
+  ProductIngredient,
+  ProductMaterial,
+  ProductMutationInput,
+  SubRecipe,
+} from '@/features/products/types'
 
 type SubRecipeIngredientRow = {
   sub_recipe_id: string
@@ -33,6 +40,10 @@ export type ProductWorkspace = {
   materials: ProductMaterial[]
   subRecipes: SubRecipe[]
   products: Product[]
+}
+
+function throwIfSupabaseError(error: { message: string } | null): void {
+  if (error) throw new Error(error.message)
 }
 
 export function buildProductWorkspace({
@@ -166,4 +177,80 @@ export async function fetchProductWorkspace(
     productIngredients: productIngredientsResult.data ?? [],
     recentSales: recentSalesResult.data ?? [],
   })
+}
+
+export async function fetchProductRecipe(
+  supabase: SupabaseClient,
+  organizationId: string,
+  productId: string,
+): Promise<ProductIngredient[]> {
+  const { data, error } = await supabase
+    .from('product_ingredients')
+    .select('material_id, sub_recipe_id, quantity')
+    .eq('organization_id', organizationId)
+    .eq('product_id', productId)
+
+  throwIfSupabaseError(error)
+
+  return (data ?? []).map((ingredient) => ({
+    type: ingredient.material_id ? 'material' : 'sub_recipe',
+    item_id: ingredient.material_id ?? ingredient.sub_recipe_id ?? '',
+    quantity: Number(ingredient.quantity),
+  }))
+}
+
+export async function saveProductWithRecipe(
+  supabase: SupabaseClient,
+  organizationId: string,
+  input: ProductMutationInput,
+): Promise<string> {
+  const { data, error } = await supabase.rpc('save_product_with_recipe', {
+    p_organization_id: organizationId,
+    p_product_id: input.id ?? null,
+    p_name: input.name,
+    p_category: input.category,
+    p_sale_price: input.salePrice,
+    p_estimated_monthly_sales: input.estimatedMonthlySales,
+    p_ingredients: input.ingredients,
+    p_audit_details: input.auditDetails ?? {},
+  })
+
+  throwIfSupabaseError(error)
+  if (typeof data !== 'string') throw new Error('Ürün kaydı tamamlandı ancak ürün kimliği alınamadı.')
+
+  return data
+}
+
+export async function bulkUpdateProducts(
+  supabase: SupabaseClient,
+  organizationId: string,
+  updates: ProductBulkUpdate[],
+  description: string,
+  auditDetails: Record<string, unknown> = {},
+): Promise<number> {
+  const { data, error } = await supabase.rpc('bulk_update_products', {
+    p_organization_id: organizationId,
+    p_updates: updates,
+    p_description: description,
+    p_audit_details: auditDetails,
+  })
+
+  throwIfSupabaseError(error)
+  if (typeof data !== 'number') throw new Error('Toplu ürün güncellemesinin sonucu doğrulanamadı.')
+
+  return data
+}
+
+export async function deleteProduct(
+  supabase: SupabaseClient,
+  organizationId: string,
+  productId: string,
+): Promise<void> {
+  const { data, error } = await supabase.rpc('delete_product', {
+    p_organization_id: organizationId,
+    p_product_id: productId,
+  })
+
+  throwIfSupabaseError(error)
+  if (data !== true) throw new Error('Ürün silme işlemi doğrulanamadı.')
 }

@@ -13,6 +13,7 @@ type ProductFormDrawerProps = {
   materials: ProductMaterial[]
   subRecipes: SubRecipe[]
   isBuildingAiRecipe: boolean
+  saving: boolean
   liveCost: number
   salePrice: number
   liveMargin: number
@@ -38,6 +39,7 @@ export function ProductFormDrawer({
   materials,
   subRecipes,
   isBuildingAiRecipe,
+  saving,
   liveCost,
   salePrice,
   liveMargin,
@@ -50,7 +52,11 @@ export function ProductFormDrawer({
   onRemoveRecipeItem,
   onSubmit,
 }: ProductFormDrawerProps) {
-  useDialogLifecycle(open, onClose)
+  const closeWhenIdle = () => {
+    if (!saving) onClose()
+  }
+
+  useDialogLifecycle(open, closeWhenIdle)
 
   if (!open) return null
 
@@ -58,7 +64,7 @@ export function ProductFormDrawer({
     <div
       className="fixed inset-0 bg-stone-950/90 backdrop-blur-md z-[9999] flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-fadeIn"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose()
+        if (event.target === event.currentTarget) closeWhenIdle()
       }}
     >
       <form
@@ -88,8 +94,9 @@ export function ProductFormDrawer({
           <button
             type="button"
             onClick={onClose}
+            disabled={saving}
             aria-label="Ürün formunu kapat"
-            className="shrink-0 min-h-10 min-w-10 text-stone-400 hover:text-white p-2 rounded-xl bg-stone-800/80 border border-stone-700/80 transition-colors"
+            className="shrink-0 min-h-10 min-w-10 text-stone-400 hover:text-white p-2 rounded-xl bg-stone-800/80 border border-stone-700/80 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             ✕
           </button>
@@ -188,15 +195,18 @@ export function ProductFormDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="min-h-10 w-full sm:w-auto bg-stone-800 hover:bg-stone-700 text-stone-300 px-5 py-2 rounded-xl text-xs font-semibold border border-stone-700 transition-colors"
+            disabled={saving}
+            className="min-h-10 w-full sm:w-auto bg-stone-800 hover:bg-stone-700 text-stone-300 px-5 py-2 rounded-xl text-xs font-semibold border border-stone-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             İptal
           </button>
           <button
             type="submit"
-            className="min-h-10 w-full sm:w-auto bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-extrabold px-6 py-2 rounded-xl text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+            disabled={saving}
+            aria-busy={saving}
+            className="min-h-10 w-full sm:w-auto bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-extrabold px-6 py-2 rounded-xl text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition-all disabled:cursor-wait disabled:opacity-60"
           >
-            {editing ? 'Ürünü Güncelle' : 'Ürünü Kaydet'}
+            {saving ? 'Kaydediliyor…' : editing ? 'Ürünü Güncelle' : 'Ürünü Kaydet'}
           </button>
         </div>
       </form>

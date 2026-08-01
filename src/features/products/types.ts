@@ -52,3 +52,20 @@ export type ProductBulkRow = {
   estimated_monthly_sales: string
   category: string
 }
+
+export type ProductMutationInput = {
+  id?: string | null
+  name: string
+  category: string
+  salePrice: number
+  estimatedMonthlySales: number
+  ingredients: ProductIngredient[]
+  auditDetails?: Record<string, unknown>
+}
+
+export type ProductBulkUpdate = {
+  id: string
+  sale_price: number
+  estimated_monthly_sales: number
+  category: string
+}

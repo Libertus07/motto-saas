@@ -18,7 +18,11 @@ export function AutoCategorizeDialog({
   onDismissSuggestion,
   onApply,
 }: AutoCategorizeDialogProps) {
-  useDialogLifecycle(open, onClose)
+  const closeWhenIdle = () => {
+    if (!saving) onClose()
+  }
+
+  useDialogLifecycle(open, closeWhenIdle)
 
   if (!open) return null
 
@@ -26,7 +30,7 @@ export function AutoCategorizeDialog({
     <div
       className="fixed inset-0 bg-stone-950/90 backdrop-blur-md flex items-center justify-center z-[9999] p-2 sm:p-4"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose()
+        if (event.target === event.currentTarget) closeWhenIdle()
       }}
     >
       <section
@@ -52,8 +56,9 @@ export function AutoCategorizeDialog({
           <button
             type="button"
             onClick={onClose}
+            disabled={saving}
             aria-label="Kategori önerilerini kapat"
-            className="shrink-0 min-h-10 min-w-10 text-stone-400 hover:text-white text-lg rounded-xl hover:bg-stone-800"
+            className="shrink-0 min-h-10 min-w-10 text-stone-400 hover:text-white text-lg rounded-xl hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             ✕
           </button>
@@ -82,9 +87,10 @@ export function AutoCategorizeDialog({
                 <button
                   type="button"
                   onClick={() => onDismissSuggestion(suggestion.id)}
+                  disabled={saving}
                   aria-label={`${suggestion.name} önerisini kaldır`}
                   title="Öneriyi Kaldır"
-                  className="shrink-0 min-h-9 min-w-9 text-stone-500 hover:text-red-400 p-1.5 rounded-lg transition-colors"
+                  className="shrink-0 min-h-9 min-w-9 text-stone-500 hover:text-red-400 p-1.5 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   ✕
                 </button>
@@ -100,7 +106,8 @@ export function AutoCategorizeDialog({
               <button
                 type="button"
                 onClick={onClose}
-                className="min-h-10 bg-stone-800 hover:bg-stone-700 text-stone-300 px-4 py-2 rounded-xl text-xs font-semibold border border-stone-700"
+                disabled={saving}
+                className="min-h-10 bg-stone-800 hover:bg-stone-700 text-stone-300 px-4 py-2 rounded-xl text-xs font-semibold border border-stone-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Vazgeç
               </button>
