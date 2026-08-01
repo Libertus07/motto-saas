@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   preprocessReceiptImage,
   mergeImagesVertically,
@@ -59,67 +59,7 @@ export function ImagePreprocessModal({
     return Array.isArray(files) ? files : [files]
   }, [files])
 
-  useEffect(() => {
-    if (!isOpen || filesList.length === 0) {
-      setFileStates([])
-      setMergedResult(null)
-      return
-    }
-
-    const initialStates: PerFileState[] = filesList.map(f => ({
-      file: f,
-      rotation: 0,
-      doCrop: true,
-      preset: 'enhanced',
-      brightness: 0,
-      contrast: 1.0,
-      originalUrl: URL.createObjectURL(f),
-      result: null,
-      loading: true
-    }))
-
-    setFileStates(initialStates)
-    setActiveIndex(0)
-    setShowOriginal(false)
-    setShouldMerge(filesList.length > 1)
-    setMergedResult(null)
-
-    // Process all files
-    initialStates.forEach((st, idx) => {
-      processFileAtIndex(idx, st.file, 0, true, 'enhanced', 0, 1.0, initialStates)
-    })
-
-    return () => {
-      initialStates.forEach(st => URL.revokeObjectURL(st.originalUrl))
-    }
-  }, [isOpen, filesList])
-
-  const triggerMerge = async (currentList: PerFileState[]) => {
-    const urls = currentList.map(s => s.result?.dataUrl).filter((u): u is string => !!u)
-    if (urls.length < 2) return
-
-    setIsMerging(true)
-    try {
-      const res = await mergeImagesVertically(urls)
-      setMergedResult(res)
-    } catch (err) {
-      console.error('Vertical merge failed:', err)
-    } finally {
-      setIsMerging(false)
-    }
-  }
-
-  // Automatically trigger vertical merge whenever fileStates finished processing
-  useEffect(() => {
-    if (fileStates.length > 1 && shouldMerge) {
-      const allDone = fileStates.every(s => !s.loading && s.result !== null)
-      if (allDone) {
-        triggerMerge(fileStates)
-      }
-    }
-  }, [fileStates, shouldMerge])
-
-  const processFileAtIndex = async (
+  const processFileAtIndex = useCallback(async (
     idx: number,
     targetFile: File,
     rot: number,
@@ -176,7 +116,75 @@ export function ImagePreprocessModal({
       }
       reader.readAsDataURL(targetFile)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!isOpen || filesList.length === 0) {
+      const id = window.setTimeout(() => {
+        setFileStates([])
+        setMergedResult(null)
+      }, 0)
+      return () => clearTimeout(id)
+    }
+
+    const initialStates: PerFileState[] = filesList.map(f => ({
+      file: f,
+      rotation: 0,
+      doCrop: true,
+      preset: 'enhanced',
+      brightness: 0,
+      contrast: 1.0,
+      originalUrl: URL.createObjectURL(f),
+      result: null,
+      loading: true
+    }))
+
+    const id = window.setTimeout(() => {
+        setFileStates(initialStates)
+        setActiveIndex(0)
+        setShowOriginal(false)
+        setShouldMerge(filesList.length > 1)
+        setMergedResult(null)
+
+        // Process all files
+        initialStates.forEach((st, idx) => {
+        processFileAtIndex(idx, st.file, 0, true, 'enhanced', 0, 1.0, initialStates)
+        })
+    }, 0)
+
+    return () => {
+      clearTimeout(id)
+      initialStates.forEach(st => URL.revokeObjectURL(st.originalUrl))
+    }
+  }, [isOpen, filesList, processFileAtIndex])
+
+  const triggerMerge = useCallback(async (currentList: PerFileState[]) => {
+    const urls = currentList.map(s => s.result?.dataUrl).filter((u): u is string => !!u)
+    if (urls.length < 2) return
+
+    setIsMerging(true)
+    try {
+      const res = await mergeImagesVertically(urls)
+      setMergedResult(res)
+    } catch (err) {
+      console.error('Vertical merge failed:', err)
+    } finally {
+      setIsMerging(false)
+    }
+  }, [])
+
+  // Automatically trigger vertical merge whenever fileStates finished processing
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+        if (fileStates.length > 1 && shouldMerge) {
+        const allDone = fileStates.every(s => !s.loading && s.result !== null)
+        if (allDone) {
+            triggerMerge(fileStates)
+        }
+        }
+    }, 0)
+    return () => clearTimeout(id)
+  }, [fileStates, shouldMerge, triggerMerge])
 
   const isMergedTabActive = activeIndex === 999
   const currentSt = isMergedTabActive ? null : fileStates[activeIndex]
@@ -278,7 +286,7 @@ export function ImagePreprocessModal({
                   v3 Ultimate Studio
                 </span>
               </div>
-              <p className="text-xs text-stone-400">Gemini AI okuma başarısını %98'e çıkarmak için belgeleri düzenleyin.</p>
+              <p className="text-xs text-stone-400">Gemini AI okuma başarısını %98&apos;e çıkarmak için belgeleri düzenleyin.</p>
             </div>
           </div>
 

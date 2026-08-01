@@ -42,10 +42,13 @@ export function useSettings() {
       setInitialSettings(merged)
     }
     setLoading(false)
-  }, [])
+  }, [activeOrg, supabase])
 
   useEffect(() => {
-    fetchSettings()
+    const id = window.setTimeout(() => {
+      fetchSettings()
+    }, 0)
+    return () => clearTimeout(id)
   }, [fetchSettings, activeOrg?.id])
 
   const setSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
@@ -61,7 +64,7 @@ export function useSettings() {
       const initialVal = (initialSettings as Record<string, unknown>)[key]
       if (value !== initialVal) {
         const label = SETTINGS_LABELS[key] || key
-        const formatVal = (v: any) =>
+        const formatVal = (v: unknown) =>
           v === true ? 'Açık' : v === false ? 'Kapalı' : v
         changes.push(`${label} (${formatVal(initialVal)} -> ${formatVal(value)})`)
       }
