@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { devError } from '@/lib/debug'
@@ -20,7 +20,7 @@ export interface DashboardStats {
   totalCogs: number
   netProfit: number
   targetMargin: number
-  criticalItems: any[]
+  criticalItems: { id: string; name: string; critical_stock_level: number; unit: string; current_stock: number }[]
   totalCash: number
   totalBank: number
   totalInvestments: number
@@ -52,11 +52,7 @@ export function DashboardClient() {
   const [showCriticalModal, setShowCriticalModal] = useState(false)
   const [stats, setStats] = useState<DashboardStats>(initialStats)
 
-  useEffect(() => {
-    fetchStats()
-  }, [])
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       // 1. Veritabanından sunucu bazlı hesaplanmış verileri çek (RPC)
       const { data, error } = await supabase.rpc('get_dashboard_stats', { days_ago: 30 })
@@ -66,10 +62,10 @@ export function DashboardClient() {
         throw error
       }
 
-      const rpcStats = data as any
+      const rpcStats = data as Record<string, unknown>
 
       // 2. Canlı Kurlar
-      let rates: any = null
+      let rates: Record<string, number> | null = null
       try {
         const res = await fetch('/api/exchange-rates')
         const rateData = await res.json()
@@ -79,7 +75,8 @@ export function DashboardClient() {
       }
 
       // 3. Yatırımların canlı kurla çarpılması
-      const totalInvestments = (rpcStats.investmentsList || []).reduce((t: number, inv: any) => {
+      const invList = (rpcStats.investmentsList as { asset_type: string; quantity: number | string; average_cost: number }[]) || []
+      const totalInvestments = invList.reduce((t: number, inv) => {
         const rate = rates ? rates[inv.asset_type] : inv.average_cost
         return t + Number(inv.quantity) * rate
       }, 0)
@@ -99,7 +96,7 @@ export function DashboardClient() {
         totalCogs: Number(rpcStats.totalCogs) || 0,
         netProfit: netRev - Number(rpcStats.totalCogs) - Number(rpcStats.monthlyExpenses),
         targetMargin: Number(rpcStats.targetMargin) || 35,
-        criticalItems: rpcStats.criticalItems || [],
+        criticalItems: (rpcStats.criticalItems as { id: string; name: string; critical_stock_level: number; unit: string; current_stock: number }[]) || [],
         totalCash: Number(rpcStats.totalCash) || 0,
         totalBank: Number(rpcStats.totalBank) || 0,
         totalInvestments
@@ -109,7 +106,14 @@ export function DashboardClient() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      fetchStats()
+    }, 0)
+    return () => clearTimeout(id)
+  }, [fetchStats])
 
   const modules = [
     { icon: '🧪', title: 'Hammaddeler', desc: 'Malzeme listesi ve fiyatlar', path: '/dashboard/hammaddeler' },
@@ -202,7 +206,7 @@ export function DashboardClient() {
               <div>
                 <h3 className="text-xl font-bold text-orange-400">Düşük Kar Marjı</h3>
                 <p className="text-orange-300/80 text-sm mt-1">
-                  <span className="font-bold text-white">{stats.lowMarginProducts} adet</span> ürünün kar marjı hedeflenen %{stats.targetMargin}'in altında. Fiyat motorunu kontrol edin.
+                  <span className="font-bold text-white">{stats.lowMarginProducts} adet</span> ürünün kar marjı hedeflenen %{stats.targetMargin}&apos;in altında. Fiyat motorunu kontrol edin.
                 </p>
               </div>
             </div>
@@ -431,12 +435,12 @@ export function DashboardClient() {
                 </div>
                 <div>
                   <h2 id="critical-stock-modal-title" className="font-black text-xl text-white">Kritik Stok Uyarıları</h2>
-                  <p className="text-stone-400 text-sm mt-1">Stoğu tükenmek üzere olan hammaddeler</p>
+                  <p className="text-stone-400 mt-2 text-sm leading-relaxed">Burası işletmenizin kalbi. Kısayollarla dilediğiniz modüle atlayın veya genel durumu gözden geçirin.</p>
                 </div>
               </div>
             </div>
             <div className="p-6 max-h-[50vh] overflow-y-auto space-y-4">
-              {stats.criticalItems.map((item: any) => (
+              {stats.criticalItems.map((item: { id: string; name: string; critical_stock_level: number; unit: string; current_stock: number }) => (
                 <div key={item.id} className="flex justify-between items-center p-4 rounded-2xl bg-stone-950 border border-stone-800 hover:border-red-500/30 transition-colors">
                   <div>
                     <p className="font-bold text-white text-lg">{item.name}</p>
