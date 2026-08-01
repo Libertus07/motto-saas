@@ -8,27 +8,7 @@ import { formatCurrency } from '@/lib/format'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useAppTour } from '@/hooks/useAppTour'
-
-type Material = { id: string; name: string; unit: string; price_per_unit: number }
-type SubRecipe = {
-  id: string
-  name: string
-  yield_quantity: number
-  yield_unit: string
-  wastage_percent: number
-  cost_per_yield?: number
-}
-type ProductIngredient = { type: 'material' | 'sub_recipe'; item_id: string; quantity: number }
-type Product = {
-  id: string
-  name: string
-  category: string
-  sale_price: number
-  estimated_monthly_sales: number
-  calculated_cost?: number
-  actual_sales_30d?: number
-}
-type BulkRow = { id: string; sale_price: string; estimated_monthly_sales: string; category: string }
+import type { Product, ProductBulkRow, ProductIngredient, ProductMaterial, SubRecipe } from '@/features/products/types'
 
 export default function Urunler() {
   const { showAlert, showConfirm } = useNotification()
@@ -56,7 +36,7 @@ export default function Urunler() {
     },
   ])
   const [products, setProducts] = useState<Product[]>([])
-  const [materials, setMaterials] = useState<Material[]>([])
+  const [materials, setMaterials] = useState<ProductMaterial[]>([])
   const [subRecipes, setSubRecipes] = useState<SubRecipe[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -71,7 +51,7 @@ export default function Urunler() {
 
   // Bulk Edit Mode
   const [bulkEditMode, setBulkEditMode] = useState(false)
-  const [bulkRows, setBulkRows] = useState<Record<string, BulkRow>>({})
+  const [bulkRows, setBulkRows] = useState<Record<string, ProductBulkRow>>({})
   const [changedIds, setChangedIds] = useState<Set<string>>(new Set())
   const [bulkSaving, setBulkSaving] = useState(false)
 
@@ -179,7 +159,7 @@ export default function Urunler() {
 
   // ─── Bulk Edit Mode ────────────────────────────────────────
   const enterBulkEdit = () => {
-    const rows: Record<string, BulkRow> = {}
+    const rows: Record<string, ProductBulkRow> = {}
     products.forEach((p) => {
       rows[p.id] = {
         id: p.id,
@@ -194,7 +174,7 @@ export default function Urunler() {
     setShowModal(false)
   }
 
-  const updateBulkRow = (id: string, field: keyof BulkRow, value: string) => {
+  const updateBulkRow = (id: string, field: keyof ProductBulkRow, value: string) => {
     setBulkRows((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
     setChangedIds((prev) => new Set([...prev, id]))
   }
