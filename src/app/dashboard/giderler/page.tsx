@@ -24,6 +24,12 @@ export default function Giderler() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  
+  // Filter States
+  const [searchTerm, setSearchTerm] = useState('')
+  const [activeCategory, setActiveCategory] = useState('Tümü')
+  const [activePeriod, setActivePeriod] = useState('Tümü')
+  
   const [customCategory, setCustomCategory] = useState('')
   const [form, setForm] = useState({
     name: '',
@@ -206,13 +212,22 @@ export default function Giderler() {
     }
   ], 800);
 
+  const processedExpenses = useMemo(() => {
+    return expenses.filter(exp => {
+      const matchCategory = activeCategory === 'Tümü' || exp.category === activeCategory
+      const matchPeriod = activePeriod === 'Tümü' || exp.period === activePeriod
+      const matchSearch = searchTerm === '' || exp.name.toLowerCase().includes(searchTerm.toLowerCase())
+      return matchCategory && matchPeriod && matchSearch
+    })
+  }, [expenses, activeCategory, activePeriod, searchTerm])
+
   const groupedExpenses = useMemo(() => {
     const groups: Record<string, Expense[]> = {}
     const today = new Date()
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
 
-    expenses.forEach(exp => {
+    processedExpenses.forEach(exp => {
       const date = new Date(exp.expense_date)
       let dateKey = formatDate(date)
 
@@ -335,6 +350,68 @@ export default function Giderler() {
             </div>
           </div>
         )}
+
+        {/* ──────────────── FILTERS CONTAINER ──────────────── */}
+        <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl space-y-4 mb-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Search Input */}
+            <div className="flex-1 relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">🔍</span>
+              <input
+                type="text"
+                placeholder="Gider adı ara..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-9 pr-4 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500/50"
+              />
+            </div>
+
+            {/* Period Filter */}
+            <div className="w-full md:w-56">
+              <select
+                value={activePeriod}
+                onChange={e => setActivePeriod(e.target.value)}
+                className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500/50"
+              >
+                <option value="Tümü">Tüm Periyotlar</option>
+                <option value="monthly">Aylık</option>
+                <option value="yearly">Yıllık</option>
+                <option value="one-time">Tek Seferlik</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-t border-stone-800/60 pt-3">
+            <span className="text-stone-400 text-xs font-semibold mr-1 shrink-0">Kategori:</span>
+            <button
+              onClick={() => setActiveCategory('Tümü')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap active:scale-95 ${
+                activeCategory === 'Tümü'
+                  ? 'bg-amber-500 text-stone-950 shadow-md shadow-amber-500/20'
+                  : 'bg-stone-950 text-stone-400 hover:text-stone-200 border border-stone-800'
+              }`}
+            >
+              Tümü
+            </button>
+            {categories.map(cat => {
+              const isActive = activeCategory === cat.value
+              return (
+                <button
+                  key={cat.value}
+                  onClick={() => setActiveCategory(cat.value)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap active:scale-95 ${
+                    isActive
+                      ? 'bg-amber-500 text-stone-950 shadow-md shadow-amber-500/20'
+                      : 'bg-stone-950 text-stone-400 hover:text-stone-200 border border-stone-800'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
         {/* 3. Giderler Tablosu */}
         <div className="bg-stone-900 border border-stone-800 rounded-3xl shadow-2xl overflow-hidden">
