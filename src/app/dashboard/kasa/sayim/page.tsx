@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { formatCurrency } from "@/lib/format"
+import { useAppTour } from '@/hooks/useAppTour'
 
 interface RecentReconciliation {
     id: string
@@ -40,6 +41,20 @@ const DENOMINATIONS = [
 ]
 
 export default function KasaSayimPage() {
+    useAppTour('kasa_sayim', [
+        {
+            element: '#tour-cash-date',
+            popover: { title: 'Doğru günü seçin', description: 'Sayımı kaydetmeden önce işlem gününü kontrol edin; sistem beklentisi bu tarihe göre hesaplanır.' }
+        },
+        {
+            element: '#tour-cash-tabs',
+            popover: { title: 'Sayım ve geçmiş aynı yerde', description: 'Gün sonu sayımını tamamlayın veya önceki mutabakatları bu iki sekmeden inceleyin.' }
+        },
+        {
+            element: '#tour-cash-count',
+            popover: { title: 'Kör sayımı girin', description: 'Kasadaki nakit, POS ve yemek kartını fiili değerlerle kaydedin; fark otomatik hesaplanır.' }
+        }
+    ])
     const supabase = useMemo(() => createClient(), [])
 
     const [date, setDate] = useState(new Date().toISOString().split('T')[0])
@@ -355,7 +370,7 @@ export default function KasaSayimPage() {
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2.5 z-10">
+                    <div id="tour-cash-date" className="flex flex-wrap items-center gap-2.5 z-10">
                         {/* Tarih Navigasyonu */}
                         <div className="flex items-center bg-stone-950 border border-stone-800/90 rounded-2xl p-1 shadow-inner">
                             <button
@@ -398,7 +413,7 @@ export default function KasaSayimPage() {
                 </header>
 
                 {/* Tab Navigator */}
-                <div className="flex gap-2 border-b border-stone-800/80 pb-2">
+                <div id="tour-cash-tabs" className="flex gap-2 border-b border-stone-800/80 pb-2">
                     <button
                         onClick={() => setActiveTab('count')}
                         className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
@@ -508,7 +523,7 @@ export default function KasaSayimPage() {
 
                         {/* Sol Kolon (7 Kolon): Fiziki Kör Sayım Formu & Para Sayma Asistanı */}
                         <div className="lg:col-span-7 space-y-6">
-                            <div className="bg-stone-900/80 backdrop-blur-xl border border-stone-800/80 rounded-3xl p-6 lg:p-8 shadow-2xl relative overflow-hidden space-y-6">
+                            <div id="tour-cash-count" className="bg-stone-900/80 backdrop-blur-xl border border-stone-800/80 rounded-3xl p-6 lg:p-8 shadow-2xl relative overflow-hidden space-y-6">
                                 <div className="flex items-center justify-between">
                                     <h2 className="text-xl font-black text-white flex items-center gap-2.5">
                                         <span className="w-7 h-7 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center text-xs">1</span>
