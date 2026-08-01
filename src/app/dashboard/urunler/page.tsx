@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useAppTour } from '@/hooks/useAppTour'
 import type { Product, ProductBulkRow, ProductIngredient, ProductMaterial, SubRecipe } from '@/features/products/types'
+import { productTourSteps } from '@/features/products/tour'
 import {
   calculateMargin,
   calculateProductMetrics,
@@ -18,29 +19,7 @@ import {
 
 export default function Urunler() {
   const { showAlert, showConfirm } = useNotification()
-  useAppTour('urunler', [
-    {
-      element: '#tour-products-create',
-      popover: {
-        title: 'Menü ürünü ekleyin',
-        description: 'Yeni ürün için satış fiyatını ve reçetesini burada tanımlayın.',
-      },
-    },
-    {
-      element: '#tour-products-filters',
-      popover: {
-        title: 'Listeyi odaklayın',
-        description: 'Arama, kategori ve sıralama ile uzun menüleri saniyeler içinde daraltın.',
-      },
-    },
-    {
-      element: '#tour-products-kpis',
-      popover: {
-        title: 'Marjı izleyin',
-        description: 'Ciro, ortalama kâr marjı ve tahmini nakit katkısını birlikte değerlendirin.',
-      },
-    },
-  ])
+  useAppTour('urunler', productTourSteps)
   const [products, setProducts] = useState<Product[]>([])
   const [materials, setMaterials] = useState<ProductMaterial[]>([])
   const [subRecipes, setSubRecipes] = useState<SubRecipe[]>([])
