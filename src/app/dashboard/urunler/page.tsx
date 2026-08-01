@@ -9,9 +9,11 @@ import { Button } from '@/components/ui/button'
 import { useAppTour } from '@/hooks/useAppTour'
 import { ProductCatalog } from '@/features/products/components/ProductCatalog'
 import { ProductFilters } from '@/features/products/components/ProductFilters'
+import { ProductFormDrawer } from '@/features/products/components/ProductFormDrawer'
 import type {
   Product,
   ProductBulkRow,
+  ProductFormValues,
   ProductIngredient,
   ProductMaterial,
   ProductSort,
@@ -52,7 +54,7 @@ export default function Urunler() {
   const [autoCatSaving, setAutoCatSaving] = useState(false)
 
   // Form State
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ProductFormValues>({
     name: '',
     category: 'Sıcak Kahveler',
     sale_price: '',
@@ -259,15 +261,19 @@ export default function Urunler() {
   }
 
   const addRecipeItem = (type: 'material' | 'sub_recipe') =>
-    setRecipeItems([...recipeItems, { type, item_id: '', quantity: 0 }])
+    setRecipeItems((currentItems) => [...currentItems, { type, item_id: '', quantity: 0 }])
 
-  const updateRecipeItem = (index: number, field: string, value: string | number) => {
-    const u = [...recipeItems]
-    u[index] = { ...u[index], [field]: value }
-    setRecipeItems(u)
+  const updateRecipeItem = (index: number, field: 'item_id' | 'quantity', value: string | number) =>
+    setRecipeItems((currentItems) =>
+      currentItems.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)),
+    )
+
+  const updateFormField = <Field extends keyof ProductFormValues>(field: Field, value: ProductFormValues[Field]) => {
+    setForm((currentForm) => ({ ...currentForm, [field]: value }))
   }
 
-  const removeRecipeItem = (index: number) => setRecipeItems(recipeItems.filter((_, i) => i !== index))
+  const removeRecipeItem = (index: number) =>
+    setRecipeItems((currentItems) => currentItems.filter((_, itemIndex) => itemIndex !== index))
 
   const handleSubmit = async () => {
     if (!form.name) return
@@ -637,245 +643,27 @@ export default function Urunler() {
         />
       </main>
 
-      {/* ──────────────── PRODUCT FORM MODAL / DRAWER ──────────────── */}
-      {showModal && (
-        <div
-          className="fixed inset-0 bg-stone-950/90 backdrop-blur-md z-[9999] flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-fadeIn"
-          onClick={() => resetForm()}
-        >
-          <div
-            className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-3xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden relative my-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="px-6 py-4 bg-stone-950 border-b border-stone-800 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-lg">
-                  {editingId ? '✏️' : '✨'}
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-base sm:text-lg">
-                    {editingId ? 'Ürünü Düzenle' : 'Yeni Menü Ürünü Ekle'}
-                  </h3>
-                  <p className="text-stone-400 text-xs">
-                    Reçete ve fiyat bilgilerini girerek ürün maliyetini hesaplayabilirsiniz.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => resetForm()}
-                className="text-stone-400 hover:text-white p-2 rounded-xl bg-stone-800/80 border border-stone-700/80 transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Product Basic Fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="text-stone-300 text-xs font-semibold mb-1 block">Ürün Adı *</label>
-                  <input
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50"
-                    placeholder="örn: Caffe Latte"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-stone-300 text-xs font-semibold mb-1 block">Kategori</label>
-                  <input
-                    list="category-options-modal"
-                    value={form.category}
-                    onChange={(e) => setForm({ ...form, category: e.target.value })}
-                    placeholder="Kategori seç/yaz..."
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50"
-                  />
-                  <datalist id="category-options-modal">
-                    {allCategories.map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
-                </div>
-
-                <div>
-                  <label className="text-stone-300 text-xs font-semibold mb-1 block">Satış Fiyatı (₺)</label>
-                  <input
-                    type="number"
-                    value={form.sale_price}
-                    onChange={(e) => setForm({ ...form, sale_price: e.target.value })}
-                    className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-amber-400 font-bold text-sm focus:outline-none focus:border-amber-500/50"
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-amber-400 text-xs font-semibold mb-1 block">Tahmini Aylık Satış</label>
-                  <input
-                    type="number"
-                    value={form.estimated_monthly_sales}
-                    onChange={(e) => setForm({ ...form, estimated_monthly_sales: e.target.value })}
-                    className="w-full bg-stone-950 border border-amber-500/30 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-
-              {/* Recipe Ingredients Section */}
-              <div className="bg-stone-950/60 p-4 rounded-2xl border border-stone-800/80 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-stone-800/80">
-                  <div>
-                    <h4 className="font-bold text-amber-400 text-sm">Ürün Reçetesi</h4>
-                    <p className="text-stone-400 text-xs">Bu ürünü hazırlamak için kullanılan hammadde veya soslar.</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={handleAiRecipeBuild}
-                      disabled={isBuildingAiRecipe}
-                      className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-bold disabled:opacity-50 transition-all active:scale-95"
-                    >
-                      {isBuildingAiRecipe ? '⏳ Oluşturuluyor...' : '✨ Yapay Zeka Hesaplasın'}
-                    </button>
-                    <button
-                      onClick={() => addRecipeItem('material')}
-                      className="bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1.5 rounded-xl text-xs font-semibold border border-stone-700 transition-colors"
-                    >
-                      + Hammadde
-                    </button>
-                    <button
-                      onClick={() => addRecipeItem('sub_recipe')}
-                      className="bg-stone-800 hover:bg-stone-700 text-amber-300 px-3 py-1.5 rounded-xl text-xs font-semibold border border-stone-700 transition-colors"
-                    >
-                      + Üretim Reçetesi
-                    </button>
-                  </div>
-                </div>
-
-                {recipeItems.length === 0 ? (
-                  <p className="text-stone-500 text-xs text-center py-4">
-                    Reçete boş. Yukarıdaki butonlarla hammadde veya üretim reçetesi ekleyebilirsiniz.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {recipeItems.map((item, index) => (
-                      <div
-                        key={index}
-                        className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-stone-900 p-2.5 rounded-xl border border-stone-800 text-xs"
-                      >
-                        <span
-                          className={`px-2 py-1 rounded-lg text-[10px] font-bold text-center shrink-0 ${
-                            item.type === 'sub_recipe'
-                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/20'
-                              : 'bg-blue-500/20 text-blue-400 border border-blue-500/20'
-                          }`}
-                        >
-                          {item.type === 'sub_recipe' ? 'Üretim Reçetesi' : 'Hammadde'}
-                        </span>
-
-                        <div className="flex-1 min-w-0">
-                          {item.type === 'material' ? (
-                            <select
-                              value={item.item_id}
-                              onChange={(e) => updateRecipeItem(index, 'item_id', e.target.value)}
-                              className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none"
-                            >
-                              <option value="">Hammadde Seçiniz...</option>
-                              {materials.map((m) => (
-                                <option key={m.id} value={m.id}>
-                                  {m.name} ({m.unit})
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <select
-                              value={item.item_id}
-                              onChange={(e) => updateRecipeItem(index, 'item_id', e.target.value)}
-                              className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none"
-                            >
-                              <option value="">Üretim Reçetesi Seçiniz...</option>
-                              {subRecipes.map((sr) => (
-                                <option key={sr.id} value={sr.id}>
-                                  {sr.name} (1 {sr.yield_unit})
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 w-full sm:w-40">
-                          <input
-                            type="number"
-                            value={item.quantity || ''}
-                            onChange={(e) => updateRecipeItem(index, 'quantity', parseFloat(e.target.value))}
-                            className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1.5 text-white text-xs text-right focus:outline-none"
-                            placeholder="Miktar"
-                          />
-                          <span className="text-stone-400 text-xs shrink-0 w-12 truncate">
-                            {item.type === 'material'
-                              ? materials.find((m) => m.id === item.item_id)?.unit
-                              : subRecipes.find((s) => s.id === item.item_id)?.yield_unit}
-                          </span>
-                        </div>
-
-                        <button
-                          onClick={() => removeRecipeItem(index)}
-                          className="text-stone-500 hover:text-red-400 p-1 rounded-lg hover:bg-stone-800 text-center transition-colors"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Real-time Financial Breakdown Card */}
-              <div className="bg-stone-950 border border-stone-800 p-4 rounded-2xl grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                <div>
-                  <span className="text-stone-400 text-[11px] block">Food Cost (Maliyet)</span>
-                  <span className="text-stone-200 font-bold text-base">₺{liveCost.toFixed(2)}</span>
-                </div>
-                <div>
-                  <span className="text-stone-400 text-[11px] block">Satış Fiyatı</span>
-                  <span className="text-amber-400 font-extrabold text-base">₺{salePrice.toFixed(2)}</span>
-                </div>
-                <div>
-                  <span className="text-stone-400 text-[11px] block">Kâr Marjı</span>
-                  <span
-                    className={`font-bold text-base ${overallAvgMargin >= 50 ? 'text-emerald-400' : 'text-amber-400'}`}
-                  >
-                    %{liveMargin.toFixed(1)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-stone-400 text-[11px] block">Aylık Nakit Katkı</span>
-                  <span className="text-violet-400 font-extrabold text-base">
-                    {formatCurrency(liveCashContribution)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer Actions */}
-            <div className="px-6 py-4 bg-stone-950 border-t border-stone-800 flex justify-end gap-3">
-              <button
-                onClick={() => resetForm()}
-                className="bg-stone-800 hover:bg-stone-700 text-stone-300 px-5 py-2 rounded-xl text-xs font-semibold border border-stone-700 transition-colors"
-              >
-                İptal
-              </button>
-              <button
-                onClick={handleSubmit}
-                className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-extrabold px-6 py-2 rounded-xl text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
-              >
-                {editingId ? 'Ürünü Güncelle' : 'Ürünü Kaydet'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ProductFormDrawer
+        open={showModal}
+        editing={editingId !== null}
+        form={form}
+        categories={allCategories}
+        recipeItems={recipeItems}
+        materials={materials}
+        subRecipes={subRecipes}
+        isBuildingAiRecipe={isBuildingAiRecipe}
+        liveCost={liveCost}
+        salePrice={salePrice}
+        liveMargin={liveMargin}
+        liveCashContribution={liveCashContribution}
+        onClose={resetForm}
+        onFormChange={updateFormField}
+        onBuildAiRecipe={handleAiRecipeBuild}
+        onAddRecipeItem={addRecipeItem}
+        onUpdateRecipeItem={updateRecipeItem}
+        onRemoveRecipeItem={removeRecipeItem}
+        onSubmit={handleSubmit}
+      />
 
       {/* ──────────────── AUTO CATEGORIZE MODAL ──────────────── */}
       {autoCatModalOpen && (

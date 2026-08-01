@@ -30,6 +30,13 @@ export type Product = {
   actual_sales_30d?: number
 }
 
+export type ProductFormValues = {
+  name: string
+  category: string
+  sale_price: string
+  estimated_monthly_sales: string
+}
+
 export type ProductSort = 'name' | 'price_desc' | 'price_asc' | 'margin_desc' | 'sales_desc'
 
 export type ProductBulkRow = {
