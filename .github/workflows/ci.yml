@@ -56,5 +56,6 @@ jobs:
     - name: Build Project
       run: npm run build
       env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        # Builds must not require credentials for a live Supabase project.
+        NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-build-placeholder
