@@ -26,10 +26,7 @@ function toTime(value?: string | null) {
   return new Date(value).getTime()
 }
 
-function pickClosestMovement(
-  movements: AccountMovementRecord[],
-  tx: InvestmentTransactionRecord
-) {
+function pickClosestMovement(movements: AccountMovementRecord[], tx: InvestmentTransactionRecord) {
   if (movements.length <= 1) {
     return movements[0] ?? null
   }
@@ -49,7 +46,7 @@ function pickClosestMovement(
 async function findLinkedAccountMovement(
   supabase: AppSupabaseClient,
   tx: InvestmentTransactionRecord,
-  investmentName?: string | null
+  investmentName?: string | null,
 ): Promise<AccountMovementRecord | null> {
   if (tx.transaction_type === 'buy') {
     const { data: exactMovement, error: exactError } = await supabase
@@ -116,10 +113,7 @@ async function findLinkedAccountMovement(
   return null
 }
 
-export async function deleteInvestmentTransactionWithRefund(
-  supabase: AppSupabaseClient,
-  transactionId: string
-) {
+export async function deleteInvestmentTransactionWithRefund(supabase: AppSupabaseClient, transactionId: string) {
   const { data: tx, error: txError } = await supabase
     .from('investment_transactions')
     .select('id, investment_id, transaction_type, quantity, total_amount, account_id, transaction_date, created_at')
@@ -153,9 +147,7 @@ export async function deleteInvestmentTransactionWithRefund(
     if (accountError) throw accountError
 
     const movementAmount = Number(linkedMovement.amount)
-    const balanceDelta = linkedMovement.movement_type === 'cikis'
-      ? movementAmount
-      : -movementAmount
+    const balanceDelta = linkedMovement.movement_type === 'cikis' ? movementAmount : -movementAmount
 
     const { error: updateAccountError } = await supabase
       .from('accounts')
@@ -164,10 +156,7 @@ export async function deleteInvestmentTransactionWithRefund(
 
     if (updateAccountError) throw updateAccountError
 
-    const { error: deleteMovementError } = await supabase
-      .from('account_movements')
-      .delete()
-      .eq('id', linkedMovement.id)
+    const { error: deleteMovementError } = await supabase.from('account_movements').delete().eq('id', linkedMovement.id)
 
     if (deleteMovementError) throw deleteMovementError
 
@@ -189,10 +178,7 @@ export async function deleteInvestmentTransactionWithRefund(
     const newQty = currentQty - Number(tx.quantity)
 
     if (newQty <= 0) {
-      const { error: deleteInvestmentError } = await supabase
-        .from('investments')
-        .delete()
-        .eq('id', investment.id)
+      const { error: deleteInvestmentError } = await supabase.from('investments').delete().eq('id', investment.id)
 
       if (deleteInvestmentError) throw deleteInvestmentError
       deletedInvestment = true

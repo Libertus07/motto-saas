@@ -1,74 +1,74 @@
-import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { requireUser } from '@/lib/supabase-server';
-import { devError } from '@/lib/debug';
-import { isSafeImageUrl } from '@/lib/ai-security';
-import { z } from 'zod';
+import { NextResponse } from 'next/server'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { requireUser } from '@/lib/supabase-server'
+import { devError } from '@/lib/debug'
+import { isSafeImageUrl } from '@/lib/ai-security'
+import { z } from 'zod'
 
 const InvestmentSchema = z.object({
   asset_type: z.enum(['gold', 'usd', 'eur', 'real_estate']).default('gold'),
   quantity: z.number().optional().nullable(),
   price_per_unit: z.number().optional().nullable(),
   purchase_date: z.string().optional().nullable(),
-  notes: z.string().optional().nullable()
-});
+  notes: z.string().optional().nullable(),
+})
 
 export async function POST(req: Request) {
-    try {
-        const { user, supabase } = await requireUser();
-        if (!user) {
-            return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 });
+  try {
+    const { user, supabase } = await requireUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 })
+    }
+
+    // AI Kota Kontrolü (SEC-104)
+    const { data: allowed } = await supabase.rpc('check_ai_quota')
+    if (!allowed) {
+      return NextResponse.json({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }, { status: 429 })
+    }
+
+    const { image, fileText } = await req.json()
+
+    if (!image && !fileText) {
+      return NextResponse.json({ error: 'Dosya verisi eksik.' }, { status: 400 })
+    }
+
+    let mimeType = ''
+    let base64Data = ''
+
+    if (image) {
+      if (image.startsWith('http://') || image.startsWith('https://')) {
+        if (!isSafeImageUrl(image)) {
+          return NextResponse.json({ error: 'İzin verilmeyen veya güvensiz URL.' }, { status: 400 })
         }
-
-        // AI Kota Kontrolü (SEC-104)
-        const { data: allowed } = await supabase.rpc('check_ai_quota');
-        if (!allowed) {
-            return NextResponse.json({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }, { status: 429 });
+        const fetchRes = await fetch(image)
+        if (!fetchRes.ok) {
+          return NextResponse.json({ error: 'URL den dosya indirilemedi.' }, { status: 400 })
         }
-
-        const { image, fileText } = await req.json();
-
-        if (!image && !fileText) {
-            return NextResponse.json({ error: 'Dosya verisi eksik.' }, { status: 400 });
+        mimeType = fetchRes.headers.get('content-type') || 'image/jpeg'
+        const arrayBuffer = await fetchRes.arrayBuffer()
+        base64Data = Buffer.from(arrayBuffer).toString('base64')
+      } else {
+        const match = image.match(/^data:([a-zA-Z0-9-]+\/[a-zA-Z0-9-+.]+);base64,(.+)$/)
+        if (!match) {
+          return NextResponse.json({ error: 'Geçersiz dosya formatı.' }, { status: 400 })
         }
+        mimeType = match[1]
+        base64Data = match[2]
+      }
+    }
 
-        let mimeType = '';
-        let base64Data = '';
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ error: 'GEMINI_API_KEY bulunamadı.' }, { status: 400 })
+    }
 
-        if (image) {
-            if (image.startsWith('http://') || image.startsWith('https://')) {
-                if (!isSafeImageUrl(image)) {
-                    return NextResponse.json({ error: 'İzin verilmeyen veya güvensiz URL.' }, { status: 400 });
-                }
-                const fetchRes = await fetch(image);
-                if (!fetchRes.ok) {
-                    return NextResponse.json({ error: 'URL den dosya indirilemedi.' }, { status: 400 });
-                }
-                mimeType = fetchRes.headers.get('content-type') || 'image/jpeg';
-                const arrayBuffer = await fetchRes.arrayBuffer();
-                base64Data = Buffer.from(arrayBuffer).toString('base64');
-            } else {
-                const match = image.match(/^data:([a-zA-Z0-9-]+\/[a-zA-Z0-9-+.]+);base64,(.+)$/);
-                if (!match) {
-                    return NextResponse.json({ error: 'Geçersiz dosya formatı.' }, { status: 400 });
-                }
-                mimeType = match[1];
-                base64Data = match[2];
-            }
-        }
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: { responseMimeType: 'application/json' },
+    })
 
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            return NextResponse.json({ error: 'GEMINI_API_KEY bulunamadı.' }, { status: 400 });
-        }
-
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
-            generationConfig: { responseMimeType: "application/json" }
-        });
-
-        const prompt = `Lütfen yüklenen belgeyi (Kuyumcu fişi, Döviz dekontu, Tapu Senedi, Araç Alım Satım evrağı vb.) incele ve bunun bir finansal yatırım işlemi olduğunu varsayarak verileri analiz et.
+    const prompt = `Lütfen yüklenen belgeyi (Kuyumcu fişi, Döviz dekontu, Tapu Senedi, Araç Alım Satım evrağı vb.) incele ve bunun bir finansal yatırım işlemi olduğunu varsayarak verileri analiz et.
 
 Bu bir YATIRIM işlemidir. Senden beklediğim şey, belgenin içinden aşağıdaki JSON yapısına uygun bilgileri çıkarman:
 - asset_type: 'gold' (Altın/Ziynet işlemleri), 'usd' (Dolar alımı), 'eur' (Euro alımı), 'real_estate' (Tapu, Ev, Arsa veya Araç gibi büyük mülkler) değerlerinden EN UYGUN olanını seç. Eğer hiçbiri uymuyorsa 'gold' olarak bırak.
@@ -84,58 +84,63 @@ Yanıtı SADECE aşağıdaki formatta saf JSON olarak dön (markdown kullanma). 
     "price_per_unit": 0,
     "purchase_date": null,
     "notes": "Belge hakkında önemli özet bilgi"
-}`;
+}`
 
-        const contentParts: Array<string | { inlineData: { data: string; mimeType: string } }> = [prompt];
+    const contentParts: Array<string | { inlineData: { data: string; mimeType: string } }> = [prompt]
 
-        if (image) {
-            contentParts.push({
-                inlineData: {
-                    data: base64Data,
-                    mimeType: mimeType
-                }
-            });
-        } else if (fileText) {
-            contentParts.push(`\n\n--- DOSYA İÇERİĞİ ---\n${fileText}`);
-        }
-
-        const result = await model.generateContent(contentParts);
-        const responseText = result.response.text();
-        
-        // Yanıtın başındaki/sonundaki olası markdown bloklarını temizle
-        let jsonStr = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-
-        // JSON formatındaki yaygın hataları (örn: sondaki virgüller) düzeltmek için
-        jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
-
-        // Sadece JSON kısmını ayıklama (bazen JSON öncesi/sonrası açıklamalar olabilir)
-        const firstBrace = jsonStr.indexOf('{');
-        const lastBrace = jsonStr.lastIndexOf('}');
-        const firstBracket = jsonStr.indexOf('[');
-        const lastBracket = jsonStr.lastIndexOf(']');
-        
-        const firstObj = firstBrace !== -1 ? firstBrace : Infinity;
-        const firstArr = firstBracket !== -1 ? firstBracket : Infinity;
-        const lastObj = lastBrace !== -1 ? lastBrace : -1;
-        const lastArr = lastBracket !== -1 ? lastBracket : -1;
-
-        if (firstObj < firstArr && lastObj > lastArr) {
-             jsonStr = jsonStr.substring(firstObj, lastObj + 1);
-        } else if (firstArr < firstObj && lastArr > lastObj) {
-             jsonStr = jsonStr.substring(firstArr, lastArr + 1);
-        }
-
-        const parsed = JSON.parse(jsonStr);
-        const validated = InvestmentSchema.parse(parsed);
-
-        return NextResponse.json(validated);
-
-    } catch (error: unknown) {
-        devError('Investment receipt parsing error:', error);
-        if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: 'Yapay zeka analiz yaparken veri formatı hatalı oldu (' + error.issues[0]?.message + ')' }, { status: 500 });
-        }
-        const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
-        return NextResponse.json({ error: 'Yapay zeka analiz yaparken bir hata oluştu: ' + message }, { status: 500 });
+    if (image) {
+      contentParts.push({
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType,
+        },
+      })
+    } else if (fileText) {
+      contentParts.push(`\n\n--- DOSYA İÇERİĞİ ---\n${fileText}`)
     }
+
+    const result = await model.generateContent(contentParts)
+    const responseText = result.response.text()
+
+    // Yanıtın başındaki/sonundaki olası markdown bloklarını temizle
+    let jsonStr = responseText
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim()
+
+    // JSON formatındaki yaygın hataları (örn: sondaki virgüller) düzeltmek için
+    jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1')
+
+    // Sadece JSON kısmını ayıklama (bazen JSON öncesi/sonrası açıklamalar olabilir)
+    const firstBrace = jsonStr.indexOf('{')
+    const lastBrace = jsonStr.lastIndexOf('}')
+    const firstBracket = jsonStr.indexOf('[')
+    const lastBracket = jsonStr.lastIndexOf(']')
+
+    const firstObj = firstBrace !== -1 ? firstBrace : Infinity
+    const firstArr = firstBracket !== -1 ? firstBracket : Infinity
+    const lastObj = lastBrace !== -1 ? lastBrace : -1
+    const lastArr = lastBracket !== -1 ? lastBracket : -1
+
+    if (firstObj < firstArr && lastObj > lastArr) {
+      jsonStr = jsonStr.substring(firstObj, lastObj + 1)
+    } else if (firstArr < firstObj && lastArr > lastObj) {
+      jsonStr = jsonStr.substring(firstArr, lastArr + 1)
+    }
+
+    const parsed = JSON.parse(jsonStr)
+    const validated = InvestmentSchema.parse(parsed)
+
+    return NextResponse.json(validated)
+  } catch (error: unknown) {
+    devError('Investment receipt parsing error:', error)
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Yapay zeka analiz yaparken veri formatı hatalı oldu (' + error.issues[0]?.message + ')' },
+        { status: 500 },
+      )
+    }
+    const message = error instanceof Error ? error.message : 'Bilinmeyen hata'
+    return NextResponse.json({ error: 'Yapay zeka analiz yaparken bir hata oluştu: ' + message }, { status: 500 })
+  }
 }

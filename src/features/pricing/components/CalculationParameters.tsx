@@ -23,7 +23,7 @@ export function CalculationParameters({ settings, onSettingsChange }: Calculatio
           <Input
             type="number"
             value={settings.targetMargin}
-            onChange={e => onSettingsChange({ ...settings, targetMargin: parseFloat(e.target.value) || 0 })}
+            onChange={(e) => onSettingsChange({ ...settings, targetMargin: parseFloat(e.target.value) || 0 })}
             className="text-amber-400 font-bold"
           />
           <p className="text-stone-500 text-[11px] mt-1">Kafe & Restoran sektörü ideal hedefi: %55-65</p>
@@ -34,7 +34,7 @@ export function CalculationParameters({ settings, onSettingsChange }: Calculatio
           <Input
             type="number"
             value={settings.taxRate}
-            onChange={e => onSettingsChange({ ...settings, taxRate: parseFloat(e.target.value) || 0 })}
+            onChange={(e) => onSettingsChange({ ...settings, taxRate: parseFloat(e.target.value) || 0 })}
             className="font-bold"
           />
         </div>

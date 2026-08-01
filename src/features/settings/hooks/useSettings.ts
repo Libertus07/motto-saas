@@ -16,12 +16,12 @@ export function useSettings() {
   const supabase = createClient()
 
   const fetchSettings = useCallback(async () => {
-    if (!activeOrg) return;
+    if (!activeOrg) return
     setLoading(true)
     const { data } = await supabase.from('settings').select('*').eq('organization_id', activeOrg.id)
     if (data) {
       const merged = { ...DEFAULT_SETTINGS }
-      data.forEach(row => {
+      data.forEach((row) => {
         const key = row.key as keyof Settings
         if (key === 'material_categories') {
           const cats = Array.isArray(row.value) ? row.value : JSON.parse(row.value || '[]')
@@ -52,7 +52,7 @@ export function useSettings() {
   }, [fetchSettings, activeOrg?.id])
 
   const setSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
-    setSettings(prev => ({ ...prev, [key]: value }))
+    setSettings((prev) => ({ ...prev, [key]: value }))
   }, [])
 
   const handleSave = async () => {
@@ -64,18 +64,22 @@ export function useSettings() {
       const initialVal = (initialSettings as Record<string, unknown>)[key]
       if (value !== initialVal) {
         const label = SETTINGS_LABELS[key] || key
-        const formatVal = (v: unknown) =>
-          v === true ? 'Açık' : v === false ? 'Kapalı' : v
+        const formatVal = (v: unknown) => (v === true ? 'Açık' : v === false ? 'Kapalı' : v)
         changes.push(`${label} (${formatVal(initialVal)} -> ${formatVal(value)})`)
       }
     }
 
     if (changes.length > 0) {
       const {
-        data: { user }
+        data: { user },
       } = await supabase.auth.getUser()
       for (const [key, value] of entries) {
-        await supabase.from('settings').upsert({ key, value, user_id: user?.id, organization_id: activeOrg?.id }, { onConflict: 'organization_id, key' })
+        await supabase
+          .from('settings')
+          .upsert(
+            { key, value, user_id: user?.id, organization_id: activeOrg?.id },
+            { onConflict: 'organization_id, key' },
+          )
       }
       const changeText = changes.join(' | ')
       await logActivity('Ayarlar', 'GUNCELLEME', `Sistem genel ayarları güncellendi.`, { detay: changeText })
@@ -105,6 +109,6 @@ export function useSettings() {
     setCategories,
     setSetting,
     handleSave,
-    activeNotificationCount
+    activeNotificationCount,
   }
 }

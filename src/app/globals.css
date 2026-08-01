@@ -1,6 +1,6 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -63,13 +63,23 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes scaleUp {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .animate-fade-in {
@@ -89,7 +99,9 @@
   border-radius: 1.25rem !important; /* rounded-2xl */
   color: #fff !important;
   font-family: inherit !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(245, 158, 11, 0.15) !important;
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(245, 158, 11, 0.15) !important;
   padding: 24px !important;
   max-width: 380px !important;
 }
@@ -176,7 +188,7 @@
 /* Mobil Uyumlu Eğitim Turu (Driver.js) Stilleri */
 @media (max-width: 640px) {
   .driver-popover.motto-tour-theme {
-    width: min( calc(100vw - 24px), 28rem) !important;
+    width: min(calc(100vw - 24px), 28rem) !important;
     max-width: calc(100vw - 24px) !important;
     max-height: min(70dvh, 34rem) !important;
     margin: 0 12px calc(12px + env(safe-area-inset-bottom)) !important;

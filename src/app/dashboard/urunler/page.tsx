@@ -10,7 +10,14 @@ import { Button } from '@/components/ui/button'
 import { useAppTour } from '@/hooks/useAppTour'
 
 type Material = { id: string; name: string; unit: string; price_per_unit: number }
-type SubRecipe = { id: string; name: string; yield_quantity: number; yield_unit: string; wastage_percent: number; cost_per_yield?: number }
+type SubRecipe = {
+  id: string
+  name: string
+  yield_quantity: number
+  yield_unit: string
+  wastage_percent: number
+  cost_per_yield?: number
+}
 type ProductIngredient = { type: 'material' | 'sub_recipe'; item_id: string; quantity: number }
 type Product = {
   id: string
@@ -28,16 +35,25 @@ export default function Urunler() {
   useAppTour('urunler', [
     {
       element: '#tour-products-create',
-      popover: { title: 'Menü ürünü ekleyin', description: 'Yeni ürün için satış fiyatını ve reçetesini burada tanımlayın.' }
+      popover: {
+        title: 'Menü ürünü ekleyin',
+        description: 'Yeni ürün için satış fiyatını ve reçetesini burada tanımlayın.',
+      },
     },
     {
       element: '#tour-products-filters',
-      popover: { title: 'Listeyi odaklayın', description: 'Arama, kategori ve sıralama ile uzun menüleri saniyeler içinde daraltın.' }
+      popover: {
+        title: 'Listeyi odaklayın',
+        description: 'Arama, kategori ve sıralama ile uzun menüleri saniyeler içinde daraltın.',
+      },
     },
     {
       element: '#tour-products-kpis',
-      popover: { title: 'Marjı izleyin', description: 'Ciro, ortalama kâr marjı ve tahmini nakit katkısını birlikte değerlendirin.' }
-    }
+      popover: {
+        title: 'Marjı izleyin',
+        description: 'Ciro, ortalama kâr marjı ve tahmini nakit katkısını birlikte değerlendirin.',
+      },
+    },
   ])
   const [products, setProducts] = useState<Product[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
@@ -61,21 +77,27 @@ export default function Urunler() {
 
   // Auto Categorize
   const [autoCatLoading, setAutoCatLoading] = useState(false)
-  const [autoCatSuggestions, setAutoCatSuggestions] = useState<{ id: string; name: string; current: string; suggested: string }[]>([])
+  const [autoCatSuggestions, setAutoCatSuggestions] = useState<
+    { id: string; name: string; current: string; suggested: string }[]
+  >([])
   const [autoCatModalOpen, setAutoCatModalOpen] = useState(false)
   const [autoCatSaving, setAutoCatSaving] = useState(false)
 
   // Form State
-  const [form, setForm] = useState({ name: '', category: 'Sıcak Kahveler', sale_price: '', estimated_monthly_sales: '0' })
+  const [form, setForm] = useState({
+    name: '',
+    category: 'Sıcak Kahveler',
+    sale_price: '',
+    estimated_monthly_sales: '0',
+  })
   const [recipeItems, setRecipeItems] = useState<ProductIngredient[]>([])
 
   const supabase = createClient()
 
   const defaultCategories = ['Sıcak Kahveler', 'Soğuk Kahveler', 'Tatlılar', 'Çaylar', 'Kutu İçecekler', 'Diğer']
-  const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)))
+  const uniqueCategories = Array.from(new Set(products.map((p) => p.category).filter(Boolean)))
   const allCategories = Array.from(new Set([...defaultCategories, ...uniqueCategories]))
 
-   
   const fetchData = async () => {
     setLoading(true)
     const { data: mats } = await supabase.from('materials').select('*').order('name')
@@ -85,11 +107,11 @@ export default function Urunler() {
     const { data: s_recipe_ings } = await supabase.from('sub_recipe_ingredients').select('*')
     let processedSubRecipes: SubRecipe[] = []
     if (s_recipes && s_recipe_ings && mats) {
-      processedSubRecipes = s_recipes.map(r => {
-        const myIngs = s_recipe_ings.filter(i => i.sub_recipe_id === r.id)
+      processedSubRecipes = s_recipes.map((r) => {
+        const myIngs = s_recipe_ings.filter((i) => i.sub_recipe_id === r.id)
         let totalCost = 0
-        myIngs.forEach(ing => {
-          const mat = mats.find(m => m.id === ing.material_id)
+        myIngs.forEach((ing) => {
+          const mat = mats.find((m) => m.id === ing.material_id)
           if (mat) totalCost += mat.price_per_unit * ing.quantity
         })
         const finalCost = totalCost * (1 + r.wastage_percent / 100)
@@ -108,27 +130,27 @@ export default function Urunler() {
       .gte('sale_date', thirtyDaysAgo.toISOString().split('T')[0])
 
     const salesByProduct: Record<string, number> = {}
-    recentSales?.forEach(s => {
+    recentSales?.forEach((s) => {
       salesByProduct[s.product_id] = (salesByProduct[s.product_id] || 0) + s.quantity
     })
 
     if (prods) {
-      const productsWithCost = prods.map(p => {
-        const myIngs = prod_ings?.filter(i => i.product_id === p.id) || []
+      const productsWithCost = prods.map((p) => {
+        const myIngs = prod_ings?.filter((i) => i.product_id === p.id) || []
         let cost = 0
-        myIngs.forEach(ing => {
+        myIngs.forEach((ing) => {
           if (ing.material_id) {
-            const mat = mats?.find(m => m.id === ing.material_id)
+            const mat = mats?.find((m) => m.id === ing.material_id)
             if (mat) cost += mat.price_per_unit * ing.quantity
           } else if (ing.sub_recipe_id) {
-            const sr = processedSubRecipes.find(s => s.id === ing.sub_recipe_id)
+            const sr = processedSubRecipes.find((s) => s.id === ing.sub_recipe_id)
             if (sr?.cost_per_yield) cost += sr.cost_per_yield * ing.quantity
           }
         })
         return { ...p, calculated_cost: cost, actual_sales_30d: salesByProduct[p.id] || 0 }
       })
       setProducts(productsWithCost)
-      setOpenCategories(new Set(productsWithCost.map(p => p.category)))
+      setOpenCategories(new Set(productsWithCost.map((p) => p.category)))
     }
     setLoading(false)
   }
@@ -143,7 +165,7 @@ export default function Urunler() {
 
   // ─── Accordion Toggle ──────────────────────────────────────
   const toggleCategory = (cat: string) => {
-    setOpenCategories(prev => {
+    setOpenCategories((prev) => {
       const next = new Set(prev)
       if (next.has(cat)) next.delete(cat)
       else next.add(cat)
@@ -158,12 +180,12 @@ export default function Urunler() {
   // ─── Bulk Edit Mode ────────────────────────────────────────
   const enterBulkEdit = () => {
     const rows: Record<string, BulkRow> = {}
-    products.forEach(p => {
+    products.forEach((p) => {
       rows[p.id] = {
         id: p.id,
         sale_price: p.sale_price.toString(),
         estimated_monthly_sales: (p.estimated_monthly_sales || 0).toString(),
-        category: p.category
+        category: p.category,
       }
     })
     setBulkRows(rows)
@@ -173,8 +195,8 @@ export default function Urunler() {
   }
 
   const updateBulkRow = (id: string, field: keyof BulkRow, value: string) => {
-    setBulkRows(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
-    setChangedIds(prev => new Set([...prev, id]))
+    setBulkRows((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
+    setChangedIds((prev) => new Set([...prev, id]))
   }
 
   const handleBulkSave = async () => {
@@ -182,7 +204,7 @@ export default function Urunler() {
     const bulkDetails: string[] = []
     for (const id of [...changedIds]) {
       const row = bulkRows[id]
-      const oldProd = products.find(p => p.id === id)
+      const oldProd = products.find((p) => p.id === id)
       const oldPrice = oldProd?.sale_price || 0
       const newPrice = parseFloat(row.sale_price)
       const oldEst = oldProd?.estimated_monthly_sales || 0
@@ -206,7 +228,7 @@ export default function Urunler() {
       'Ürünler',
       'GUNCELLEME',
       `${changedIds.size} adet ürünün bilgileri (fiyat/kategori) topluca güncellendi.`,
-      bulkDetails.length > 0 ? { detay: bulkDetails.join(' | ') } : undefined
+      bulkDetails.length > 0 ? { detay: bulkDetails.join(' | ') } : undefined,
     )
   }
 
@@ -218,18 +240,23 @@ export default function Urunler() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          materials: products.map(p => ({ id: p.id, name: p.name, category: p.category })),
-          categories: allCategories
-        })
+          materials: products.map((p) => ({ id: p.id, name: p.name, category: p.category })),
+          categories: allCategories,
+        }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       const suggestions = (data.suggestions || [])
-        .map((s: { id: string, suggested_category: string }) => {
-          const prod = products.find(p => p.id === s.id)
-          return { id: s.id, name: prod?.name || s.id, current: prod?.category || 'Diğer', suggested: s.suggested_category }
+        .map((s: { id: string; suggested_category: string }) => {
+          const prod = products.find((p) => p.id === s.id)
+          return {
+            id: s.id,
+            name: prod?.name || s.id,
+            current: prod?.category || 'Diğer',
+            suggested: s.suggested_category,
+          }
         })
-        .filter((s: { suggested: string, current: string }) => s.suggested !== s.current)
+        .filter((s: { suggested: string; current: string }) => s.suggested !== s.current)
 
       setAutoCatSuggestions(suggestions)
       setAutoCatModalOpen(true)
@@ -248,7 +275,11 @@ export default function Urunler() {
     setAutoCatSuggestions([])
     setAutoCatSaving(false)
     fetchData()
-    logActivity('Ürünler', 'GUNCELLEME', `${approved.length} adet ürünün kategorisi yapay zeka ile otomatik güncellendi.`)
+    logActivity(
+      'Ürünler',
+      'GUNCELLEME',
+      `${approved.length} adet ürünün kategorisi yapay zeka ile otomatik güncellendi.`,
+    )
   }
 
   // ─── Form Management ────────────────────────────────────────
@@ -268,18 +299,17 @@ export default function Urunler() {
     setRecipeItems(u)
   }
 
-  const removeRecipeItem = (index: number) =>
-    setRecipeItems(recipeItems.filter((_, i) => i !== index))
+  const removeRecipeItem = (index: number) => setRecipeItems(recipeItems.filter((_, i) => i !== index))
 
   const calculateLiveCost = () => {
     let total = 0
-    recipeItems.forEach(item => {
+    recipeItems.forEach((item) => {
       if (!item.item_id || !item.quantity) return
       if (item.type === 'material') {
-        const mat = materials.find(m => m.id === item.item_id)
+        const mat = materials.find((m) => m.id === item.item_id)
         if (mat) total += mat.price_per_unit * item.quantity
       } else {
-        const sr = subRecipes.find(s => s.id === item.item_id)
+        const sr = subRecipes.find((s) => s.id === item.item_id)
         if (sr?.cost_per_yield) total += sr.cost_per_yield * item.quantity
       }
     })
@@ -292,15 +322,16 @@ export default function Urunler() {
       name: form.name,
       category: form.category,
       sale_price: parseFloat(form.sale_price || '0'),
-      estimated_monthly_sales: parseInt(form.estimated_monthly_sales || '0')
+      estimated_monthly_sales: parseInt(form.estimated_monthly_sales || '0'),
     }
     let productId = editingId
     let details = ''
 
     if (editingId) {
-      const oldProd = products.find(p => p.id === editingId)
+      const oldProd = products.find((p) => p.id === editingId)
       const changes = []
-      if (oldProd?.sale_price !== payload.sale_price) changes.push(`Fiyat: ${oldProd?.sale_price} -> ${payload.sale_price} ₺`)
+      if (oldProd?.sale_price !== payload.sale_price)
+        changes.push(`Fiyat: ${oldProd?.sale_price} -> ${payload.sale_price} ₺`)
       if ((oldProd?.estimated_monthly_sales || 0) !== payload.estimated_monthly_sales)
         changes.push(`Tahmin: ${oldProd?.estimated_monthly_sales} -> ${payload.estimated_monthly_sales}`)
       if (oldProd?.category !== payload.category)
@@ -315,15 +346,15 @@ export default function Urunler() {
     }
 
     if (productId && recipeItems.length > 0) {
-      const validItems = recipeItems.filter(r => r.item_id && r.quantity > 0)
+      const validItems = recipeItems.filter((r) => r.item_id && r.quantity > 0)
       if (validItems.length > 0) {
         await supabase.from('product_ingredients').insert(
-          validItems.map(r => ({
+          validItems.map((r) => ({
             product_id: productId,
             material_id: r.type === 'material' ? r.item_id : null,
             sub_recipe_id: r.type === 'sub_recipe' ? r.item_id : null,
-            quantity: r.quantity
-          }))
+            quantity: r.quantity,
+          })),
         )
       }
     }
@@ -333,7 +364,7 @@ export default function Urunler() {
       'Ürünler',
       editingId ? 'GUNCELLEME' : 'EKLEME',
       `${form.name} isimli ürün ${editingId ? 'güncellendi' : 'sisteme eklendi'}.`,
-      { detay: details }
+      { detay: details },
     )
   }
 
@@ -342,25 +373,25 @@ export default function Urunler() {
       name: product.name,
       category: product.category,
       sale_price: product.sale_price.toString(),
-      estimated_monthly_sales: (product.estimated_monthly_sales || 0).toString()
+      estimated_monthly_sales: (product.estimated_monthly_sales || 0).toString(),
     })
     setEditingId(product.id)
     const { data } = await supabase.from('product_ingredients').select('*').eq('product_id', product.id)
     setRecipeItems(
-      data?.map(r => ({
+      data?.map((r) => ({
         type: r.material_id ? 'material' : 'sub_recipe',
         item_id: r.material_id || r.sub_recipe_id,
-        quantity: r.quantity
-      })) || []
+        quantity: r.quantity,
+      })) || [],
     )
     setShowModal(true)
   }
 
   const handleDelete = async (id: string) => {
-    const productToDelete = products.find(p => p.id === id)
+    const productToDelete = products.find((p) => p.id === id)
     const confirmed = await showConfirm(
       `"${productToDelete?.name}" ürününü silmek istediğinize emin misiniz?`,
-      'Ürünü Sil 🗑️'
+      'Ürünü Sil 🗑️',
     )
     if (!confirmed) return
     await supabase.from('products').delete().eq('id', id)
@@ -380,23 +411,25 @@ export default function Urunler() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productName: form.name,
-          materials: materials.map(m => ({ id: m.id, name: m.name, unit: m.unit })),
-          subRecipes: subRecipes.map(sr => ({ id: sr.id, name: sr.name, yield_unit: sr.yield_unit })),
-          option: 1
-        })
+          materials: materials.map((m) => ({ id: m.id, name: m.name, unit: m.unit })),
+          subRecipes: subRecipes.map((sr) => ({ id: sr.id, name: sr.name, yield_unit: sr.yield_unit })),
+          option: 1,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       if (data.ingredients && Array.isArray(data.ingredients)) {
-        const newItems: ProductIngredient[] = data.ingredients.map((ing: { type: string, id: string, quantity: number }) => ({
-          type: ing.type || 'material',
-          item_id: ing.id,
-          quantity: Number(ing.quantity) || 0
-        }))
+        const newItems: ProductIngredient[] = data.ingredients.map(
+          (ing: { type: string; id: string; quantity: number }) => ({
+            type: ing.type || 'material',
+            item_id: ing.id,
+            quantity: Number(ing.quantity) || 0,
+          }),
+        )
         if (recipeItems.length > 0) {
           const confirmed = await showConfirm(
             'Mevcut reçete silinip yapay zeka reçetesi eklenecek. Onaylıyor musunuz?',
-            'Reçeteyi Güncelle 🤖'
+            'Reçeteyi Güncelle 🤖',
           )
           if (!confirmed) {
             setIsBuildingAiRecipe(false)
@@ -419,16 +452,13 @@ export default function Urunler() {
 
   const totalRevenue = useMemo(
     () => products.reduce((t, p) => t + p.sale_price * (p.actual_sales_30d || 0), 0),
-    [products]
+    [products],
   )
 
   const totalEstContribution = useMemo(
     () =>
-      products.reduce(
-        (t, p) => t + (p.sale_price - (p.calculated_cost || 0)) * (p.estimated_monthly_sales || 0),
-        0
-      ),
-    [products]
+      products.reduce((t, p) => t + (p.sale_price - (p.calculated_cost || 0)) * (p.estimated_monthly_sales || 0), 0),
+    [products],
   )
 
   const overallAvgMargin = useMemo(() => {
@@ -444,8 +474,8 @@ export default function Urunler() {
     margin >= 50
       ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
       : margin >= 30
-      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-      : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+        ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+        : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
 
   // Filtered and sorted products
   const processedProducts = useMemo(() => {
@@ -453,11 +483,11 @@ export default function Urunler() {
 
     if (search.trim()) {
       const query = search.toLowerCase()
-      result = result.filter(p => p.name.toLowerCase().includes(query))
+      result = result.filter((p) => p.name.toLowerCase().includes(query))
     }
 
     if (categoryFilter !== 'Tümü') {
-      result = result.filter(p => p.category === categoryFilter)
+      result = result.filter((p) => p.category === categoryFilter)
     }
 
     result.sort((a, b) => {
@@ -479,11 +509,11 @@ export default function Urunler() {
   const groupedByCategory = useMemo(() => {
     const activeCats = categoryFilter !== 'Tümü' ? [categoryFilter] : allCategories
     return activeCats
-      .map(cat => ({
+      .map((cat) => ({
         cat,
-        items: processedProducts.filter(p => p.category === cat)
+        items: processedProducts.filter((p) => p.category === cat),
       }))
-      .filter(g => g.items.length > 0)
+      .filter((g) => g.items.length > 0)
   }, [allCategories, processedProducts, categoryFilter])
 
   return (
@@ -627,7 +657,9 @@ export default function Urunler() {
                 📈
               </span>
             </div>
-            <div className={`text-xl sm:text-2xl font-black ${overallAvgMargin >= 50 ? 'text-emerald-400' : 'text-amber-400'}`}>
+            <div
+              className={`text-xl sm:text-2xl font-black ${overallAvgMargin >= 50 ? 'text-emerald-400' : 'text-amber-400'}`}
+            >
               %{overallAvgMargin.toFixed(1)}
             </div>
             <div className="text-stone-400 text-[11px] mt-1">Menü Genel Ortalama</div>
@@ -646,14 +678,17 @@ export default function Urunler() {
         </div>
 
         {/* SEARCH, FILTER & ACTION BAR */}
-        <div id="tour-products-filters" className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div
+          id="tour-products-filters"
+          className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3"
+        >
           {/* Search Input */}
           <div className="flex-1 relative">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">🔍</span>
             <Input
               type="text"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Ürün adı ile hızlı ara..."
               className="pl-9 pr-8"
             />
@@ -671,20 +706,22 @@ export default function Urunler() {
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={categoryFilter}
-              onChange={e => setCategoryFilter(e.target.value)}
+              onChange={(e) => setCategoryFilter(e.target.value)}
               className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-300 text-xs focus:outline-none focus:border-amber-500/50 cursor-pointer"
             >
               <option value="Tümü">Tüm Kategoriler ({products.length})</option>
-              {allCategories.map(cat => (
+              {allCategories.map((cat) => (
                 <option key={cat} value={cat}>
-                  {cat} ({products.filter(p => p.category === cat).length})
+                  {cat} ({products.filter((p) => p.category === cat).length})
                 </option>
               ))}
             </select>
 
             <select
               value={sortBy}
-              onChange={e => setSortBy(e.target.value as 'name' | 'price_desc' | 'price_asc' | 'margin_desc' | 'sales_desc')}
+              onChange={(e) =>
+                setSortBy(e.target.value as 'name' | 'price_desc' | 'price_asc' | 'margin_desc' | 'sales_desc')
+              }
               className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-300 text-xs focus:outline-none focus:border-amber-500/50 cursor-pointer"
             >
               <option value="name">İsme Göre (A-Z)</option>
@@ -714,7 +751,8 @@ export default function Urunler() {
             <div className="text-5xl mb-3">📋</div>
             <h3 className="text-lg font-bold text-stone-300 mb-1">Aramanıza Uygun Ürün Bulunamadı</h3>
             <p className="text-xs text-stone-400 max-w-sm mx-auto">
-              Arama filtrenizi temizleyerek veya &quot;+ Yeni Ürün Ekle&quot; butonunu kullanarak yeni ürün tanımlayabilirsiniz.
+              Arama filtrenizi temizleyerek veya &quot;+ Yeni Ürün Ekle&quot; butonunu kullanarak yeni ürün
+              tanımlayabilirsiniz.
             </p>
           </div>
         ) : (
@@ -752,7 +790,9 @@ export default function Urunler() {
 
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <span className={`font-bold text-xs sm:text-sm px-2 py-0.5 rounded-lg border ${getMarginColor(avgMargin)}`}>
+                        <span
+                          className={`font-bold text-xs sm:text-sm px-2 py-0.5 rounded-lg border ${getMarginColor(avgMargin)}`}
+                        >
                           Ort. %{avgMargin.toFixed(1)}
                         </span>
                       </div>
@@ -777,9 +817,10 @@ export default function Urunler() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-stone-800/50 text-xs sm:text-sm">
-                            {items.map(product => {
+                            {items.map((product) => {
                               const cost = product.calculated_cost || 0
-                              const margin = product.sale_price > 0 ? ((product.sale_price - cost) / product.sale_price) * 100 : 0
+                              const margin =
+                                product.sale_price > 0 ? ((product.sale_price - cost) / product.sale_price) * 100 : 0
                               const isEditing = editingId === product.id
                               const row = bulkRows[product.id]
 
@@ -800,7 +841,7 @@ export default function Urunler() {
                                         <input
                                           type="number"
                                           value={row.sale_price}
-                                          onChange={e => updateBulkRow(product.id, 'sale_price', e.target.value)}
+                                          onChange={(e) => updateBulkRow(product.id, 'sale_price', e.target.value)}
                                           className={inputCls + ' text-right w-24 font-bold text-amber-400'}
                                         />
                                       </div>
@@ -809,7 +850,9 @@ export default function Urunler() {
                                       <input
                                         type="number"
                                         value={row.estimated_monthly_sales}
-                                        onChange={e => updateBulkRow(product.id, 'estimated_monthly_sales', e.target.value)}
+                                        onChange={(e) =>
+                                          updateBulkRow(product.id, 'estimated_monthly_sales', e.target.value)
+                                        }
                                         className={inputCls + ' text-right w-20'}
                                       />
                                     </td>
@@ -817,7 +860,9 @@ export default function Urunler() {
                                       {product.actual_sales_30d || 0}
                                     </td>
                                     <td className="px-4 py-3 text-right">
-                                      <span className={`font-bold px-2 py-0.5 rounded-lg border ${getMarginColor(margin)}`}>
+                                      <span
+                                        className={`font-bold px-2 py-0.5 rounded-lg border ${getMarginColor(margin)}`}
+                                      >
                                         %{margin.toFixed(1)}
                                       </span>
                                     </td>
@@ -836,16 +881,22 @@ export default function Urunler() {
                                   }`}
                                 >
                                   <td className="px-5 py-3.5 font-bold text-stone-100">{product.name}</td>
-                                  <td className="px-4 py-3.5 text-right text-stone-400 font-medium">₺{cost.toFixed(2)}</td>
+                                  <td className="px-4 py-3.5 text-right text-stone-400 font-medium">
+                                    ₺{cost.toFixed(2)}
+                                  </td>
                                   <td className="px-4 py-3.5 text-right text-white font-extrabold text-base">
                                     ₺{product.sale_price.toFixed(2)}
                                   </td>
-                                  <td className="px-4 py-3.5 text-right text-stone-400">{product.estimated_monthly_sales} adet</td>
+                                  <td className="px-4 py-3.5 text-right text-stone-400">
+                                    {product.estimated_monthly_sales} adet
+                                  </td>
                                   <td className="px-4 py-3.5 text-right text-amber-400 font-bold">
                                     {product.actual_sales_30d || 0} adet
                                   </td>
                                   <td className="px-4 py-3.5 text-right">
-                                    <span className={`font-bold px-2.5 py-0.5 rounded-lg border ${getMarginColor(margin)}`}>
+                                    <span
+                                      className={`font-bold px-2.5 py-0.5 rounded-lg border ${getMarginColor(margin)}`}
+                                    >
                                       %{margin.toFixed(1)}
                                     </span>
                                   </td>
@@ -876,9 +927,10 @@ export default function Urunler() {
 
                       {/* Mobile Cards View */}
                       <div className="md:hidden divide-y divide-stone-800/60">
-                        {items.map(product => {
+                        {items.map((product) => {
                           const cost = product.calculated_cost || 0
-                          const margin = product.sale_price > 0 ? ((product.sale_price - cost) / product.sale_price) * 100 : 0
+                          const margin =
+                            product.sale_price > 0 ? ((product.sale_price - cost) / product.sale_price) * 100 : 0
                           const row = bulkRows[product.id]
 
                           if (bulkEditMode && row) {
@@ -895,7 +947,7 @@ export default function Urunler() {
                                     <input
                                       type="number"
                                       value={row.sale_price}
-                                      onChange={e => updateBulkRow(product.id, 'sale_price', e.target.value)}
+                                      onChange={(e) => updateBulkRow(product.id, 'sale_price', e.target.value)}
                                       className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1.5 text-amber-400 font-bold text-sm"
                                     />
                                   </div>
@@ -904,7 +956,9 @@ export default function Urunler() {
                                     <input
                                       type="number"
                                       value={row.estimated_monthly_sales}
-                                      onChange={e => updateBulkRow(product.id, 'estimated_monthly_sales', e.target.value)}
+                                      onChange={(e) =>
+                                        updateBulkRow(product.id, 'estimated_monthly_sales', e.target.value)
+                                      }
                                       className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1.5 text-white text-sm"
                                     />
                                   </div>
@@ -917,7 +971,9 @@ export default function Urunler() {
                             <div key={product.id} className="p-4 space-y-2.5 hover:bg-stone-800/20 transition-colors">
                               <div className="flex items-center justify-between">
                                 <h4 className="font-bold text-white text-sm sm:text-base">{product.name}</h4>
-                                <span className={`font-bold text-xs px-2 py-0.5 rounded-lg border ${getMarginColor(margin)}`}>
+                                <span
+                                  className={`font-bold text-xs px-2 py-0.5 rounded-lg border ${getMarginColor(margin)}`}
+                                >
                                   %{margin.toFixed(1)} Kar
                                 </span>
                               </div>
@@ -929,7 +985,9 @@ export default function Urunler() {
                                 </div>
                                 <div>
                                   <span className="text-stone-400 block text-[10px]">Satış Fiyatı</span>
-                                  <span className="font-extrabold text-amber-400">₺{product.sale_price.toFixed(2)}</span>
+                                  <span className="font-extrabold text-amber-400">
+                                    ₺{product.sale_price.toFixed(2)}
+                                  </span>
                                 </div>
                                 <div>
                                   <span className="text-stone-400 block text-[10px]">Tahmini Satış</span>
@@ -976,7 +1034,7 @@ export default function Urunler() {
         >
           <div
             className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-3xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden relative my-auto"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="px-6 py-4 bg-stone-950 border-b border-stone-800 flex items-center justify-between">
@@ -1009,7 +1067,7 @@ export default function Urunler() {
                   <label className="text-stone-300 text-xs font-semibold mb-1 block">Ürün Adı *</label>
                   <input
                     value={form.name}
-                    onChange={e => setForm({ ...form, name: e.target.value })}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50"
                     placeholder="örn: Caffe Latte"
                   />
@@ -1020,12 +1078,12 @@ export default function Urunler() {
                   <input
                     list="category-options-modal"
                     value={form.category}
-                    onChange={e => setForm({ ...form, category: e.target.value })}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })}
                     placeholder="Kategori seç/yaz..."
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50"
                   />
                   <datalist id="category-options-modal">
-                    {allCategories.map(c => (
+                    {allCategories.map((c) => (
                       <option key={c} value={c} />
                     ))}
                   </datalist>
@@ -1036,7 +1094,7 @@ export default function Urunler() {
                   <input
                     type="number"
                     value={form.sale_price}
-                    onChange={e => setForm({ ...form, sale_price: e.target.value })}
+                    onChange={(e) => setForm({ ...form, sale_price: e.target.value })}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-amber-400 font-bold text-sm focus:outline-none focus:border-amber-500/50"
                     placeholder="0.00"
                   />
@@ -1047,7 +1105,7 @@ export default function Urunler() {
                   <input
                     type="number"
                     value={form.estimated_monthly_sales}
-                    onChange={e => setForm({ ...form, estimated_monthly_sales: e.target.value })}
+                    onChange={(e) => setForm({ ...form, estimated_monthly_sales: e.target.value })}
                     className="w-full bg-stone-950 border border-amber-500/30 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50"
                     placeholder="0"
                   />
@@ -1109,11 +1167,11 @@ export default function Urunler() {
                           {item.type === 'material' ? (
                             <select
                               value={item.item_id}
-                              onChange={e => updateRecipeItem(index, 'item_id', e.target.value)}
+                              onChange={(e) => updateRecipeItem(index, 'item_id', e.target.value)}
                               className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none"
                             >
                               <option value="">Hammadde Seçiniz...</option>
-                              {materials.map(m => (
+                              {materials.map((m) => (
                                 <option key={m.id} value={m.id}>
                                   {m.name} ({m.unit})
                                 </option>
@@ -1122,11 +1180,11 @@ export default function Urunler() {
                           ) : (
                             <select
                               value={item.item_id}
-                              onChange={e => updateRecipeItem(index, 'item_id', e.target.value)}
+                              onChange={(e) => updateRecipeItem(index, 'item_id', e.target.value)}
                               className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none"
                             >
                               <option value="">Üretim Reçetesi Seçiniz...</option>
-                              {subRecipes.map(sr => (
+                              {subRecipes.map((sr) => (
                                 <option key={sr.id} value={sr.id}>
                                   {sr.name} (1 {sr.yield_unit})
                                 </option>
@@ -1139,14 +1197,14 @@ export default function Urunler() {
                           <input
                             type="number"
                             value={item.quantity || ''}
-                            onChange={e => updateRecipeItem(index, 'quantity', parseFloat(e.target.value))}
+                            onChange={(e) => updateRecipeItem(index, 'quantity', parseFloat(e.target.value))}
                             className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1.5 text-white text-xs text-right focus:outline-none"
                             placeholder="Miktar"
                           />
                           <span className="text-stone-400 text-xs shrink-0 w-12 truncate">
                             {item.type === 'material'
-                              ? materials.find(m => m.id === item.item_id)?.unit
-                              : subRecipes.find(s => s.id === item.item_id)?.yield_unit}
+                              ? materials.find((m) => m.id === item.item_id)?.unit
+                              : subRecipes.find((s) => s.id === item.item_id)?.yield_unit}
                           </span>
                         </div>
 
@@ -1174,13 +1232,17 @@ export default function Urunler() {
                 </div>
                 <div>
                   <span className="text-stone-400 text-[11px] block">Kâr Marjı</span>
-                  <span className={`font-bold text-base ${overallAvgMargin >= 50 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  <span
+                    className={`font-bold text-base ${overallAvgMargin >= 50 ? 'text-emerald-400' : 'text-amber-400'}`}
+                  >
                     %{liveMargin.toFixed(1)}
                   </span>
                 </div>
                 <div>
                   <span className="text-stone-400 text-[11px] block">Aylık Nakit Katkı</span>
-                  <span className="text-violet-400 font-extrabold text-base">{formatCurrency(liveCashContribution)}</span>
+                  <span className="text-violet-400 font-extrabold text-base">
+                    {formatCurrency(liveCashContribution)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1233,7 +1295,10 @@ export default function Urunler() {
                 </div>
               ) : (
                 autoCatSuggestions.map((s, i) => (
-                  <div key={s.id} className="flex items-center justify-between bg-stone-950 p-3 rounded-xl border border-stone-800 text-xs">
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between bg-stone-950 p-3 rounded-xl border border-stone-800 text-xs"
+                  >
                     <div className="min-w-0 flex-1">
                       <p className="text-white font-semibold truncate">{s.name}</p>
                       <div className="flex items-center gap-2 mt-0.5 text-[11px]">
@@ -1243,7 +1308,7 @@ export default function Urunler() {
                       </div>
                     </div>
                     <button
-                      onClick={() => setAutoCatSuggestions(prev => prev.filter((_, idx) => idx !== i))}
+                      onClick={() => setAutoCatSuggestions((prev) => prev.filter((_, idx) => idx !== i))}
                       className="text-stone-500 hover:text-red-400 p-1.5 rounded-lg transition-colors ml-2"
                       title="Öneriyi Kaldır"
                     >
@@ -1266,7 +1331,7 @@ export default function Urunler() {
                   </button>
                   <button
                     onClick={() =>
-                      handleApplyAutoCat(autoCatSuggestions.map(s => ({ id: s.id, suggested: s.suggested })))
+                      handleApplyAutoCat(autoCatSuggestions.map((s) => ({ id: s.id, suggested: s.suggested })))
                     }
                     disabled={autoCatSaving}
                     className="bg-violet-600 hover:bg-violet-500 disabled:opacity-60 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-violet-600/20"

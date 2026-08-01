@@ -32,46 +32,37 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     isOpen: false,
     message: '',
     title: '',
-    resolve: null
+    resolve: null,
   })
 
-  const showAlert = (
-    message: string, 
-    severity: NotificationSeverity = 'info', 
-    title?: string
-  ): Promise<void> => {
+  const showAlert = (message: string, severity: NotificationSeverity = 'info', title?: string): Promise<void> => {
     return new Promise((resolve) => {
-      const defaultTitle = 
-        severity === 'success' ? 'Başarılı' : 
-        severity === 'error' ? 'Hata' : 
-        severity === 'warning' ? 'Uyarı' : 'Bilgi';
-      
-      const toastTitle = title || defaultTitle;
-      
+      const defaultTitle =
+        severity === 'success' ? 'Başarılı' : severity === 'error' ? 'Hata' : severity === 'warning' ? 'Uyarı' : 'Bilgi'
+
+      const toastTitle = title || defaultTitle
+
       if (severity === 'success') {
-        toast.success(toastTitle, { description: message });
+        toast.success(toastTitle, { description: message })
       } else if (severity === 'error') {
-        toast.error(toastTitle, { description: message });
+        toast.error(toastTitle, { description: message })
       } else if (severity === 'warning') {
-        toast.warning(toastTitle, { description: message });
+        toast.warning(toastTitle, { description: message })
       } else {
-        toast.info(toastTitle, { description: message });
+        toast.info(toastTitle, { description: message })
       }
-      
+
       resolve()
     })
   }
 
-  const showConfirm = (
-    message: string, 
-    title: string = 'Onay Gerekli'
-  ): Promise<boolean> => {
+  const showConfirm = (message: string, title: string = 'Onay Gerekli'): Promise<boolean> => {
     return new Promise((resolve) => {
       setConfirmState({
         isOpen: true,
         message,
         title,
-        resolve
+        resolve,
       })
     })
   }
@@ -80,29 +71,27 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (confirmState.resolve) {
       confirmState.resolve(value)
     }
-    setConfirmState(prev => ({ ...prev, isOpen: false, resolve: null }))
+    setConfirmState((prev) => ({ ...prev, isOpen: false, resolve: null }))
   }
 
   return (
     <NotificationContext.Provider value={{ showAlert, showConfirm }}>
       {children}
-      
+
       <AlertDialog open={confirmState.isOpen} onOpenChange={(open) => !open && handleClose(false)}>
         <AlertDialogContent className="bg-stone-900 border-stone-800 text-stone-100">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-amber-500">{confirmState.title}</AlertDialogTitle>
-            <AlertDialogDescription className="text-stone-400">
-              {confirmState.message}
-            </AlertDialogDescription>
+            <AlertDialogDescription className="text-stone-400">{confirmState.message}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel 
+            <AlertDialogCancel
               onClick={() => handleClose(false)}
               className="bg-stone-800 text-stone-200 border-stone-700 hover:bg-stone-700 hover:text-stone-100"
             >
               İptal
             </AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={() => handleClose(true)}
               className="bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold"
             >

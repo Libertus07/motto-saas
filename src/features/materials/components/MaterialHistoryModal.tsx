@@ -1,5 +1,5 @@
-import { formatDate } from "@/lib/format"
-import type { PriceHistory } from "../types"
+import { formatDate } from '@/lib/format'
+import type { PriceHistory } from '../types'
 
 type MaterialHistoryModalProps = {
   isOpen: boolean
@@ -14,7 +14,7 @@ export function MaterialHistoryModal({
   onClose,
   selectedMatName,
   priceHistory,
-  loadingHistory
+  loadingHistory,
 }: MaterialHistoryModalProps) {
   if (!isOpen) return null
 
@@ -26,7 +26,9 @@ export function MaterialHistoryModal({
             <h2 className="text-xl font-bold text-amber-400">Fiyat Geçmişi</h2>
             <p className="text-stone-400 text-sm">{selectedMatName}</p>
           </div>
-          <button onClick={onClose} className="text-stone-500 hover:text-white text-xl">✕</button>
+          <button onClick={onClose} className="text-stone-500 hover:text-white text-xl">
+            ✕
+          </button>
         </div>
 
         {loadingHistory ? (
@@ -35,17 +37,13 @@ export function MaterialHistoryModal({
           <p className="text-stone-500 py-8 text-center">Bu hammadde için fiyat değişimi kaydedilmemiş.</p>
         ) : (
           <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3">
-            {priceHistory.map(hist => {
+            {priceHistory.map((hist) => {
               const isIncrease = hist.new_price > hist.old_price
-              const diffPercent = hist.old_price > 0
-                ? ((hist.new_price - hist.old_price) / hist.old_price) * 100
-                : 0
+              const diffPercent = hist.old_price > 0 ? ((hist.new_price - hist.old_price) / hist.old_price) * 100 : 0
               return (
                 <div key={hist.id} className="bg-stone-800 rounded-lg p-4 flex items-center justify-between">
                   <div>
-                    <p className="text-stone-400 text-xs mb-1">
-                      {formatDate(new Date(hist.created_at))}
-                    </p>
+                    <p className="text-stone-400 text-xs mb-1">{formatDate(new Date(hist.created_at))}</p>
                     <div className="flex items-center gap-2">
                       <span className="text-stone-500 line-through">₺{hist.old_price.toFixed(2)}</span>
                       <span className="text-stone-300">→</span>

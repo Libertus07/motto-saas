@@ -2,14 +2,8 @@ import { describe, expect, it } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 
-const migrationPath = path.join(
-  process.cwd(),
-  'supabase/migrations/20260728000003_tenant_rls_policies_sec102.sql'
-)
-const hardeningMigrationPath = path.join(
-  process.cwd(),
-  'supabase/migrations/20260801000001_harden_profiles_rls.sql'
-)
+const migrationPath = path.join(process.cwd(), 'supabase/migrations/20260728000003_tenant_rls_policies_sec102.sql')
+const hardeningMigrationPath = path.join(process.cwd(), 'supabase/migrations/20260801000001_harden_profiles_rls.sql')
 
 describe('tenant RLS migration contract', () => {
   it('defines organization-aware policies for protected business data', () => {

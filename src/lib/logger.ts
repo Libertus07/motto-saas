@@ -1,4 +1,4 @@
-"use server"
+'use server'
 
 import { createServerSupabase } from './supabase-server'
 import { devError } from '@/lib/debug'
@@ -10,12 +10,12 @@ export async function logActivity(
   moduleName: string,
   actionType: LogAction,
   description: string,
-  details?: Record<string, unknown> | unknown
+  details?: Record<string, unknown> | unknown,
 ) {
   try {
     const supabase = await createServerSupabase()
     const {
-      data: { user }
+      data: { user },
     } = await supabase.auth.getUser()
 
     let organizationId: string | null = null
@@ -49,8 +49,8 @@ export async function logActivity(
       ...safeDetails,
       _meta: {
         ip: ipAddress,
-        userAgent: browserInfo
-      }
+        userAgent: browserInfo,
+      },
     }
 
     const logPayload: Record<string, unknown> = {
@@ -58,7 +58,7 @@ export async function logActivity(
       action_type: actionType,
       description,
       user_id: user?.id || 'Bilinmeyen Kullanıcı',
-      details: enrichedDetails
+      details: enrichedDetails,
     }
 
     if (organizationId) {

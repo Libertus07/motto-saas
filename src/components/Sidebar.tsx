@@ -24,7 +24,7 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
     async function fetchData() {
       // Kullanıcı Bilgisi
       const {
-        data: { user }
+        data: { user },
       } = await supabase.auth.getUser()
       if (user) {
         setUserName(user.email?.split('@')[0] || 'Kullanıcı')
@@ -37,8 +37,8 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
       // İşletme Ayarları
       const { data: settingsData } = await supabase.from('settings').select('key, value')
       if (settingsData) {
-        const bName = settingsData.find(s => s.key === 'business_name')?.value
-        const bLogo = settingsData.find(s => s.key === 'business_logo')?.value
+        const bName = settingsData.find((s) => s.key === 'business_name')?.value
+        const bLogo = settingsData.find((s) => s.key === 'business_logo')?.value
         if (bName) setBusinessName(bName)
         if (bLogo) setBusinessLogo(bLogo)
       }
@@ -56,7 +56,7 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
     {
       title: 'Genel',
       badgeColor: 'bg-amber-500',
-      items: [{ name: 'Ana Ekran', icon: '🏠', path: '/dashboard' }]
+      items: [{ name: 'Ana Ekran', icon: '🏠', path: '/dashboard' }],
     },
     {
       title: 'Katalog & Üretim',
@@ -66,8 +66,8 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
         { name: 'Hammaddeler', icon: '🧪', path: '/dashboard/hammaddeler' },
         { name: 'Stok Takibi', icon: '📦', path: '/dashboard/stok' },
         { name: 'Üretim Reçeteleri', icon: '🥣', path: '/dashboard/yari-mamuller' },
-        { name: 'Tedarikçiler', icon: '🏢', path: '/dashboard/tedarikciler' }
-      ]
+        { name: 'Tedarikçiler', icon: '🏢', path: '/dashboard/tedarikciler' },
+      ],
     },
     {
       title: 'Finans & Kasa',
@@ -77,8 +77,8 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
         { name: 'Kasa Sayımı', icon: '🏧', path: '/dashboard/kasa/sayim' },
         { name: 'Giderler', icon: '💸', path: '/dashboard/giderler' },
         { name: 'Yatırımlar', icon: '📈', path: '/dashboard/yatirimlar' },
-        { name: 'Fiyat Motoru', icon: '⚙️', path: '/dashboard/fiyat-motoru' }
-      ]
+        { name: 'Fiyat Motoru', icon: '⚙️', path: '/dashboard/fiyat-motoru' },
+      ],
     },
     {
       title: 'Yönetim',
@@ -86,9 +86,9 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
       items: [
         { name: 'Raporlar', icon: '📊', path: '/dashboard/raporlar' },
         { name: 'İşlem Geçmişi', icon: '🕵️‍♂️', path: '/dashboard/islem-gecmisi' },
-        { name: 'Ayarlar', icon: '⚙️', path: '/dashboard/ayarlar' }
-      ]
-    }
+        { name: 'Ayarlar', icon: '⚙️', path: '/dashboard/ayarlar' },
+      ],
+    },
   ]
 
   const userInitial = userName ? userName[0].toUpperCase() : 'U'
@@ -102,7 +102,15 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
             <div className="w-10 h-10 rounded-2xl bg-stone-800 animate-pulse shrink-0 border border-stone-700/50" />
           ) : businessLogo ? (
             <div className="w-10 h-10 rounded-2xl bg-stone-950 border border-amber-500/30 p-1 shrink-0 flex items-center justify-center shadow-inner shadow-amber-500/10">
-              <Image src={businessLogo} alt="Logo" width={40} height={40} unoptimized className="w-full h-full object-contain" onError={() => setBusinessLogo('')} />
+              <Image
+                src={businessLogo}
+                alt="Logo"
+                width={40}
+                height={40}
+                unoptimized
+                className="w-full h-full object-contain"
+                onError={() => setBusinessLogo('')}
+              />
             </div>
           ) : (
             <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl shrink-0 font-extrabold shadow-inner">
@@ -143,7 +151,11 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
       </div>
 
       {/* ──────────────── NAVIGATION MENU ──────────────── */}
-      <nav id="tour-sidebar-nav" aria-label="Ana Navigasyon" className="flex-1 p-3.5 space-y-5 overflow-y-auto scrollbar-none">
+      <nav
+        id="tour-sidebar-nav"
+        aria-label="Ana Navigasyon"
+        className="flex-1 p-3.5 space-y-5 overflow-y-auto scrollbar-none"
+      >
         {menuGroups.map((group, groupIndex) => (
           <div key={groupIndex} className="space-y-1">
             <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-stone-500 uppercase tracking-widest px-3 py-1">
@@ -152,7 +164,7 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
             </div>
 
             <div className="space-y-1">
-              {group.items.map(item => {
+              {group.items.map((item) => {
                 const isActive = pathname === item.path
                 return (
                   <Link
@@ -170,10 +182,15 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
                   >
                     {/* Active Vertical Glow Line */}
                     {isActive && (
-                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-amber-500 rounded-r-full shadow-sm shadow-amber-400" aria-hidden="true" />
+                      <span
+                        className="absolute left-0 top-2 bottom-2 w-1 bg-amber-500 rounded-r-full shadow-sm shadow-amber-400"
+                        aria-hidden="true"
+                      />
                     )}
 
-                    <span className="text-lg transition-transform group-hover:scale-110" aria-hidden="true">{item.icon}</span>
+                    <span className="text-lg transition-transform group-hover:scale-110" aria-hidden="true">
+                      {item.icon}
+                    </span>
                     <span className="truncate">{item.name}</span>
                   </Link>
                 )
@@ -202,7 +219,10 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
               }}
               className="flex items-center gap-3 px-4 py-3 text-xs sm:text-sm text-stone-300 hover:bg-stone-800/60 hover:text-amber-400 transition-colors border-b border-stone-800/80 font-bold"
             >
-              <span className="text-base" aria-hidden="true">👤</span> Profilim
+              <span className="text-base" aria-hidden="true">
+                👤
+              </span>{' '}
+              Profilim
             </Link>
             <Link
               href="/dashboard/ayarlar?tab=genel"
@@ -212,13 +232,19 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
               }}
               className="flex items-center gap-3 px-4 py-3 text-xs sm:text-sm text-stone-300 hover:bg-stone-800/60 hover:text-amber-400 transition-colors border-b border-stone-800/80 font-bold"
             >
-              <span className="text-base" aria-hidden="true">⚙️</span> Hesap Ayarları
+              <span className="text-base" aria-hidden="true">
+                ⚙️
+              </span>{' '}
+              Hesap Ayarları
             </Link>
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-3 text-xs sm:text-sm text-rose-400 hover:bg-rose-500/10 transition-colors text-left font-extrabold"
             >
-              <span className="text-base" aria-hidden="true">🚪</span> Çıkış Yap
+              <span className="text-base" aria-hidden="true">
+                🚪
+              </span>{' '}
+              Çıkış Yap
             </button>
           </div>
         )}

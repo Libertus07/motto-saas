@@ -28,9 +28,7 @@ export function GenelTab({ s, set, onSave, saving }: GenelTabProps) {
     const fileExt = file.name.split('.').pop()
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
 
-    const { error } = await supabase.storage
-      .from('motto_assets')
-      .upload(`logos/${fileName}`, file, { upsert: true })
+    const { error } = await supabase.storage.from('motto_assets').upload(`logos/${fileName}`, file, { upsert: true })
 
     if (error) {
       showAlert('Logo yüklenirken hata oluştu: ' + error.message, 'error')
@@ -39,7 +37,7 @@ export function GenelTab({ s, set, onSave, saving }: GenelTabProps) {
     }
 
     const {
-      data: { publicUrl }
+      data: { publicUrl },
     } = supabase.storage.from('motto_assets').getPublicUrl(`logos/${fileName}`)
 
     set('business_logo', publicUrl)
@@ -83,28 +81,28 @@ export function GenelTab({ s, set, onSave, saving }: GenelTabProps) {
           <FormRow label="İşletme Adı">
             <Input
               value={s.business_name}
-              onChange={e => set('business_name', e.target.value)}
+              onChange={(e) => set('business_name', e.target.value)}
               placeholder="Motto Café"
             />
           </FormRow>
           <FormRow label="Telefon Numarası">
             <Input
               value={s.business_phone}
-              onChange={e => set('business_phone', e.target.value)}
+              onChange={(e) => set('business_phone', e.target.value)}
               placeholder="+90 532 000 0000"
             />
           </FormRow>
           <FormRow label="Vergi Numarası">
             <Input
               value={s.business_tax_no}
-              onChange={e => set('business_tax_no', e.target.value)}
+              onChange={(e) => set('business_tax_no', e.target.value)}
               placeholder="1234567890"
             />
           </FormRow>
           <FormRow label="Dil">
             <select
               value={s.language}
-              onChange={e => set('language', e.target.value)}
+              onChange={(e) => set('language', e.target.value)}
               className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500/50 transition-all"
             >
               <option value="tr">Türkçe</option>
@@ -114,7 +112,7 @@ export function GenelTab({ s, set, onSave, saving }: GenelTabProps) {
           <FormRow label="Adres" hint="Z raporu ve belgeler için kullanılır.">
             <Input
               value={s.business_address}
-              onChange={e => set('business_address', e.target.value)}
+              onChange={(e) => set('business_address', e.target.value)}
               placeholder="Bağcılar Mah. Atatürk Cad. No:12, İstanbul"
             />
           </FormRow>
@@ -124,20 +122,20 @@ export function GenelTab({ s, set, onSave, saving }: GenelTabProps) {
       <SectionCard title="Çalışma Saatleri" description="Saatlik gider hesabı ve raporlama için kullanılır.">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <FormRow label="Açılış Saati">
-            <Input type="time" value={s.work_hours_start} onChange={e => set('work_hours_start', e.target.value)} />
+            <Input type="time" value={s.work_hours_start} onChange={(e) => set('work_hours_start', e.target.value)} />
           </FormRow>
           <FormRow label="Kapanış Saati">
-            <Input type="time" value={s.work_hours_end} onChange={e => set('work_hours_end', e.target.value)} />
+            <Input type="time" value={s.work_hours_end} onChange={(e) => set('work_hours_end', e.target.value)} />
           </FormRow>
           <FormRow label="Aylık Çalışma Günü" hint="Tatil günleri hariç">
             <Input
               type="number"
               value={s.working_days_per_month}
-              onChange={e => set('working_days_per_month', e.target.value)}
+              onChange={(e) => set('working_days_per_month', e.target.value)}
             />
           </FormRow>
           <FormRow label="Günlük Çalışma Saati" hint="Gider paylaştırma için">
-            <Input type="number" value={s.daily_work_hours} onChange={e => set('daily_work_hours', e.target.value)} />
+            <Input type="number" value={s.daily_work_hours} onChange={(e) => set('daily_work_hours', e.target.value)} />
           </FormRow>
         </div>
       </SectionCard>

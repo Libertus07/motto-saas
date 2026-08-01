@@ -1,12 +1,12 @@
-import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js'
+import dotenv from 'dotenv'
 
-dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env.local' })
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function run() {
   const { data, error } = await supabase
@@ -14,11 +14,11 @@ async function run() {
     .select('*')
     .eq('source_type', 'investment')
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(10)
 
-  console.log("Account Movements (Investment Type):");
-  console.log(JSON.stringify(data, null, 2));
-  if (error) console.error(error);
+  console.log('Account Movements (Investment Type):')
+  console.log(JSON.stringify(data, null, 2))
+  if (error) console.error(error)
 }
 
-run();
+run()

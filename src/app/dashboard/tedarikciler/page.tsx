@@ -62,16 +62,25 @@ export default function Tedarikciler() {
   useAppTour('tedarikciler', [
     {
       element: '#tour-suppliers-create',
-      popover: { title: 'Tedarikçi kartı açın', description: 'Firma, yetkili ve iletişim bilgisini ekleyerek cari takibi bu noktadan başlatın.' }
+      popover: {
+        title: 'Tedarikçi kartı açın',
+        description: 'Firma, yetkili ve iletişim bilgisini ekleyerek cari takibi bu noktadan başlatın.',
+      },
     },
     {
       element: '#tour-suppliers-list',
-      popover: { title: 'Cari hesabı inceleyin', description: 'Firmayı arayın, seçin ve alış–ödeme hareketlerini sağ panelde detaylandırın.' }
+      popover: {
+        title: 'Cari hesabı inceleyin',
+        description: 'Firmayı arayın, seçin ve alış–ödeme hareketlerini sağ panelde detaylandırın.',
+      },
     },
     {
       element: '#tour-suppliers-kpis',
-      popover: { title: 'Ödeme önceliklerini görün', description: 'Toplam borç ve borçlu firma sayısı, nakit planlaması için hızlı bir özet sunar.' }
-    }
+      popover: {
+        title: 'Ödeme önceliklerini görün',
+        description: 'Toplam borç ve borçlu firma sayısı, nakit planlaması için hızlı bir özet sunar.',
+      },
+    },
   ])
   const { showAlert, showConfirm } = useNotification()
   const { activeOrg } = useOrganization()
@@ -100,7 +109,7 @@ export default function Tedarikciler() {
   const supabase = useMemo(() => createClient(), [])
 
   const fetchAccounts = useCallback(async () => {
-    if (!activeOrg) return;
+    if (!activeOrg) return
     const { data } = await supabase.from('accounts').select('*').eq('organization_id', activeOrg.id).order('created_at')
     if (data && data.length > 0) {
       setAccounts(data)
@@ -109,7 +118,7 @@ export default function Tedarikciler() {
   }, [activeOrg, supabase])
 
   const fetchSuppliers = useCallback(async () => {
-    if (!activeOrg) return;
+    if (!activeOrg) return
     setLoading(true)
     const { data } = await supabase.from('suppliers').select('*').eq('organization_id', activeOrg.id).order('name')
     setSuppliers(data || [])
@@ -138,10 +147,12 @@ export default function Tedarikciler() {
         .order('created_at', { ascending: false }),
       supabase
         .from('stock_movements')
-        .select('id, created_at, quantity, unit_price, batch_id, materials!stock_movements_material_id_fkey(name, unit)')
+        .select(
+          'id, created_at, quantity, unit_price, batch_id, materials!stock_movements_material_id_fkey(name, unit)',
+        )
         .eq('supplier_id', supplier.id)
         .eq('organization_id', activeOrg?.id)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }),
     ])
 
     setTransactions(trxData || [])
@@ -149,7 +160,7 @@ export default function Tedarikciler() {
     // Group stock movements by batch_id or date
     const movs = movData || []
     const groups: Record<string, GroupedReceipt> = {}
-    ;(movs as unknown as SupplierMovement[]).forEach(item => {
+    ;(movs as unknown as SupplierMovement[]).forEach((item) => {
       const dateStr = item.created_at.split('T')[0]
       const key = item.batch_id || dateStr
 
@@ -160,7 +171,7 @@ export default function Tedarikciler() {
           totalAmount: 0,
           totalItems: 0,
           documentUrl: undefined,
-          items: []
+          items: [],
         }
       }
       groups[key].items.push(item)
@@ -168,9 +179,7 @@ export default function Tedarikciler() {
       groups[key].totalItems += 1
     })
 
-    const sortedGroups = Object.values(groups).sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    )
+    const sortedGroups = Object.values(groups).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     setGroupedReceipts(sortedGroups)
   }
 
@@ -210,7 +219,7 @@ export default function Tedarikciler() {
         p_amount: amount,
         p_note: paymentNote || 'Manuel Ödeme',
         p_account_id: paymentAccountId || null,
-        p_organization_id: activeOrg?.id
+        p_organization_id: activeOrg?.id,
       })
       if (rpcError) throw rpcError
 
@@ -222,12 +231,10 @@ export default function Tedarikciler() {
       fetchSuppliers()
       viewTransactions({ ...selectedSupplier, total_debt: newDebt })
 
-      logActivity(
-        'Tedarikçi',
-        'EKLEME',
-        `${selectedSupplier.name} firmasına ${amount} TL ödeme eklendi.`,
-        { amount, note: paymentNote }
-      )
+      logActivity('Tedarikçi', 'EKLEME', `${selectedSupplier.name} firmasına ${amount} TL ödeme eklendi.`, {
+        amount,
+        note: paymentNote,
+      })
       await showAlert('Ödeme başarıyla kaydedildi!', 'success')
     } catch (error: unknown) {
       console.error('Ödeme ekleme hatası:', error)
@@ -248,12 +255,12 @@ export default function Tedarikciler() {
         .single()
       if (mov && mov.accounts) {
         const account = mov.accounts as unknown as AccountNameResult
-        accountName = Array.isArray(account) ? account[0]?.name ?? null : account.name
+        accountName = Array.isArray(account) ? (account[0]?.name ?? null) : account.name
       }
     }
 
     let confirmMessage = `Emin misiniz?\n\n${formatDate(new Date(trx.transaction_date))} tarihli ve ${formatCurrency(
-      trx.amount
+      trx.amount,
     )} tutarındaki bu `
     if (trx.transaction_type === 'invoice') {
       confirmMessage += `fatura işlemi silindiğinde:\n- ${selectedSupplier.name} bakiyesinden bu borç tutarı SİLİNECEK.`
@@ -278,7 +285,7 @@ export default function Tedarikciler() {
         const response = await fetch('/api/delete-receipt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ batch_id: trx.batch_id, organization_id: activeOrg?.id })
+          body: JSON.stringify({ batch_id: trx.batch_id, organization_id: activeOrg?.id }),
         })
 
         const data = await response.json()
@@ -288,7 +295,7 @@ export default function Tedarikciler() {
       } else {
         const { error: rpcError } = await supabase.rpc('delete_supplier_transaction', {
           p_transaction_id: trx.id,
-          p_organization_id: activeOrg?.id
+          p_organization_id: activeOrg?.id,
         })
         if (rpcError) throw rpcError
       }
@@ -307,7 +314,7 @@ export default function Tedarikciler() {
         'Tedarikçi',
         'SILME',
         `${selectedSupplier.name} firmasına ait ${trx.amount} TL tutarındaki cari işlem silindi.`,
-        { transaction: trx }
+        { transaction: trx },
       )
       await showAlert('İşlem silindi ve bakiye güncellendi!', 'success')
     } catch (error: unknown) {
@@ -325,16 +332,13 @@ export default function Tedarikciler() {
       phone: formData.get('phone') as string,
       iban: formData.get('iban') as string,
       address: formData.get('address') as string,
-      contact_info: formData.get('contact_info') as string
+      contact_info: formData.get('contact_info') as string,
     }
 
     const changes = []
-    if (selectedSupplier.name !== updates.name)
-      changes.push(`İsim: ${selectedSupplier.name} -> ${updates.name}`)
-    if (selectedSupplier.phone !== updates.phone)
-      changes.push(`Tel: ${selectedSupplier.phone} -> ${updates.phone}`)
-    if (selectedSupplier.iban !== updates.iban)
-      changes.push(`IBAN: ${selectedSupplier.iban} -> ${updates.iban}`)
+    if (selectedSupplier.name !== updates.name) changes.push(`İsim: ${selectedSupplier.name} -> ${updates.name}`)
+    if (selectedSupplier.phone !== updates.phone) changes.push(`Tel: ${selectedSupplier.phone} -> ${updates.phone}`)
+    if (selectedSupplier.iban !== updates.iban) changes.push(`IBAN: ${selectedSupplier.iban} -> ${updates.iban}`)
     if (selectedSupplier.address !== updates.address)
       changes.push(`Adres: ${selectedSupplier.address} -> ${updates.address}`)
     if (selectedSupplier.contact_info !== updates.contact_info)
@@ -347,12 +351,9 @@ export default function Tedarikciler() {
     if (error) {
       await showAlert('Güncellenirken hata oluştu.', 'error')
     } else {
-      logActivity(
-        'Tedarikçi',
-        'GUNCELLEME',
-        `${selectedSupplier.name} firmasının bilgileri güncellendi.`,
-        { detay: details }
-      )
+      logActivity('Tedarikçi', 'GUNCELLEME', `${selectedSupplier.name} firmasının bilgileri güncellendi.`, {
+        detay: details,
+      })
       await showAlert('Tedarikçi bilgileri başarıyla güncellendi!', 'success')
       fetchSuppliers()
       setSelectedSupplier({ ...selectedSupplier, ...updates } as Supplier)
@@ -368,7 +369,7 @@ export default function Tedarikciler() {
         name: newSupplier.name,
         contact_info: newSupplier.contact_info,
         total_debt: 0,
-        organization_id: activeOrg?.id
+        organization_id: activeOrg?.id,
       })
       .select()
       .single()
@@ -392,13 +393,13 @@ export default function Tedarikciler() {
   }, [suppliers])
 
   const activeDebtedSuppliersCount = useMemo(() => {
-    return suppliers.filter(s => parseFloat((s.total_debt || 0).toString()) > 0).length
+    return suppliers.filter((s) => parseFloat((s.total_debt || 0).toString()) > 0).length
   }, [suppliers])
 
   const filteredSuppliers = useMemo(() => {
     if (!supplierSearch.trim()) return suppliers
     const q = supplierSearch.toLowerCase()
-    return suppliers.filter(s => s.name.toLowerCase().includes(q) || (s.contact_info || '').toLowerCase().includes(q))
+    return suppliers.filter((s) => s.name.toLowerCase().includes(q) || (s.contact_info || '').toLowerCase().includes(q))
   }, [suppliers, supplierSearch])
 
   return (
@@ -464,7 +465,9 @@ export default function Tedarikciler() {
                 🔴
               </span>
             </div>
-            <div className={`text-xl sm:text-2xl font-black ${totalDebtSum > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+            <div
+              className={`text-xl sm:text-2xl font-black ${totalDebtSum > 0 ? 'text-rose-400' : 'text-emerald-400'}`}
+            >
               {formatCurrency(totalDebtSum)}
             </div>
             <div className="text-stone-400 text-[11px] mt-1">Tedarikçilere Olan Borç Tutarı</div>
@@ -477,9 +480,7 @@ export default function Tedarikciler() {
                 ⚠️
               </span>
             </div>
-            <div className="text-xl sm:text-2xl font-black text-amber-400">
-              {activeDebtedSuppliersCount} Firma
-            </div>
+            <div className="text-xl sm:text-2xl font-black text-amber-400">{activeDebtedSuppliersCount} Firma</div>
             <div className="text-stone-400 text-[11px] mt-1">Ödemesi Bekleyen Toptancılar</div>
           </div>
 
@@ -498,7 +499,10 @@ export default function Tedarikciler() {
         {/* ──────────────── DUAL PANEL CONTENT ──────────────── */}
         <div className="flex flex-col lg:flex-row gap-6">
           {/* SOL PANEL: Tedarikçi Listesi */}
-          <div id="tour-suppliers-list" className="w-full lg:w-96 bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl overflow-hidden shadow-xl flex flex-col h-auto lg:h-[calc(100vh-260px)]">
+          <div
+            id="tour-suppliers-list"
+            className="w-full lg:w-96 bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl overflow-hidden shadow-xl flex flex-col h-auto lg:h-[calc(100vh-260px)]"
+          >
             <div className="p-4 border-b border-stone-800/80 bg-stone-950/60 space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="font-extrabold text-stone-100 text-sm sm:text-base flex items-center gap-2">
@@ -516,7 +520,7 @@ export default function Tedarikciler() {
                 <input
                   type="text"
                   value={supplierSearch}
-                  onChange={e => setSupplierSearch(e.target.value)}
+                  onChange={(e) => setSupplierSearch(e.target.value)}
                   placeholder="Firma veya yetkili ara..."
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500/50"
                 />
@@ -531,11 +535,9 @@ export default function Tedarikciler() {
                   Tedarikçiler Yükleniyor...
                 </div>
               ) : filteredSuppliers.length === 0 ? (
-                <div className="p-8 text-center text-stone-500 text-xs">
-                  Aramanıza uygun tedarikçi bulunamadı.
-                </div>
+                <div className="p-8 text-center text-stone-500 text-xs">Aramanıza uygun tedarikçi bulunamadı.</div>
               ) : (
-                filteredSuppliers.map(sup => {
+                filteredSuppliers.map((sup) => {
                   const debt = parseFloat((sup.total_debt || 0).toString())
                   const isSelected = selectedSupplier?.id === sup.id
 
@@ -544,14 +546,14 @@ export default function Tedarikciler() {
                       key={sup.id}
                       onClick={() => viewTransactions(sup)}
                       className={`p-4 cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-amber-500/10 border-l-4 border-amber-500'
-                          : 'hover:bg-stone-800/30'
+                        isSelected ? 'bg-amber-500/10 border-l-4 border-amber-500' : 'hover:bg-stone-800/30'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <h4 className="font-extrabold text-stone-100 text-xs sm:text-sm">{sup.name}</h4>
-                        <span className={`font-black text-xs sm:text-sm ${debt > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                        <span
+                          className={`font-black text-xs sm:text-sm ${debt > 0 ? 'text-rose-400' : 'text-emerald-400'}`}
+                        >
                           {formatCurrency(debt)}
                         </span>
                       </div>
@@ -579,9 +581,7 @@ export default function Tedarikciler() {
                       </span>
                     )}
                   </div>
-                  <p className="text-stone-400 text-xs mt-1">
-                    Cari Hesap Hareketleri Dökümü & Alış Belgeleri
-                  </p>
+                  <p className="text-stone-400 text-xs mt-1">Cari Hesap Hareketleri Dökümü & Alış Belgeleri</p>
                 </div>
 
                 <div className="flex items-center justify-between sm:justify-end gap-4 bg-stone-900/90 p-3 rounded-2xl border border-stone-800">
@@ -668,7 +668,7 @@ export default function Tedarikciler() {
                             </td>
                           </tr>
                         ) : (
-                          transactions.map(trx => (
+                          transactions.map((trx) => (
                             <tr key={trx.id} className="hover:bg-stone-800/30 transition-colors">
                               <td className="px-4 py-3 text-stone-400 font-medium">
                                 {formatDate(new Date(trx.transaction_date))}
@@ -695,7 +695,7 @@ export default function Tedarikciler() {
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <button
-                                  onClick={e => {
+                                  onClick={(e) => {
                                     e.stopPropagation()
                                     handleDeleteTransaction(trx)
                                   }}
@@ -720,7 +720,7 @@ export default function Tedarikciler() {
                         Henüz bu tedarikçiden satın alınan ürün kaydı yok.
                       </div>
                     ) : (
-                      groupedReceipts.map(group => {
+                      groupedReceipts.map((group) => {
                         const isExpanded =
                           expandedBatch === group.batchId || (!group.batchId && expandedBatch === group.date)
                         const expandKey = group.batchId || group.date
@@ -763,7 +763,7 @@ export default function Tedarikciler() {
 
                                 {group.batchId && (
                                   <button
-                                    onClick={e => {
+                                    onClick={(e) => {
                                       e.stopPropagation()
                                       viewDocument(group.batchId)
                                     }}
@@ -788,7 +788,7 @@ export default function Tedarikciler() {
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-stone-800/50">
-                                    {group.items.map(item => {
+                                    {group.items.map((item) => {
                                       const total = (item.quantity || 0) * (item.unit_price || 0)
                                       return (
                                         <tr key={item.id} className="hover:bg-stone-800/30 transition-colors">
@@ -821,9 +821,7 @@ export default function Tedarikciler() {
                 {activeTab === 'bilgiler' && (
                   <form onSubmit={handleUpdateSupplier} className="space-y-4 max-w-xl">
                     <div>
-                      <label className="text-stone-300 text-xs font-semibold mb-1 block">
-                        Firma / Tedarikçi Adı *
-                      </label>
+                      <label className="text-stone-300 text-xs font-semibold mb-1 block">Firma / Tedarikçi Adı *</label>
                       <input
                         name="name"
                         defaultValue={selectedSupplier.name}
@@ -905,7 +903,7 @@ export default function Tedarikciler() {
         >
           <div
             className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden relative my-auto"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="px-6 py-4 bg-stone-950 border-b border-stone-800 flex items-center justify-between">
@@ -933,7 +931,7 @@ export default function Tedarikciler() {
                 <input
                   type="number"
                   value={paymentAmount}
-                  onChange={e => setPaymentAmount(e.target.value)}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
                   placeholder="Örn: 5000"
                   className="w-full bg-stone-950 border border-emerald-500/40 rounded-xl px-4 py-2.5 text-emerald-400 font-black text-xl focus:outline-none focus:border-emerald-500"
                   autoFocus
@@ -946,11 +944,11 @@ export default function Tedarikciler() {
                 </label>
                 <select
                   value={paymentAccountId}
-                  onChange={e => setPaymentAccountId(e.target.value)}
+                  onChange={(e) => setPaymentAccountId(e.target.value)}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
                 >
                   <option value="">-- Hesap Seçiniz (Opsiyonel) --</option>
-                  {accounts.map(acc => (
+                  {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
                       {acc.name} ({acc.type === 'cash' ? 'Nakit Kasa' : 'Banka Hesabı'})
                     </option>
@@ -963,7 +961,7 @@ export default function Tedarikciler() {
                 <input
                   type="text"
                   value={paymentNote}
-                  onChange={e => setPaymentNote(e.target.value)}
+                  onChange={(e) => setPaymentNote(e.target.value)}
                   placeholder="Örn: Banka havalesi ile ödendi"
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500"
                 />
@@ -998,7 +996,7 @@ export default function Tedarikciler() {
         >
           <div
             className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden relative my-auto"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="px-6 py-4 bg-stone-950 border-b border-stone-800 flex items-center justify-between">
@@ -1025,7 +1023,7 @@ export default function Tedarikciler() {
                 <label className="text-stone-300 text-xs font-semibold mb-1 block">Tedarikçi / Firma Adı *</label>
                 <input
                   value={newSupplier.name}
-                  onChange={e => setNewSupplier({ ...newSupplier, name: e.target.value })}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50"
                   placeholder="örn: Güven Gıda San. Tic. A.Ş."
                   autoFocus
@@ -1033,10 +1031,12 @@ export default function Tedarikciler() {
               </div>
 
               <div>
-                <label className="text-stone-300 text-xs font-semibold mb-1 block">Yetkili Kişi / İletişim Bilgisi</label>
+                <label className="text-stone-300 text-xs font-semibold mb-1 block">
+                  Yetkili Kişi / İletişim Bilgisi
+                </label>
                 <input
                   value={newSupplier.contact_info}
-                  onChange={e => setNewSupplier({ ...newSupplier, contact_info: e.target.value })}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, contact_info: e.target.value })}
                   className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50"
                   placeholder="örn: Ahmet Bey - 0532 XXX XX XX"
                 />

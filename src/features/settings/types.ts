@@ -63,9 +63,9 @@ export const DEFAULT_SETTINGS: Settings = {
     'Manav',
     'Şuruplar ve Soslar',
     'Temizlik',
-    'Diğer'
+    'Diğer',
   ],
-  inventory_count_day: '1'
+  inventory_count_day: '1',
 }
 
 export const SETTINGS_LABELS: Record<string, string> = {
@@ -88,5 +88,5 @@ export const SETTINGS_LABELS: Record<string, string> = {
   notify_low_margin: 'Düşük Kâr Marjı Uyarısı',
   notify_daily_revenue: 'Günlük Ciro Hedefi Bildirimi',
   notify_supplier_price: 'Tedarikçi Fiyat Değişimi',
-  inventory_count_day: 'Aylık Sabit Sayım Günü'
+  inventory_count_day: 'Aylık Sabit Sayım Günü',
 }

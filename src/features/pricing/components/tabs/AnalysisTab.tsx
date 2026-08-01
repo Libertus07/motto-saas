@@ -27,7 +27,7 @@ export function AnalysisTab({ calculations }: AnalysisTabProps) {
     let artirilmali = 0
     let indirim = 0
 
-    calculations.forEach(c => {
+    calculations.forEach((c) => {
       const diff = getPriceDiff(c.product.sale_price || 0, c.suggestedPrice)
       if (diff === null) ideal++
       else if (diff < 0) artirilmali++
@@ -42,22 +42,22 @@ export function AnalysisTab({ calculations }: AnalysisTabProps) {
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(
-        c => c.product.name.toLowerCase().includes(q) || (c.product.category || '').toLowerCase().includes(q)
+        (c) => c.product.name.toLowerCase().includes(q) || (c.product.category || '').toLowerCase().includes(q),
       )
     }
 
     if (analysisFilter === 'artirilmali') {
-      list = list.filter(c => {
+      list = list.filter((c) => {
         const diff = getPriceDiff(c.product.sale_price || 0, c.suggestedPrice)
         return diff !== null && diff < 0
       })
     } else if (analysisFilter === 'ideal') {
-      list = list.filter(c => {
+      list = list.filter((c) => {
         const diff = getPriceDiff(c.product.sale_price || 0, c.suggestedPrice)
         return diff === null
       })
     } else if (analysisFilter === 'indirim') {
-      list = list.filter(c => {
+      list = list.filter((c) => {
         const diff = getPriceDiff(c.product.sale_price || 0, c.suggestedPrice)
         return diff !== null && diff > 0
       })
@@ -126,7 +126,7 @@ export function AnalysisTab({ calculations }: AnalysisTabProps) {
           <Input
             type="text"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Fiyat analizinde ürün ara..."
             className="pl-9"
           />
@@ -193,9 +193,7 @@ export function AnalysisTab({ calculations }: AnalysisTabProps) {
                       <td className="px-5 py-3.5 font-bold text-stone-100">{product.name}</td>
                       <td className="px-4 py-3.5 text-right text-stone-400">₺{rawCost.toFixed(2)}</td>
                       <td className="px-4 py-3.5 text-right text-stone-400">₺{expenseShare.toFixed(2)}</td>
-                      <td className="px-4 py-3.5 text-right font-semibold text-stone-200">
-                        ₺{totalCost.toFixed(2)}
-                      </td>
+                      <td className="px-4 py-3.5 text-right font-semibold text-stone-200">₺{totalCost.toFixed(2)}</td>
                       <td className="px-4 py-3.5 text-right font-bold text-white">
                         ₺{(product.sale_price || 0).toFixed(2)}
                       </td>

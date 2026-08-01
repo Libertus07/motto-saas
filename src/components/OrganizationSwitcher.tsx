@@ -13,9 +13,7 @@ export function OrganizationSwitcher() {
   }
 
   if (loading) {
-    return (
-      <div className="h-7 w-32 bg-stone-800/60 rounded-xl animate-pulse border border-stone-800" />
-    )
+    return <div className="h-7 w-32 bg-stone-800/60 rounded-xl animate-pulse border border-stone-800" />
   }
 
   return (
@@ -29,7 +27,9 @@ export function OrganizationSwitcher() {
       >
         <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
         <span className="truncate max-w-[120px] sm:max-w-[160px]">{activeOrg?.name || 'Şube Seç'}</span>
-        <span className="text-[10px] text-stone-500" aria-hidden="true">{isOpen ? '▲' : '▼'}</span>
+        <span className="text-[10px] text-stone-500" aria-hidden="true">
+          {isOpen ? '▲' : '▼'}
+        </span>
       </button>
 
       {isOpen && (
@@ -41,7 +41,7 @@ export function OrganizationSwitcher() {
           <div className="px-3 py-2 text-[10px] font-black uppercase text-stone-500 tracking-wider border-b border-stone-800/80 mb-1">
             Şubelerim & Organizasyonlar
           </div>
-          {organizations.map(org => (
+          {organizations.map((org) => (
             <button
               key={org.id}
               onClick={() => handleSelectOrg(org)}

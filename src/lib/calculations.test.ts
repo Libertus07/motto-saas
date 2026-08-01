@@ -5,7 +5,7 @@ import {
   calculateFoodCostRatio,
   calculateBreakEvenQuantity,
   calculateRevenueWeightedExpenseShare,
-  calculateBcgCategory
+  calculateBcgCategory,
 } from './calculations'
 
 describe('Kritik Finansal Hesaplama Testleri', () => {

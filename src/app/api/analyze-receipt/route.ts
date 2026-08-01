@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { requireUser } from '@/lib/supabase-server';
-import { devError } from '@/lib/debug';
-import { isSafeImageUrl } from '@/lib/ai-security';
-import { z } from 'zod';
+import { NextResponse } from 'next/server'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { requireUser } from '@/lib/supabase-server'
+import { devError } from '@/lib/debug'
+import { isSafeImageUrl } from '@/lib/ai-security'
+import { z } from 'zod'
 
 const ReceiptItemSchema = z.object({
   name: z.string(),
@@ -12,8 +12,8 @@ const ReceiptItemSchema = z.object({
   unit: z.string().optional().nullable(),
   boxMultiplier: z.union([z.number(), z.string()]).optional().nullable(),
   totalPrice: z.number().optional().nullable(),
-  unitPrice: z.number().optional().nullable()
-});
+  unitPrice: z.number().optional().nullable(),
+})
 
 const ReceiptSchema = z.object({
   supplier_name: z.string().optional().nullable(),
@@ -23,67 +23,70 @@ const ReceiptSchema = z.object({
   supplier_stated_debt: z.number().optional().nullable(),
   invoice_date: z.string().optional().nullable(),
   total_amount: z.number().optional().nullable(),
-  items: z.array(ReceiptItemSchema).default([])
-});
+  items: z.array(ReceiptItemSchema).default([]),
+})
 
 export async function POST(req: Request) {
-    try {
-        const { user, supabase } = await requireUser();
-        if (!user) {
-            return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 });
+  try {
+    const { user, supabase } = await requireUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 })
+    }
+
+    // AI Kota Kontrolü (SEC-104)
+    const { data: allowed } = await supabase.rpc('check_ai_quota')
+    if (!allowed) {
+      return NextResponse.json({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }, { status: 429 })
+    }
+
+    const { image, fileText, fileType } = await req.json()
+
+    if (!image && !fileText) {
+      return NextResponse.json({ error: 'Dosya verisi eksik.' }, { status: 400 })
+    }
+
+    let mimeType = ''
+    let base64Data = ''
+
+    if (image) {
+      if (image.startsWith('http://') || image.startsWith('https://')) {
+        if (!isSafeImageUrl(image)) {
+          return NextResponse.json({ error: 'İzin verilmeyen veya güvensiz URL.' }, { status: 400 })
         }
-
-        // AI Kota Kontrolü (SEC-104)
-        const { data: allowed } = await supabase.rpc('check_ai_quota');
-        if (!allowed) {
-            return NextResponse.json({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }, { status: 429 });
+        const fetchRes = await fetch(image)
+        if (!fetchRes.ok) {
+          return NextResponse.json({ error: 'URL den dosya indirilemedi.' }, { status: 400 })
         }
-
-        const { image, fileText, fileType } = await req.json();
-
-        if (!image && !fileText) {
-            return NextResponse.json({ error: 'Dosya verisi eksik.' }, { status: 400 });
+        mimeType = fetchRes.headers.get('content-type') || 'image/jpeg'
+        const arrayBuffer = await fetchRes.arrayBuffer()
+        base64Data = Buffer.from(arrayBuffer).toString('base64')
+      } else {
+        // data:image/jpeg;base64,... veya data:application/pdf;base64,...
+        const match = image.match(/^data:([a-zA-Z0-9-]+\/[a-zA-Z0-9-+.]+);base64,(.+)$/)
+        if (!match) {
+          return NextResponse.json({ error: 'Geçersiz dosya formatı.' }, { status: 400 })
         }
+        mimeType = match[1]
+        base64Data = match[2]
+      }
+    }
 
-        let mimeType = '';
-        let base64Data = '';
+    // API Key kontrolü
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'GEMINI_API_KEY bulunamadı. Lütfen .env.local dosyasına ekleyin.' },
+        { status: 400 },
+      )
+    }
 
-        if (image) {
-            if (image.startsWith('http://') || image.startsWith('https://')) {
-                if (!isSafeImageUrl(image)) {
-                    return NextResponse.json({ error: 'İzin verilmeyen veya güvensiz URL.' }, { status: 400 });
-                }
-                const fetchRes = await fetch(image);
-                if (!fetchRes.ok) {
-                    return NextResponse.json({ error: 'URL den dosya indirilemedi.' }, { status: 400 });
-                }
-                mimeType = fetchRes.headers.get('content-type') || 'image/jpeg';
-                const arrayBuffer = await fetchRes.arrayBuffer();
-                base64Data = Buffer.from(arrayBuffer).toString('base64');
-            } else {
-                // data:image/jpeg;base64,... veya data:application/pdf;base64,...
-                const match = image.match(/^data:([a-zA-Z0-9-]+\/[a-zA-Z0-9-+.]+);base64,(.+)$/);
-                if (!match) {
-                    return NextResponse.json({ error: 'Geçersiz dosya formatı.' }, { status: 400 });
-                }
-                mimeType = match[1];
-                base64Data = match[2];
-            }
-        }
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: { responseMimeType: 'application/json' },
+    })
 
-        // API Key kontrolü
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            return NextResponse.json({ error: 'GEMINI_API_KEY bulunamadı. Lütfen .env.local dosyasına ekleyin.' }, { status: 400 });
-        }
-
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
-            generationConfig: { responseMimeType: "application/json" }
-        });
-
-        const prompt = `Lütfen bu belgeyi (fiş, fatura, e-fatura XML veya fiyat listesi JSON) analiz et ve içerisindeki ürün kalemlerini DİKKATLİCE çıkar.
+    const prompt = `Lütfen bu belgeyi (fiş, fatura, e-fatura XML veya fiyat listesi JSON) analiz et ve içerisindeki ürün kalemlerini DİKKATLİCE çıkar.
 
 ÖNEMLİ KURAL 1 (TİTİZLİK VE EKSİKSİZLİK): Belgedeki ürün kalemlerini satır satır son derece titiz bir şekilde analiz et. HİÇBİR gerçek ürünü atlama (eksik ürün bırakma) ve belgede YER ALMAYAN hiçbir ürünü uydurma (fazla ürün ekleme).
 ÖNEMLİ KURAL 2 (İSTENMEYEN KALEMLER): KDV, Ara Toplam, Genel Toplam, İndirim, Yuvarlama, Nakit, Kredi Kartı, Para Üstü, Tutar, Matrah gibi toplam ve ödeme satırlarını KESİNLİKLE ürün (items) olarak EKLEME. Yalnızca fiziksel mal/hizmet kalemlerini ekle.
@@ -115,58 +118,63 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown veya 
       "unitPrice": 0
     }
   ]
-}`;
+}`
 
-        const contentParts: Array<string | { inlineData: { data: string; mimeType: string } }> = [prompt];
+    const contentParts: Array<string | { inlineData: { data: string; mimeType: string } }> = [prompt]
 
-        if (image) {
-            contentParts.push({
-                inlineData: {
-                    data: base64Data,
-                    mimeType: mimeType
-                }
-            });
-        } else if (fileText) {
-            contentParts.push(`\n\n--- DOSYA İÇERİĞİ (${fileType}) ---\n${fileText}`);
-        }
-
-        const result = await model.generateContent(contentParts);
-        const responseText = result.response.text();
-        
-        // Yanıtın başındaki/sonundaki olası markdown bloklarını temizle
-        let jsonStr = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-
-        // JSON formatındaki yaygın hataları (örn: sondaki virgüller) düzeltmek için
-        jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1');
-
-        // Sadece JSON kısmını ayıklama (bazen JSON öncesi/sonrası açıklamalar olabilir)
-        const firstBrace = jsonStr.indexOf('{');
-        const lastBrace = jsonStr.lastIndexOf('}');
-        const firstBracket = jsonStr.indexOf('[');
-        const lastBracket = jsonStr.lastIndexOf(']');
-        
-        const firstObj = firstBrace !== -1 ? firstBrace : Infinity;
-        const firstArr = firstBracket !== -1 ? firstBracket : Infinity;
-        const lastObj = lastBrace !== -1 ? lastBrace : -1;
-        const lastArr = lastBracket !== -1 ? lastBracket : -1;
-
-        if (firstObj < firstArr && lastObj > lastArr) {
-             jsonStr = jsonStr.substring(firstObj, lastObj + 1);
-        } else if (firstArr < firstObj && lastArr > lastObj) {
-             jsonStr = jsonStr.substring(firstArr, lastArr + 1);
-        }
-
-        const parsed = JSON.parse(jsonStr);
-        const validated = ReceiptSchema.parse(parsed);
-
-        return NextResponse.json(validated);
-
-    } catch (error: unknown) {
-        devError('Receipt parsing error:', error);
-        if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: 'Yapay zeka fişi okudu ancak veri formatı hatalı (' + error.issues[0]?.message + ')' }, { status: 500 });
-        }
-        const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
-        return NextResponse.json({ error: 'Yapay zeka fişi okurken bir hata oluştu: ' + message }, { status: 500 });
+    if (image) {
+      contentParts.push({
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType,
+        },
+      })
+    } else if (fileText) {
+      contentParts.push(`\n\n--- DOSYA İÇERİĞİ (${fileType}) ---\n${fileText}`)
     }
+
+    const result = await model.generateContent(contentParts)
+    const responseText = result.response.text()
+
+    // Yanıtın başındaki/sonundaki olası markdown bloklarını temizle
+    let jsonStr = responseText
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim()
+
+    // JSON formatındaki yaygın hataları (örn: sondaki virgüller) düzeltmek için
+    jsonStr = jsonStr.replace(/,\s*([\]}])/g, '$1')
+
+    // Sadece JSON kısmını ayıklama (bazen JSON öncesi/sonrası açıklamalar olabilir)
+    const firstBrace = jsonStr.indexOf('{')
+    const lastBrace = jsonStr.lastIndexOf('}')
+    const firstBracket = jsonStr.indexOf('[')
+    const lastBracket = jsonStr.lastIndexOf(']')
+
+    const firstObj = firstBrace !== -1 ? firstBrace : Infinity
+    const firstArr = firstBracket !== -1 ? firstBracket : Infinity
+    const lastObj = lastBrace !== -1 ? lastBrace : -1
+    const lastArr = lastBracket !== -1 ? lastBracket : -1
+
+    if (firstObj < firstArr && lastObj > lastArr) {
+      jsonStr = jsonStr.substring(firstObj, lastObj + 1)
+    } else if (firstArr < firstObj && lastArr > lastObj) {
+      jsonStr = jsonStr.substring(firstArr, lastArr + 1)
+    }
+
+    const parsed = JSON.parse(jsonStr)
+    const validated = ReceiptSchema.parse(parsed)
+
+    return NextResponse.json(validated)
+  } catch (error: unknown) {
+    devError('Receipt parsing error:', error)
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Yapay zeka fişi okudu ancak veri formatı hatalı (' + error.issues[0]?.message + ')' },
+        { status: 500 },
+      )
+    }
+    const message = error instanceof Error ? error.message : 'Bilinmeyen hata'
+    return NextResponse.json({ error: 'Yapay zeka fişi okurken bir hata oluştu: ' + message }, { status: 500 })
+  }
 }

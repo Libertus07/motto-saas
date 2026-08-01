@@ -13,7 +13,7 @@ describe.skip('Row Level Security (RLS) Multi-Tenant Tests', () => {
 
   // Service client (bypasses RLS) to setup/teardown data
   const _adminClient = createClient(supabaseUrl, serviceRoleKey)
-  
+
   const orgA_Id: string | undefined = undefined
   const orgB_Id: string | undefined = undefined
   const userA_Token: string | undefined = undefined
@@ -34,7 +34,7 @@ describe.skip('Row Level Security (RLS) Multi-Tenant Tests', () => {
     // orgA_Id = orgA.id
     // orgB_Id = orgB.id
     // Create users & get tokens for User A and User B...
-    
+
     // Create a dummy record belonging to Org A
     // const { data: record } = await adminClient.from('inventory').insert({ name: 'Test Item A', organization_id: orgA_Id }).select().single()
     // const testRecordId = record.id
@@ -50,11 +50,11 @@ describe.skip('Row Level Security (RLS) Multi-Tenant Tests', () => {
     if (!userA_Token || !orgA_Id) return // Skip if no auth
 
     const userAClient = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: `Bearer ${userA_Token}` } }
+      global: { headers: { Authorization: `Bearer ${userA_Token}` } },
     })
 
     const { data, error } = await userAClient.from('inventory').select('*').eq('organization_id', orgA_Id)
-    
+
     expect(error).toBeNull()
     expect(data).toBeDefined()
     // expect(data?.length).toBeGreaterThan(0)
@@ -64,12 +64,12 @@ describe.skip('Row Level Security (RLS) Multi-Tenant Tests', () => {
     if (!userB_Token || !orgA_Id) return // Skip if no auth
 
     const userBClient = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: `Bearer ${userB_Token}` } }
+      global: { headers: { Authorization: `Bearer ${userB_Token}` } },
     })
 
     // User B tries to fetch Org A's data
     const { data, error } = await userBClient.from('inventory').select('*').eq('organization_id', orgA_Id)
-    
+
     // Depending on RLS, it might return empty array (silent rejection) or an error
     expect(error).toBeNull()
     expect(data?.length).toBe(0) // Should not see the data
@@ -79,7 +79,7 @@ describe.skip('Row Level Security (RLS) Multi-Tenant Tests', () => {
     if (!userA_Token || !orgB_Id) return
 
     const userAClient = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: `Bearer ${userA_Token}` } }
+      global: { headers: { Authorization: `Bearer ${userA_Token}` } },
     })
 
     const { data, error } = await userAClient
@@ -87,7 +87,7 @@ describe.skip('Row Level Security (RLS) Multi-Tenant Tests', () => {
       .update({ name: 'Hacked by A' })
       .eq('organization_id', orgB_Id)
       .select('id')
-      
+
     // Should fail or update 0 rows
     expect(error).toBeNull()
     expect(data?.length || 0).toBe(0)

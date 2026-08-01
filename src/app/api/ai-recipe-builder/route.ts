@@ -1,69 +1,86 @@
-import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { requireUser } from '@/lib/supabase-server';
-import { devError } from '@/lib/debug';
-import { z } from 'zod';
+import { NextResponse } from 'next/server'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { requireUser } from '@/lib/supabase-server'
+import { devError } from '@/lib/debug'
+import { z } from 'zod'
 
 const RecipeIngredientSchema = z.object({
   id: z.string().optional().nullable(),
   type: z.string().optional().nullable(),
   name: z.string().optional().nullable(),
-  quantity: z.number().optional().nullable()
-});
+  quantity: z.number().optional().nullable(),
+})
 
 const RecipeBuilderSchema = z.object({
-  ingredients: z.array(RecipeIngredientSchema).default([])
-});
+  ingredients: z.array(RecipeIngredientSchema).default([]),
+})
 
 const RecipeRequestSchema = z.object({
   productName: z.string().trim().min(1),
-  materials: z.array(z.object({ id: z.string(), name: z.string(), unit: z.string(), price_per_unit: z.number() })).optional(),
-  subRecipes: z.array(z.object({ id: z.string(), name: z.string(), total_cost: z.number(), yield_quantity: z.number().nullable().optional() })).optional()
-});
+  materials: z
+    .array(z.object({ id: z.string(), name: z.string(), unit: z.string(), price_per_unit: z.number() }))
+    .optional(),
+  subRecipes: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        total_cost: z.number(),
+        yield_quantity: z.number().nullable().optional(),
+      }),
+    )
+    .optional(),
+})
 
 export async function POST(req: Request) {
-    try {
-        const { user, supabase } = await requireUser();
-        if (!user) {
-            return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 });
-        }
+  try {
+    const { user, supabase } = await requireUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Yetkisiz erişim' }, { status: 401 })
+    }
 
-        // AI Kota Kontrolü (SEC-104)
-        const { data: allowed } = await supabase.rpc('check_ai_quota');
-        if (!allowed) {
-            return NextResponse.json({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }, { status: 429 });
-        }
+    // AI Kota Kontrolü (SEC-104)
+    const { data: allowed } = await supabase.rpc('check_ai_quota')
+    if (!allowed) {
+      return NextResponse.json({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }, { status: 429 })
+    }
 
-        const requestResult = RecipeRequestSchema.safeParse(await req.json());
-        if (!requestResult.success) {
-            return NextResponse.json({ error: 'Geçerli bir ürün adı gerekli.' }, { status: 400 });
-        }
-        const { productName, materials, subRecipes } = requestResult.data;
+    const requestResult = RecipeRequestSchema.safeParse(await req.json())
+    if (!requestResult.success) {
+      return NextResponse.json({ error: 'Geçerli bir ürün adı gerekli.' }, { status: 400 })
+    }
+    const { productName, materials, subRecipes } = requestResult.data
 
-        if (!productName) {
-            return NextResponse.json({ error: 'Ürün adı gerekli.' }, { status: 400 });
-        }
+    if (!productName) {
+      return NextResponse.json({ error: 'Ürün adı gerekli.' }, { status: 400 })
+    }
 
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            return NextResponse.json({ error: 'GEMINI_API_KEY bulunamadı.' }, { status: 400 });
-        }
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ error: 'GEMINI_API_KEY bulunamadı.' }, { status: 400 })
+    }
 
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
-            generationConfig: { responseMimeType: "application/json" }
-        });
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: { responseMimeType: 'application/json' },
+    })
 
-        const materialsContext = materials?.map(m => `- ${m.id} | ${m.name} | ${m.unit} | ₺${m.price_per_unit}`).join('\n') || 'Yok';
-        const subRecipesContext = subRecipes?.map(s => `- ${s.id} | ${s.name} | Porsiyon Maliyeti: ₺${(s.total_cost / (s.yield_quantity || 1)).toFixed(2)}`).join('\n') || 'Yok';
+    const materialsContext =
+      materials?.map((m) => `- ${m.id} | ${m.name} | ${m.unit} | ₺${m.price_per_unit}`).join('\n') || 'Yok'
+    const subRecipesContext =
+      subRecipes
+        ?.map(
+          (s) => `- ${s.id} | ${s.name} | Porsiyon Maliyeti: ₺${(s.total_cost / (s.yield_quantity || 1)).toFixed(2)}`,
+        )
+        .join('\n') || 'Yok'
 
-        const { data: settings } = await supabase.from('settings').select('*');
-        const takeawayRatioSetting = settings?.find(s => s.key === 'takeaway_ratio')?.value || '60';
-        const takeawayRatioPercent = Number(takeawayRatioSetting);
-        const takeawayRatioDecimal = takeawayRatioPercent / 100;
+    const { data: settings } = await supabase.from('settings').select('*')
+    const takeawayRatioSetting = settings?.find((s) => s.key === 'takeaway_ratio')?.value || '60'
+    const takeawayRatioPercent = Number(takeawayRatioSetting)
+    const takeawayRatioDecimal = takeawayRatioPercent / 100
 
-        const prompt = `Sen profesyonel bir restoran/kafe reçete (BOM - Bill of Materials) uzmanısın.
+    const prompt = `Sen profesyonel bir restoran/kafe reçete (BOM - Bill of Materials) uzmanısın.
 Kullanıcının verdiği ürün ismine göre standart bir reçete oluşturman gerekiyor.
 
 Kullanıcının sistemindeki mevcut hammaddeler:
@@ -88,23 +105,28 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra markdown (\`\`\`json v
       "quantity": miktar_sayi_olarak_noktali_virgül_yok
     }
   ]
-}`;
+}`
 
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
-        
-        const jsonStr = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(jsonStr);
-        const validated = RecipeBuilderSchema.parse(parsed);
+    const result = await model.generateContent(prompt)
+    const responseText = result.response.text()
 
-        return NextResponse.json(validated);
+    const jsonStr = responseText
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim()
+    const parsed = JSON.parse(jsonStr)
+    const validated = RecipeBuilderSchema.parse(parsed)
 
-    } catch (error: unknown) {
-        devError('AI Recipe Builder error:', error);
-        if (error instanceof z.ZodError) {
-            return NextResponse.json({ error: 'Yapay zeka reçete oluştururken veri formatı hatalı oldu (' + error.issues[0]?.message + ')' }, { status: 500 });
-        }
-        const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
-        return NextResponse.json({ error: 'Yapay zeka reçete oluştururken bir hata oluştu: ' + message }, { status: 500 });
+    return NextResponse.json(validated)
+  } catch (error: unknown) {
+    devError('AI Recipe Builder error:', error)
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Yapay zeka reçete oluştururken veri formatı hatalı oldu (' + error.issues[0]?.message + ')' },
+        { status: 500 },
+      )
     }
+    const message = error instanceof Error ? error.message : 'Bilinmeyen hata'
+    return NextResponse.json({ error: 'Yapay zeka reçete oluştururken bir hata oluştu: ' + message }, { status: 500 })
+  }
 }

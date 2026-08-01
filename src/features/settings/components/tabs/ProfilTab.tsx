@@ -45,7 +45,7 @@ export function ProfilTab() {
     } else {
       setEmailMsg({
         text: 'Mevcut ve yeni e-posta adreslerinize birer doğrulama kodu gönderildi.',
-        type: 'success'
+        type: 'success',
       })
       setShowOtpInput(true)
     }
@@ -64,7 +64,7 @@ export function ProfilTab() {
     const { error: errOld } = await supabase.auth.verifyOtp({
       email: currentEmail,
       token: oldEmailOtp,
-      type: 'email_change'
+      type: 'email_change',
     })
 
     if (errOld) {
@@ -76,7 +76,7 @@ export function ProfilTab() {
     const { error: errNew } = await supabase.auth.verifyOtp({
       email,
       token: newEmailOtp,
-      type: 'email_change'
+      type: 'email_change',
     })
 
     if (errNew) {
@@ -91,7 +91,7 @@ export function ProfilTab() {
     setOldEmailOtp('')
     setNewEmailOtp('')
     await logActivity('Ayarlar', 'GUNCELLEME', 'Kullanıcı e-posta adresi güncellendi.', {
-      detay: `Yeni Email: ${email}`
+      detay: `Yeni Email: ${email}`,
     })
     setEmailSaving(false)
   }
@@ -114,7 +114,7 @@ export function ProfilTab() {
     'text-orange-400',
     'text-amber-400',
     'text-emerald-400',
-    'text-emerald-400'
+    'text-emerald-400',
   ]
   const strengthLabels = ['Çok Zayıf', 'Zayıf', 'Orta', 'Güçlü', 'Çok Güçlü']
 
@@ -149,7 +149,7 @@ export function ProfilTab() {
     const { error: otpError } = await supabase.auth.verifyOtp({
       email: currentEmail,
       token: pwdOtp,
-      type: 'recovery'
+      type: 'recovery',
     })
 
     if (otpError) {
@@ -168,7 +168,7 @@ export function ProfilTab() {
       setPwdOtp('')
       setShowPwdOtpInput(false)
       await logActivity('Ayarlar', 'GUNCELLEME', 'Kullanıcı şifresi doğrulama kodu ile güncellendi.', {
-        detay: 'Şifre değiştirildi.'
+        detay: 'Şifre değiştirildi.',
       })
     }
     setPwdSaving(false)
@@ -184,7 +184,7 @@ export function ProfilTab() {
             </div>
           </FormRow>
           <FormRow label="Yeni E-posta Adresi">
-            <Input value={email} onChange={e => setEmail(e.target.value)} type="email" autoComplete="off" />
+            <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="off" />
           </FormRow>
 
           <div className="md:col-span-2 mt-2">
@@ -212,10 +212,20 @@ export function ProfilTab() {
             <>
               <div className="md:col-span-2 border-t border-stone-800/80 pt-2 mt-1" />
               <FormRow label="Eski E-posta Onay Kodu" hint="Mevcut adresinize gönderilen kod">
-                <Input value={oldEmailOtp} onChange={e => setOldEmailOtp(e.target.value)} type="text" placeholder="123456" />
+                <Input
+                  value={oldEmailOtp}
+                  onChange={(e) => setOldEmailOtp(e.target.value)}
+                  type="text"
+                  placeholder="123456"
+                />
               </FormRow>
               <FormRow label="Yeni E-posta Onay Kodu" hint="Yeni adresinize gönderilen kod">
-                <Input value={newEmailOtp} onChange={e => setNewEmailOtp(e.target.value)} type="text" placeholder="123456" />
+                <Input
+                  value={newEmailOtp}
+                  onChange={(e) => setNewEmailOtp(e.target.value)}
+                  type="text"
+                  placeholder="123456"
+                />
               </FormRow>
 
               <div className="md:col-span-2 mt-2">
@@ -247,16 +257,11 @@ export function ProfilTab() {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormRow label="Yeni Şifre">
-            <PasswordInput
-              value={password}
-              onChange={setPassword}
-              placeholder="••••••••"
-              autoComplete="new-password"
-            />
+            <PasswordInput value={password} onChange={setPassword} placeholder="••••••••" autoComplete="new-password" />
             {password.length > 0 && (
               <div className="mt-2 animate-fadeIn space-y-1">
                 <div className="flex gap-1">
-                  {[0, 1, 2, 3].map(idx => (
+                  {[0, 1, 2, 3].map((idx) => (
                     <div
                       key={idx}
                       className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
@@ -281,13 +286,9 @@ export function ProfilTab() {
             {passwordConfirm.length > 0 && (
               <div className="mt-2 text-xs font-semibold flex items-center gap-1 animate-fadeIn">
                 {password === passwordConfirm ? (
-                  <span className="text-emerald-400 flex items-center gap-1 font-bold">
-                    ✓ Şifreler eşleşiyor
-                  </span>
+                  <span className="text-emerald-400 flex items-center gap-1 font-bold">✓ Şifreler eşleşiyor</span>
                 ) : (
-                  <span className="text-rose-400 flex items-center gap-1 font-bold">
-                    ✕ Şifreler eşleşmiyor
-                  </span>
+                  <span className="text-rose-400 flex items-center gap-1 font-bold">✕ Şifreler eşleşmiyor</span>
                 )}
               </div>
             )}
@@ -318,7 +319,7 @@ export function ProfilTab() {
             <>
               <div className="md:col-span-2 border-t border-stone-800/80 pt-2 mt-1" />
               <FormRow label="Şifre Değiştirme Onay Kodu" hint="E-posta adresinize gönderilen 6 haneli kod">
-                <Input value={pwdOtp} onChange={e => setPwdOtp(e.target.value)} type="text" placeholder="123456" />
+                <Input value={pwdOtp} onChange={(e) => setPwdOtp(e.target.value)} type="text" placeholder="123456" />
               </FormRow>
 
               <div className="md:col-span-2 mt-2">

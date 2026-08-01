@@ -1,12 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import {
-  preprocessReceiptImage,
-  mergeImagesVertically,
-  PreprocessResult,
-  FilterPreset
-} from '@/lib/imagePreprocess'
+import { preprocessReceiptImage, mergeImagesVertically, PreprocessResult, FilterPreset } from '@/lib/imagePreprocess'
 import Image from 'next/image'
 
 interface ImagePreprocessModalProps {
@@ -28,12 +23,7 @@ interface PerFileState {
   loading: boolean
 }
 
-export function ImagePreprocessModal({
-  isOpen,
-  files,
-  onClose,
-  onConfirm
-}: ImagePreprocessModalProps) {
+export function ImagePreprocessModal({ isOpen, files, onClose, onConfirm }: ImagePreprocessModalProps) {
   const [fileStates, setFileStates] = useState<PerFileState[]>([])
   const [activeIndex, setActiveIndex] = useState<number>(0)
   const [showOriginal, setShowOriginal] = useState(false)
@@ -59,64 +49,75 @@ export function ImagePreprocessModal({
     return Array.isArray(files) ? files : [files]
   }, [files])
 
-  const processFileAtIndex = useCallback(async (
-    idx: number,
-    targetFile: File,
-    rot: number,
-    crop: boolean,
-    prst: FilterPreset,
-    bright: number,
-    cntrst: number,
-    currentStates?: PerFileState[]
-  ) => {
-    setFileStates(prev => {
-      const list = [...(currentStates || prev)]
-      if (list[idx]) {
-        list[idx] = { ...list[idx], loading: true, rotation: rot, doCrop: crop, preset: prst, brightness: bright, contrast: cntrst }
-      }
-      return list
-    })
-
-    try {
-      const res = await preprocessReceiptImage(targetFile, {
-        rotationAngle: rot,
-        doCrop: crop,
-        preset: prst,
-        brightness: bright,
-        contrast: cntrst
-      })
-
-      setFileStates(prev => {
-        const list = [...prev]
+  const processFileAtIndex = useCallback(
+    async (
+      idx: number,
+      targetFile: File,
+      rot: number,
+      crop: boolean,
+      prst: FilterPreset,
+      bright: number,
+      cntrst: number,
+      currentStates?: PerFileState[],
+    ) => {
+      setFileStates((prev) => {
+        const list = [...(currentStates || prev)]
         if (list[idx]) {
-          list[idx] = { ...list[idx], result: res, loading: false }
+          list[idx] = {
+            ...list[idx],
+            loading: true,
+            rotation: rot,
+            doCrop: crop,
+            preset: prst,
+            brightness: bright,
+            contrast: cntrst,
+          }
         }
         return list
       })
-    } catch (err) {
-      console.error('Preprocessing failed for file index', idx, err)
-      const reader = new FileReader()
-      reader.onload = () => {
-        const dataUrl = reader.result as string
-        const fallbackRes: PreprocessResult = {
-          dataUrl,
-          sizeBytes: targetFile.size,
-          width: 0,
-          height: 0,
-          readinessScore: 75,
-          readinessLabel: '🟡 Orijinal Görsel Okunuyor'
-        }
-        setFileStates(prev => {
+
+      try {
+        const res = await preprocessReceiptImage(targetFile, {
+          rotationAngle: rot,
+          doCrop: crop,
+          preset: prst,
+          brightness: bright,
+          contrast: cntrst,
+        })
+
+        setFileStates((prev) => {
           const list = [...prev]
           if (list[idx]) {
-            list[idx] = { ...list[idx], result: fallbackRes, loading: false }
+            list[idx] = { ...list[idx], result: res, loading: false }
           }
           return list
         })
+      } catch (err) {
+        console.error('Preprocessing failed for file index', idx, err)
+        const reader = new FileReader()
+        reader.onload = () => {
+          const dataUrl = reader.result as string
+          const fallbackRes: PreprocessResult = {
+            dataUrl,
+            sizeBytes: targetFile.size,
+            width: 0,
+            height: 0,
+            readinessScore: 75,
+            readinessLabel: '🟡 Orijinal Görsel Okunuyor',
+          }
+          setFileStates((prev) => {
+            const list = [...prev]
+            if (list[idx]) {
+              list[idx] = { ...list[idx], result: fallbackRes, loading: false }
+            }
+            return list
+          })
+        }
+        reader.readAsDataURL(targetFile)
       }
-      reader.readAsDataURL(targetFile)
-    }
-  }, [])
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!isOpen || filesList.length === 0) {
@@ -127,7 +128,7 @@ export function ImagePreprocessModal({
       return () => clearTimeout(id)
     }
 
-    const initialStates: PerFileState[] = filesList.map(f => ({
+    const initialStates: PerFileState[] = filesList.map((f) => ({
       file: f,
       rotation: 0,
       doCrop: true,
@@ -136,30 +137,30 @@ export function ImagePreprocessModal({
       contrast: 1.0,
       originalUrl: URL.createObjectURL(f),
       result: null,
-      loading: true
+      loading: true,
     }))
 
     const id = window.setTimeout(() => {
-        setFileStates(initialStates)
-        setActiveIndex(0)
-        setShowOriginal(false)
-        setShouldMerge(filesList.length > 1)
-        setMergedResult(null)
+      setFileStates(initialStates)
+      setActiveIndex(0)
+      setShowOriginal(false)
+      setShouldMerge(filesList.length > 1)
+      setMergedResult(null)
 
-        // Process all files
-        initialStates.forEach((st, idx) => {
+      // Process all files
+      initialStates.forEach((st, idx) => {
         processFileAtIndex(idx, st.file, 0, true, 'enhanced', 0, 1.0, initialStates)
-        })
+      })
     }, 0)
 
     return () => {
       clearTimeout(id)
-      initialStates.forEach(st => URL.revokeObjectURL(st.originalUrl))
+      initialStates.forEach((st) => URL.revokeObjectURL(st.originalUrl))
     }
   }, [isOpen, filesList, processFileAtIndex])
 
   const triggerMerge = useCallback(async (currentList: PerFileState[]) => {
-    const urls = currentList.map(s => s.result?.dataUrl).filter((u): u is string => !!u)
+    const urls = currentList.map((s) => s.result?.dataUrl).filter((u): u is string => !!u)
     if (urls.length < 2) return
 
     setIsMerging(true)
@@ -176,12 +177,12 @@ export function ImagePreprocessModal({
   // Automatically trigger vertical merge whenever fileStates finished processing
   useEffect(() => {
     const id = window.setTimeout(() => {
-        if (fileStates.length > 1 && shouldMerge) {
-        const allDone = fileStates.every(s => !s.loading && s.result !== null)
+      if (fileStates.length > 1 && shouldMerge) {
+        const allDone = fileStates.every((s) => !s.loading && s.result !== null)
         if (allDone) {
-            triggerMerge(fileStates)
+          triggerMerge(fileStates)
         }
-        }
+      }
     }, 0)
     return () => clearTimeout(id)
   }, [fileStates, shouldMerge, triggerMerge])
@@ -192,28 +193,68 @@ export function ImagePreprocessModal({
   const handleRotate = () => {
     if (!currentSt) return
     const nextRot = (currentSt.rotation + 90) % 360
-    processFileAtIndex(activeIndex, currentSt.file, nextRot, currentSt.doCrop, currentSt.preset, currentSt.brightness, currentSt.contrast)
+    processFileAtIndex(
+      activeIndex,
+      currentSt.file,
+      nextRot,
+      currentSt.doCrop,
+      currentSt.preset,
+      currentSt.brightness,
+      currentSt.contrast,
+    )
   }
 
   const handleToggleCrop = () => {
     if (!currentSt) return
     const nextCrop = !currentSt.doCrop
-    processFileAtIndex(activeIndex, currentSt.file, currentSt.rotation, nextCrop, currentSt.preset, currentSt.brightness, currentSt.contrast)
+    processFileAtIndex(
+      activeIndex,
+      currentSt.file,
+      currentSt.rotation,
+      nextCrop,
+      currentSt.preset,
+      currentSt.brightness,
+      currentSt.contrast,
+    )
   }
 
   const handlePresetChange = (newPreset: FilterPreset) => {
     if (!currentSt) return
-    processFileAtIndex(activeIndex, currentSt.file, currentSt.rotation, currentSt.doCrop, newPreset, currentSt.brightness, currentSt.contrast)
+    processFileAtIndex(
+      activeIndex,
+      currentSt.file,
+      currentSt.rotation,
+      currentSt.doCrop,
+      newPreset,
+      currentSt.brightness,
+      currentSt.contrast,
+    )
   }
 
   const handleBrightnessChange = (val: number) => {
     if (!currentSt) return
-    processFileAtIndex(activeIndex, currentSt.file, currentSt.rotation, currentSt.doCrop, currentSt.preset, val, currentSt.contrast)
+    processFileAtIndex(
+      activeIndex,
+      currentSt.file,
+      currentSt.rotation,
+      currentSt.doCrop,
+      currentSt.preset,
+      val,
+      currentSt.contrast,
+    )
   }
 
   const handleContrastChange = (val: number) => {
     if (!currentSt) return
-    processFileAtIndex(activeIndex, currentSt.file, currentSt.rotation, currentSt.doCrop, currentSt.preset, currentSt.brightness, val)
+    processFileAtIndex(
+      activeIndex,
+      currentSt.file,
+      currentSt.rotation,
+      currentSt.doCrop,
+      currentSt.preset,
+      currentSt.brightness,
+      val,
+    )
   }
 
   // Hover Büyüteç Lens Mantığı
@@ -231,12 +272,12 @@ export function ImagePreprocessModal({
       x: e.clientX,
       y: e.clientY,
       imgX,
-      imgY
+      imgY,
     })
   }
 
   const handleMouseLeave = () => {
-    setMagnifier(prev => ({ ...prev, show: false }))
+    setMagnifier((prev) => ({ ...prev, show: false }))
   }
 
   const handleConfirmAll = () => {
@@ -244,7 +285,7 @@ export function ImagePreprocessModal({
       // If user chose to merge multiple images vertically into 1 unified long Z-report image:
       onConfirm([mergedResult])
     } else {
-      const results = fileStates.map(s => s.result).filter((r): r is PreprocessResult => r !== null)
+      const results = fileStates.map((s) => s.result).filter((r): r is PreprocessResult => r !== null)
       if (results.length > 0) {
         onConfirm(results)
       }
@@ -256,13 +297,14 @@ export function ImagePreprocessModal({
   const displayResult = isMergedTabActive ? mergedResult : currentSt?.result
   const origSizeMB = currentSt ? (currentSt.file.size / (1024 * 1024)).toFixed(2) : '3.0'
   const procSizeKB = displayResult ? (displayResult.sizeBytes / 1024).toFixed(0) : '0'
-  const savingsPct = displayResult && currentSt ? Math.max(0, Math.round((1 - displayResult.sizeBytes / currentSt.file.size) * 100)) : 85
+  const savingsPct =
+    displayResult && currentSt ? Math.max(0, Math.round((1 - displayResult.sizeBytes / currentSt.file.size) * 100)) : 85
 
   const activeSrc = isMergedTabActive
     ? mergedResult?.dataUrl
     : showOriginal && currentSt?.originalUrl
-    ? currentSt.originalUrl
-    : currentSt?.result?.dataUrl
+      ? currentSt.originalUrl
+      : currentSt?.result?.dataUrl
 
   return (
     <div
@@ -272,21 +314,27 @@ export function ImagePreprocessModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200"
     >
       <div className="relative w-full max-w-5xl max-h-[94vh] flex flex-col bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl overflow-hidden text-stone-100">
-        
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-stone-800 bg-stone-950/70">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-lg" aria-hidden="true">
+            <div
+              className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-lg"
+              aria-hidden="true"
+            >
               ✨
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 id="modal-title-studio" className="font-semibold text-stone-100 text-lg">Akıllı Görsel İyileştirme Stüdyosu</h3>
+                <h3 id="modal-title-studio" className="font-semibold text-stone-100 text-lg">
+                  Akıllı Görsel İyileştirme Stüdyosu
+                </h3>
                 <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold">
                   v3 Ultimate Studio
                 </span>
               </div>
-              <p className="text-xs text-stone-400">Gemini AI okuma başarısını %98&apos;e çıkarmak için belgeleri düzenleyin.</p>
+              <p className="text-xs text-stone-400">
+                Gemini AI okuma başarısını %98&apos;e çıkarmak için belgeleri düzenleyin.
+              </p>
             </div>
           </div>
 
@@ -341,7 +389,7 @@ export function ImagePreprocessModal({
               <input
                 type="checkbox"
                 checked={shouldMerge}
-                onChange={e => setShouldMerge(e.target.checked)}
+                onChange={(e) => setShouldMerge(e.target.checked)}
                 className="accent-emerald-500 w-4 h-4 cursor-pointer"
               />
               <span className="text-xs text-emerald-300 font-bold">Tek Görsel Olarak Birleştir</span>
@@ -362,9 +410,13 @@ export function ImagePreprocessModal({
           )}
 
           <div className="flex items-center gap-3 ml-auto">
-            <span className="text-stone-400">Orijinal: <strong className="text-stone-200">{origSizeMB} MB</strong></span>
+            <span className="text-stone-400">
+              Orijinal: <strong className="text-stone-200">{origSizeMB} MB</strong>
+            </span>
             <span className="text-stone-600">➔</span>
-            <span className="text-amber-400">Optimize: <strong className="text-emerald-400">{procSizeKB} KB</strong></span>
+            <span className="text-amber-400">
+              Optimize: <strong className="text-emerald-400">{procSizeKB} KB</strong>
+            </span>
             <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">
               %{savingsPct} Tasarruf 🟢
             </span>
@@ -428,7 +480,6 @@ export function ImagePreprocessModal({
                   <div className="absolute bottom-1 right-1 w-4 h-4 border-b-2 border-r-2 border-amber-400 shadow-md" />
                 </>
               )}
-
             </div>
           )}
 
@@ -440,7 +491,7 @@ export function ImagePreprocessModal({
                 left: `${magnifier.x + 20}px`,
                 backgroundImage: `url(${activeSrc})`,
                 backgroundPosition: `${magnifier.imgX}% ${magnifier.imgY}%`,
-                backgroundSize: '300%'
+                backgroundSize: '300%',
               }}
               className="pointer-events-none fixed z-30 w-36 h-36 rounded-full border-2 border-amber-400 shadow-2xl bg-no-repeat bg-stone-900 overflow-hidden ring-4 ring-black/40"
             >
@@ -453,11 +504,9 @@ export function ImagePreprocessModal({
 
         {/* Presets & Fine-Tuning Control Bar */}
         <div className="p-4 bg-stone-950/95 border-t border-stone-800 space-y-3">
-          
           {/* Presets Buttons & Sliders */}
           {!isMergedTabActive && currentSt && (
             <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
-              
               {/* Presets */}
               <div className="flex items-center gap-1.5 bg-stone-900 p-1 rounded-xl border border-stone-800">
                 <button
@@ -502,10 +551,12 @@ export function ImagePreprocessModal({
                     max="2.5"
                     step="0.1"
                     value={currentSt.contrast}
-                    onChange={e => handleContrastChange(parseFloat(e.target.value))}
+                    onChange={(e) => handleContrastChange(parseFloat(e.target.value))}
                     className="w-24 accent-amber-500 cursor-pointer"
                   />
-                  <span className="w-8 text-stone-300 font-mono text-[11px]">{Math.round(currentSt.contrast * 100)}%</span>
+                  <span className="w-8 text-stone-300 font-mono text-[11px]">
+                    {Math.round(currentSt.contrast * 100)}%
+                  </span>
                 </div>
 
                 <div className="h-4 w-px bg-stone-800" />
@@ -518,13 +569,14 @@ export function ImagePreprocessModal({
                     max="40"
                     step="5"
                     value={currentSt.brightness}
-                    onChange={e => handleBrightnessChange(parseInt(e.target.value))}
+                    onChange={(e) => handleBrightnessChange(parseInt(e.target.value))}
                     className="w-24 accent-amber-500 cursor-pointer"
                   />
-                  <span className="w-8 text-stone-300 font-mono text-[11px]">{currentSt.brightness > 0 ? `+${currentSt.brightness}` : currentSt.brightness}</span>
+                  <span className="w-8 text-stone-300 font-mono text-[11px]">
+                    {currentSt.brightness > 0 ? `+${currentSt.brightness}` : currentSt.brightness}
+                  </span>
                 </div>
               </div>
-
             </div>
           )}
 
@@ -554,7 +606,7 @@ export function ImagePreprocessModal({
               )}
 
               <button
-                onClick={() => setShowAiOverlays(prev => !prev)}
+                onClick={() => setShowAiOverlays((prev) => !prev)}
                 className={`px-3 py-2 rounded-xl border text-xs font-medium transition-colors flex items-center gap-1.5 ${
                   showAiOverlays
                     ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
@@ -585,17 +637,18 @@ export function ImagePreprocessModal({
               </button>
 
               <button
-                disabled={fileStates.some(s => s.loading) || isMerging}
+                disabled={fileStates.some((s) => s.loading) || isMerging}
                 onClick={handleConfirmAll}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50 flex items-center gap-2"
               >
-                ✨ {fileStates.length > 1 && shouldMerge ? '🧩 Birleştirilmiş Fişi Yapay Zekaya Gönder' : 'Yapay Zekaya Gönder ve Çözümle'}
+                ✨{' '}
+                {fileStates.length > 1 && shouldMerge
+                  ? '🧩 Birleştirilmiş Fişi Yapay Zekaya Gönder'
+                  : 'Yapay Zekaya Gönder ve Çözümle'}
               </button>
             </div>
           </div>
-
         </div>
-
       </div>
     </div>
   )

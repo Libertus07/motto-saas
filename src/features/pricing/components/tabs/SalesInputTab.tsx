@@ -18,13 +18,13 @@ export function SalesInputTab({
   realSalesMeta,
   totalDailyRevenue,
   updateSales,
-  adjustSalesByDelta
+  adjustSalesByDelta,
 }: SalesInputTabProps) {
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('Tümü')
 
   const categoriesList = useMemo(() => {
-    const cats = new Set(products.map(p => p.category || 'Diğer'))
+    const cats = new Set(products.map((p) => p.category || 'Diğer'))
     return ['Tümü', ...Array.from(cats)]
   }, [products])
 
@@ -32,10 +32,10 @@ export function SalesInputTab({
     let list = [...products]
     if (search.trim()) {
       const q = search.toLowerCase()
-      list = list.filter(p => p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q))
+      list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q))
     }
     if (selectedCategory !== 'Tümü') {
-      list = list.filter(p => (p.category || 'Diğer') === selectedCategory)
+      list = list.filter((p) => (p.category || 'Diğer') === selectedCategory)
     }
     return list
   }, [products, search, selectedCategory])
@@ -70,7 +70,7 @@ export function SalesInputTab({
           <Input
             type="text"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Ürün adı ile arayın..."
             className="pl-9"
           />
@@ -78,7 +78,7 @@ export function SalesInputTab({
 
         {/* Category Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          {categoriesList.map(cat => (
+          {categoriesList.map((cat) => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
@@ -110,7 +110,7 @@ export function SalesInputTab({
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-800/50 text-xs sm:text-sm">
-              {filteredProducts.map(product => {
+              {filteredProducts.map((product) => {
                 const salesData = productSales[product.id]
                 const sales = salesData?.dailySales || 0
                 const isReal = salesData?.isRealData
@@ -138,9 +138,7 @@ export function SalesInputTab({
                       )}
                     </td>
                     <td className="px-4 py-3.5 text-stone-400 font-medium">{product.category}</td>
-                    <td className="px-4 py-3.5 text-right font-extrabold text-amber-400">
-                      ₺{product.sale_price || 0}
-                    </td>
+                    <td className="px-4 py-3.5 text-right font-extrabold text-amber-400">₺{product.sale_price || 0}</td>
                     <td className="px-4 py-3.5 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
@@ -160,7 +158,7 @@ export function SalesInputTab({
                         <Input
                           type="number"
                           value={sales || ''}
-                          onChange={e => updateSales(product.id, 'dailySales', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateSales(product.id, 'dailySales', parseInt(e.target.value) || 0)}
                           className={`w-16 h-8 px-1 text-center text-xs font-bold ${
                             isReal ? 'border-emerald-500/50' : ''
                           }`}
@@ -219,7 +217,7 @@ export function SalesInputTab({
 
         {/* Mobile Cards View */}
         <div className="md:hidden divide-y divide-stone-800/60">
-          {filteredProducts.map(product => {
+          {filteredProducts.map((product) => {
             const salesData = productSales[product.id]
             const sales = salesData?.dailySales || 0
             const isReal = salesData?.isRealData
@@ -239,9 +237,7 @@ export function SalesInputTab({
                       </span>
                     )}
                   </h4>
-                  <span className="text-amber-400 font-extrabold text-sm">
-                    ₺{product.sale_price || 0}
-                  </span>
+                  <span className="text-amber-400 font-extrabold text-sm">₺{product.sale_price || 0}</span>
                 </div>
 
                 <div className="flex items-center justify-between bg-stone-950/60 p-2.5 rounded-xl border border-stone-800/60 text-xs">
@@ -256,7 +252,7 @@ export function SalesInputTab({
                     <Input
                       type="number"
                       value={sales || ''}
-                      onChange={e => updateSales(product.id, 'dailySales', parseInt(e.target.value) || 0)}
+                      onChange={(e) => updateSales(product.id, 'dailySales', parseInt(e.target.value) || 0)}
                       className="w-16 h-8 px-1 text-center text-xs font-bold"
                     />
                     <button

@@ -33,7 +33,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     async function loadOrganizations() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
         if (!user) {
           setLoading(false)
           return
@@ -46,16 +48,16 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           .eq('status', 'active')
 
         if (members && members.length > 0) {
-          const list: OrganizationItem[] = (members as unknown as OrganizationMember[]).map(m => ({
+          const list: OrganizationItem[] = (members as unknown as OrganizationMember[]).map((m) => ({
             id: m.organization_id,
             name: m.organizations?.name || 'Motto Varsayılan Şube',
-            role: m.role || 'owner'
+            role: m.role || 'owner',
           }))
 
           setOrganizations(list)
 
           const savedOrgId = localStorage.getItem('motto_active_org_id')
-          const found = list.find(o => o.id === savedOrgId) || list[0]
+          const found = list.find((o) => o.id === savedOrgId) || list[0]
           setActiveOrgState(found)
           if (!savedOrgId) {
             localStorage.setItem('motto_active_org_id', found.id)
@@ -65,7 +67,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           const defaultOrg: OrganizationItem = {
             id: '00000000-0000-0000-0000-000000000001',
             name: 'Motto SaaS (Ana Şube)',
-            role: 'owner'
+            role: 'owner',
           }
           setOrganizations([defaultOrg])
           setActiveOrgState(defaultOrg)

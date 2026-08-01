@@ -18,27 +18,36 @@ export default function FiyatMotoruPage() {
   useAppTour('fiyat_motoru', [
     {
       element: '#tour-pricing-kpis',
-      popover: { title: 'Günlük resmi görün', description: 'Ciro, gider ve tahmini kâr birlikte hesaplanır; önce bu özeti kontrol edin.' }
+      popover: {
+        title: 'Günlük resmi görün',
+        description: 'Ciro, gider ve tahmini kâr birlikte hesaplanır; önce bu özeti kontrol edin.',
+      },
     },
     {
       element: '#tour-pricing-parameters',
-      popover: { title: 'Hedef marjı belirleyin', description: 'Fiyat önerilerinin temelini oluşturan hedef ve maliyet parametrelerini buradan yönetin.' }
+      popover: {
+        title: 'Hedef marjı belirleyin',
+        description: 'Fiyat önerilerinin temelini oluşturan hedef ve maliyet parametrelerini buradan yönetin.',
+      },
     },
     {
       element: '#tour-pricing-tabs',
-      popover: { title: 'Üç adımlı karar akışı', description: 'Satış adetlerini girin, fiyat analizini inceleyin ve sonucu görsel raporlara taşıyın.' }
-    }
+      popover: {
+        title: 'Üç adımlı karar akışı',
+        description: 'Satış adetlerini girin, fiyat analizini inceleyin ve sonucu görsel raporlara taşıyın.',
+      },
+    },
   ])
   const [saving, setSaving] = useState(false)
   const { showAlert } = useNotification()
 
   const { products, setProducts, expenses, loading, realSalesMeta, settings, setSettings } = usePricingData()
-  
+
   const { productSales, calculations, updateSales, adjustSalesByDelta } = usePricingCalculator(
     products,
     expenses,
     realSalesMeta,
-    settings
+    settings,
   )
 
   const handleSaveCosts = async () => {
@@ -52,17 +61,19 @@ export default function FiyatMotoruPage() {
           .eq('id', calc.product.id)
         if (error) throw error
       }
-      
+
       const { error: marginErr } = await supabase
         .from('settings')
         .upsert({ key: 'target_margin', value: settings.targetMargin.toString() })
       if (marginErr) throw marginErr
 
-      setProducts(prev => prev.map(p => {
-        const c = calculations.find(x => x.product.id === p.id)
-        return c ? { ...p, calculated_cost: c.totalCost } : p
-      }))
-      
+      setProducts((prev) =>
+        prev.map((p) => {
+          const c = calculations.find((x) => x.product.id === p.id)
+          return c ? { ...p, calculated_cost: c.totalCost } : p
+        }),
+      )
+
       showAlert('Birim maliyetler ürün kartlarına kaydedildi.', 'success')
     } catch (err: unknown) {
       console.error('Kaydetme hatası:', err)
@@ -83,8 +94,11 @@ export default function FiyatMotoruPage() {
     )
   }
 
-  const totalDailyRevenue = products.reduce((t, p) => t + (p.sale_price || 0) * (productSales[p.id]?.dailySales || 0), 0)
-  
+  const totalDailyRevenue = products.reduce(
+    (t, p) => t + (p.sale_price || 0) * (productSales[p.id]?.dailySales || 0),
+    0,
+  )
+
   const fixedMonthlyExpenses = expenses.reduce((t, e) => {
     if (e.period === 'daily' || e.period === 'one_time') return t
     return t + (e.period === 'yearly' ? e.amount / 12 : e.amount)
@@ -116,10 +130,10 @@ export default function FiyatMotoruPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
         <div id="tour-pricing-kpis">
           <PricingKpiMetrics
-          productCount={products.length}
-          totalDailyRevenue={totalDailyRevenue}
-          dailyExpenses={dailyExpenses}
-          totalDailyProfit={totalDailyProfit}
+            productCount={products.length}
+            totalDailyRevenue={totalDailyRevenue}
+            dailyExpenses={dailyExpenses}
+            totalDailyProfit={totalDailyProfit}
           />
         </div>
 
@@ -127,7 +141,10 @@ export default function FiyatMotoruPage() {
           <CalculationParameters settings={settings} onSettingsChange={setSettings} />
         </div>
 
-        <div id="tour-pricing-tabs" className="border-b border-stone-800 flex items-center overflow-x-auto scrollbar-none sticky top-[73px] z-20 bg-stone-950/80 backdrop-blur-xl">
+        <div
+          id="tour-pricing-tabs"
+          className="border-b border-stone-800 flex items-center overflow-x-auto scrollbar-none sticky top-[73px] z-20 bg-stone-950/80 backdrop-blur-xl"
+        >
           <button
             onClick={() => setActiveTab('sales')}
             className={`px-4 sm:px-6 py-3.5 sm:py-4 font-bold text-xs sm:text-sm border-b-2 whitespace-nowrap transition-colors ${
@@ -171,12 +188,10 @@ export default function FiyatMotoruPage() {
           />
         )}
 
-        {activeTab === 'results' && (
-          <AnalysisTab calculations={calculations} />
-        )}
+        {activeTab === 'results' && <AnalysisTab calculations={calculations} />}
 
         {activeTab === 'reports' && (
-          <ReportsTab 
+          <ReportsTab
             calculations={calculations}
             productSales={productSales}
             totalDailyProfit={totalDailyProfit}

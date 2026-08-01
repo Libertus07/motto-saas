@@ -1,0 +1,4 @@
+{
+  "*.{js,jsx,ts,tsx}": ["prettier --write", "eslint --fix"],
+  "{package.json,tsconfig.json,*.config.{js,mjs,ts},.github/workflows/*.{yml,yaml},src/**/*.css}": "prettier --write"
+}
