@@ -382,7 +382,7 @@ export default function FisYukle() {
     }
 
     const auditDetailsText = rpcResult?.audit_details || ''
-    logActivity(
+    await logActivity(
       'Stok',
       'EKLEME',
       `Yapay zeka ile fiş okunarak ${selectedItems.length} kalem ürün/stok sisteme eklendi.`,
