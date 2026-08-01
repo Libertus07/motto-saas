@@ -1,7 +1,6 @@
-import { useEffect } from 'react'
-
 import type { ProductFormValues, ProductIngredient, ProductMaterial, SubRecipe } from '@/features/products/types'
 import { formatCurrency } from '@/lib/format'
+import { useDialogLifecycle } from '@/hooks/useDialogLifecycle'
 
 import { ProductRecipeEditor } from './ProductRecipeEditor'
 
@@ -51,22 +50,7 @@ export function ProductFormDrawer({
   onRemoveRecipeItem,
   onSubmit,
 }: ProductFormDrawerProps) {
-  useEffect(() => {
-    if (!open) return
-
-    const previousOverflow = document.body.style.overflow
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-
-    document.body.style.overflow = 'hidden'
-    document.addEventListener('keydown', closeOnEscape)
-
-    return () => {
-      document.body.style.overflow = previousOverflow
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [open, onClose])
+  useDialogLifecycle(open, onClose)
 
   if (!open) return null
 

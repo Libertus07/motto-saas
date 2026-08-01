@@ -37,6 +37,13 @@ export type ProductFormValues = {
   estimated_monthly_sales: string
 }
 
+export type ProductCategorySuggestion = {
+  id: string
+  name: string
+  current: string
+  suggested: string
+}
+
 export type ProductSort = 'name' | 'price_desc' | 'price_asc' | 'margin_desc' | 'sales_desc'
 
 export type ProductBulkRow = {
