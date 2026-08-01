@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { driver, type DriveStep, type Driver } from 'driver.js'
+import 'driver.js/dist/driver.css'
 
 const tourStorageKey = (tourId: string) => `tour_status_${tourId}`
 const replayEventName = 'motto:replay-tour'
@@ -48,6 +49,9 @@ export function useAppTour(tourId: string, steps: DriveStep[], delayMs = 800) {
         completed = true
         activeDriver.destroy()
       },
+      onNextClick: (_, __, { driver: activeDriver }) => activeDriver.moveNext(),
+      onPrevClick: (_, __, { driver: activeDriver }) => activeDriver.movePrevious(),
+      onCloseClick: (_, __, { driver: activeDriver }) => activeDriver.destroy(),
       onDestroyed: () => {
         const status: TourStatus = completed ? 'completed' : 'dismissed'
         localStorage.setItem(tourStorageKey(tourId), status)
