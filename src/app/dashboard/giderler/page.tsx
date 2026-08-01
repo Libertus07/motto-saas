@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
+import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
 import { useAppTour } from '@/hooks/useAppTour'
 
 type Expense = {
@@ -205,6 +206,37 @@ export default function Giderler() {
     }
   ], 800);
 
+  const groupedExpenses = useMemo(() => {
+    const groups: Record<string, Expense[]> = {}
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    expenses.forEach(exp => {
+      const date = new Date(exp.expense_date)
+      let dateKey = formatDate(date)
+
+      if (date.toDateString() === today.toDateString()) {
+        dateKey = 'Bugün'
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        dateKey = 'Dün'
+      }
+
+      if (!groups[dateKey]) {
+        groups[dateKey] = []
+      }
+      groups[dateKey].push(exp)
+    })
+    
+    return Object.entries(groups).map(([key, items]) => ({
+      id: key,
+      title: key,
+      subtitle: `${items.length} Gider İşlemi`,
+      icon: <span className="text-xl">📅</span>,
+      items
+    }))
+  }, [expenses])
+
   return (
     <div className="flex flex-col-reverse xl:flex-row min-h-screen bg-stone-950 text-white">
       
@@ -318,62 +350,68 @@ export default function Giderler() {
               <p>Henüz bir gider kaydedilmemiş.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-stone-950/50 text-stone-400 text-xs uppercase tracking-wider">
-                    <th className="p-4 font-medium border-b border-stone-800">Tarih</th>
-                    <th className="p-4 font-medium border-b border-stone-800">Gider Adı</th>
-                    <th className="p-4 font-medium border-b border-stone-800">Kategori</th>
-                    <th className="p-4 font-medium border-b border-stone-800 text-center">Periyot</th>
-                    <th className="p-4 font-medium border-b border-stone-800 text-right">Tutar</th>
-                    <th className="p-4 font-medium border-b border-stone-800 text-right">İşlem</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-800/50">
-                  {expenses.map(exp => {
-                    const isDiscount = exp.category === 'indirim-ikram' || exp.category === 'iade'
-                    return (
-                      <tr key={exp.id} className="hover:bg-stone-800/20 transition-colors group">
-                        <td className="p-4 text-sm text-stone-400 whitespace-nowrap">
-                          {new Date(exp.expense_date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}
-                        </td>
-                        <td className="p-4 font-medium text-stone-200">
-                          {exp.name}
-                          {isDiscount && <span className="ml-2 text-[10px] bg-stone-800 text-stone-400 px-2 py-0.5 rounded-full">Muhasebesel</span>}
-                        </td>
-                        <td className="p-4">
-                          <div className="inline-flex items-center gap-2 bg-stone-950 px-3 py-1 rounded-full border border-stone-800 text-sm">
-                            <span>{getCategoryIcon(exp.category)}</span>
-                            <span className="text-stone-300 capitalize">{categories.find(c => c.value === exp.category)?.label || exp.category}</span>
+            <div className="p-4 sm:p-6 bg-stone-950/50">
+              <HistoryAccordion
+                groups={groupedExpenses}
+                defaultExpandedIds={groupedExpenses.length > 0 ? [groupedExpenses[0].id] : []}
+                renderHeaderRight={(group) => {
+                  const total = group.items.reduce((sum, e) => sum + (e.category === 'indirim-ikram' || e.category === 'iade' ? 0 : e.amount), 0);
+                  return (
+                    <div className="text-right">
+                      <p className="text-xs text-stone-500">Toplam Gider</p>
+                      <p className="text-sm font-bold text-rose-400">{formatCurrency(total)}</p>
+                    </div>
+                  );
+                }}
+                renderContent={(items) => (
+                  <div className="space-y-2">
+                    {items.map(exp => {
+                      const isDiscount = exp.category === 'indirim-ikram' || exp.category === 'iade'
+                      return (
+                        <div key={exp.id} className="group bg-stone-900 border border-stone-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-amber-500/30 transition-all">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-stone-800 border border-stone-700 flex items-center justify-center text-xl">
+                              {getCategoryIcon(exp.category)}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-stone-200">{exp.name}</h4>
+                                {isDiscount && <span className="text-[10px] bg-stone-800 text-stone-400 px-2 py-0.5 rounded-full">Muhasebesel</span>}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs text-stone-400 capitalize">{categories.find(c => c.value === exp.category)?.label || exp.category}</span>
+                                <span className="text-stone-700">•</span>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
+                                  exp.period === 'monthly' ? 'bg-blue-500/10 text-blue-400' : 
+                                  exp.period === 'yearly' ? 'bg-purple-500/10 text-purple-400' :
+                                  'bg-stone-800 text-stone-400'
+                                }`}>
+                                  {exp.period === 'monthly' ? 'Aylık' : exp.period === 'yearly' ? 'Yıllık' : 'Tek Seferlik'}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        </td>
-                        <td className="p-4 text-center">
-                          <span className={`text-xs px-2 py-1 rounded-md font-bold whitespace-nowrap ${
-                            exp.period === 'monthly' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 
-                            exp.period === 'yearly' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                            'bg-stone-800 text-stone-400 border border-stone-700'
-                          }`}>
-                            {exp.period === 'monthly' ? 'Aylık' : exp.period === 'yearly' ? 'Yıllık' : 'Tek Seferlik'}
-                          </span>
-                        </td>
-                        <td className="p-4 text-right">
-                          <span className={`font-bold ${isDiscount ? 'text-stone-500 line-through' : 'text-rose-400'}`}>
-                            {formatCurrency(exp.amount)}
-                          </span>
-                          {exp.period === 'yearly' && (
-                            <div className="text-[10px] text-stone-500 mt-1">Aylık Yük: {formatCurrency(exp.amount / 12)}</div>
-                          )}
-                        </td>
-                        <td className="p-4 text-right opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleEdit(exp)} className="text-blue-400 hover:text-blue-300 text-sm mr-3 font-medium">Düzenle</button>
-                          <button onClick={() => handleDelete(exp.id)} className="text-rose-400 hover:text-rose-300 text-sm font-medium">Sil</button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                          
+                          <div className="flex items-center justify-between md:justify-end gap-6 border-t border-stone-800 md:border-none pt-3 md:pt-0">
+                            <div className="text-right">
+                              <p className={`font-bold text-lg ${isDiscount ? 'text-stone-500 line-through' : 'text-rose-400'}`}>
+                                {formatCurrency(exp.amount)}
+                              </p>
+                              {exp.period === 'yearly' && (
+                                <p className="text-[10px] text-stone-500">Aylık Yük: {formatCurrency(exp.amount / 12)}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleEdit(exp)} className="p-2 bg-stone-800/50 hover:bg-blue-500/10 hover:text-blue-400 text-stone-400 rounded-lg transition-colors" aria-label="Düzenle">✏️</button>
+                              <button onClick={() => handleDelete(exp.id)} className="p-2 bg-stone-800/50 hover:bg-rose-500/10 hover:text-rose-400 text-stone-400 rounded-lg transition-colors" aria-label="Sil">🗑️</button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              />
             </div>
           )}
         </div>

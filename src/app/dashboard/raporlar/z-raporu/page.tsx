@@ -194,6 +194,23 @@ export default function ZRaporuYukle() {
         return bestScore >= 0.60 ? bestMatch : null;
     }
 
+    const matchExpenseCategory = (expenseName: string): string => {
+        if (!expenseName) return 'diger';
+        const name = expenseName.toLowerCase();
+        if (name.includes('kurye') || name.includes('personel') || name.includes('bahşiş') || name.includes('maaş') || name.includes('avans')) return 'personel';
+        if (name.includes('elektrik')) return 'elektrik';
+        if (name.includes('su') || name.includes('damacana')) return 'su';
+        if (name.includes('doğalgaz') || name.includes('dogalgaz') || name.includes('tüp')) return 'dogalgaz';
+        if (name.includes('internet') || name.includes('telefon') || name.includes('ttnet') || name.includes('turkcell')) return 'internet';
+        if (name.includes('muhasebe') || name.includes('mali') || name.includes('noter')) return 'muhasebe';
+        if (name.includes('kira') || name.includes('stopaj')) return 'kira';
+        if (name.includes('sigorta') || name.includes('sgk') || name.includes('kasko')) return 'sigorta';
+        if (name.includes('pazarlama') || name.includes('reklam') || name.includes('sponsor')) return 'pazarlama';
+        
+        // Gıda, temizlik vs. genelde 'diger' sayılıyor (Kullanıcı isterse Özel Kategori olarak düzenler)
+        return 'diger';
+    }
+
     const handleAnalyze = async () => {
         if (!imageUrl && !fileText) return
         setAnalyzing(true)
@@ -218,7 +235,11 @@ export default function ZRaporuYukle() {
                 return { ...item, matchedProductId: match?.id }
             })
 
-            setParsedData({ ...data, items: mappedItems })
+            const mappedExpenses = (data.expenses || []).map((exp: ParsedExpenseItem) => {
+                return { ...exp, category: matchExpenseCategory(exp.expense_name) }
+            })
+
+            setParsedData({ ...data, items: mappedItems, expenses: mappedExpenses })
         } catch (error: any) {
             let errorMsg = error.message;
             if (errorMsg === 'The string did not match the expected pattern.') {
