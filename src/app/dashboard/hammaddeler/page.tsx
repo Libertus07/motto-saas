@@ -6,6 +6,7 @@ import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency } from '@/lib/format'
 import dynamic from 'next/dynamic'
+import type { AutoCategoryResponse, EditRow, Material, PriceHistory } from '@/features/materials/types'
 
 const MaterialHistoryModal = dynamic(
   () => import('@/features/materials/components/MaterialHistoryModal').then((mod) => mod.MaterialHistoryModal),
@@ -17,37 +18,7 @@ const MaterialAutoCatModal = dynamic(
 )
 import { useAppTour } from '@/hooks/useAppTour'
 
-type Material = {
-  id: string
-  name: string
-  unit: string
-  price_per_unit: number
-  stock_quantity: number
-  category?: string
-  critical_stock_level?: number
-}
-
-type PriceHistory = {
-  id: string
-  old_price: number
-  new_price: number
-  source: string
-  created_at: string
-}
-
-type EditRow = {
-  id: string
-  name: string
-  unit: string
-  price_per_unit: string
-  stock_quantity: string
-  critical_stock_level: string
-  category: string
-}
-
 type SettingRow = { key: string; value: unknown }
-type AutoCategorySuggestion = { id: string; suggested_category: string }
-type AutoCategoryResponse = { error?: string; suggestions?: AutoCategorySuggestion[] }
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error
