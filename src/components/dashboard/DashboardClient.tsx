@@ -20,7 +20,7 @@ export interface DashboardStats {
   totalCogs: number
   netProfit: number
   targetMargin: number
-  criticalItems: { id: string; name: string; critical_stock_level: number; unit: string; current_stock: number }[]
+  criticalItems: { id: string; name: string; critical_stock_level: number; unit: string; stock_quantity: number }[]
   totalCash: number
   totalBank: number
   totalInvestments: number
@@ -96,7 +96,7 @@ export function DashboardClient() {
         totalCogs: Number(rpcStats.totalCogs) || 0,
         netProfit: netRev - Number(rpcStats.totalCogs) - Number(rpcStats.monthlyExpenses),
         targetMargin: Number(rpcStats.targetMargin) || 35,
-        criticalItems: (rpcStats.criticalItems as { id: string; name: string; critical_stock_level: number; unit: string; current_stock: number }[]) || [],
+        criticalItems: (rpcStats.criticalItems as { id: string; name: string; critical_stock_level: number; unit: string; stock_quantity: number }[]) || [],
         totalCash: Number(rpcStats.totalCash) || 0,
         totalBank: Number(rpcStats.totalBank) || 0,
         totalInvestments
@@ -440,7 +440,7 @@ export function DashboardClient() {
               </div>
             </div>
             <div className="p-6 max-h-[50vh] overflow-y-auto space-y-4">
-              {stats.criticalItems.map((item: { id: string; name: string; critical_stock_level: number; unit: string; current_stock: number }) => (
+              {stats.criticalItems.map((item: { id: string; name: string; critical_stock_level: number; unit: string; stock_quantity: number }) => (
                 <div key={item.id} className="flex justify-between items-center p-4 rounded-2xl bg-stone-950 border border-stone-800 hover:border-red-500/30 transition-colors">
                   <div>
                     <p className="font-bold text-white text-lg">{item.name}</p>
