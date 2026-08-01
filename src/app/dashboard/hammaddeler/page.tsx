@@ -7,6 +7,7 @@ import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency } from '@/lib/format'
 import dynamic from 'next/dynamic'
 import type { AutoCategoryResponse, EditRow, Material, PriceHistory } from '@/features/materials/types'
+import { filterAndSortMaterials, type MaterialSort } from '@/features/materials/utils'
 
 const MaterialHistoryModal = dynamic(
   () => import('@/features/materials/components/MaterialHistoryModal').then((mod) => mod.MaterialHistoryModal),
@@ -36,7 +37,7 @@ export default function Hammaddeler() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('Tümü')
-  const [sortBy, setSortBy] = useState<'name' | 'price_desc' | 'stock_desc' | 'critical_first'>('name')
+  const [sortBy, setSortBy] = useState<MaterialSort>('name')
 
   // Modals state
   const [historyModalOpen, setHistoryModalOpen] = useState(false)
@@ -493,39 +494,10 @@ export default function Hammaddeler() {
 
   const activeCategoriesCount = useMemo(() => new Set(materials.map((m) => m.category || 'Diğer')).size, [materials])
 
-  const processedMaterials = useMemo(() => {
-    let result = [...materials]
-
-    if (search.trim()) {
-      const query = search.toLowerCase()
-      result = result.filter((m) => m.name.toLowerCase().includes(query))
-    }
-
-    if (categoryFilter !== 'Tümü') {
-      result = result.filter((m) => (m.category || 'Diğer') === categoryFilter)
-    }
-
-    result.sort((a, b) => {
-      const isCriticalA =
-        a.critical_stock_level != null &&
-        a.critical_stock_level > 0 &&
-        (a.stock_quantity || 0) <= a.critical_stock_level
-      const isCriticalB =
-        b.critical_stock_level != null &&
-        b.critical_stock_level > 0 &&
-        (b.stock_quantity || 0) <= b.critical_stock_level
-
-      if (sortBy === 'critical_first') {
-        if (isCriticalA && !isCriticalB) return -1
-        if (!isCriticalA && isCriticalB) return 1
-      }
-      if (sortBy === 'price_desc') return b.price_per_unit - a.price_per_unit
-      if (sortBy === 'stock_desc') return (b.stock_quantity || 0) - (a.stock_quantity || 0)
-      return a.name.localeCompare(b.name)
-    })
-
-    return result
-  }, [materials, search, categoryFilter, sortBy])
+  const processedMaterials = useMemo(
+    () => filterAndSortMaterials(materials, search, categoryFilter, sortBy),
+    [materials, search, categoryFilter, sortBy],
+  )
 
   const groupedByCategory = useMemo(() => {
     const allCats = [...new Set([...categories, 'Diğer', ...processedMaterials.map((m) => m.category || 'Diğer')])]
