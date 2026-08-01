@@ -14,10 +14,10 @@ describe.skip('Row Level Security (RLS) Multi-Tenant Tests', () => {
   // Service client (bypasses RLS) to setup/teardown data
   const _adminClient = createClient(supabaseUrl, serviceRoleKey)
   
-  let orgA_Id: string | undefined = undefined
-  let orgB_Id: string | undefined = undefined
-  let userA_Token: string | undefined = undefined
-  let userB_Token: string | undefined = undefined
+  const orgA_Id: string | undefined = undefined
+  const orgB_Id: string | undefined = undefined
+  const userA_Token: string | undefined = undefined
+  const userB_Token: string | undefined = undefined
 
   beforeAll(async () => {
     // 1. Create two test organizations

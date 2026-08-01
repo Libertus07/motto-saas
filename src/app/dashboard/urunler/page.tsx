@@ -60,7 +60,7 @@ export default function Urunler() {
   const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)))
   const allCategories = Array.from(new Set([...defaultCategories, ...uniqueCategories]))
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   const fetchData = async () => {
     setLoading(true)
     const { data: mats } = await supabase.from('materials').select('*').order('name')
