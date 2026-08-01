@@ -7,6 +7,7 @@ import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency } from '@/lib/format'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { useAppTour } from '@/hooks/useAppTour'
 
 type Material = { id: string; name: string; unit: string; price_per_unit: number }
 type SubRecipe = { id: string; name: string; yield_quantity: number; yield_unit: string; wastage_percent: number; cost_per_yield?: number }
@@ -24,6 +25,20 @@ type BulkRow = { id: string; sale_price: string; estimated_monthly_sales: string
 
 export default function Urunler() {
   const { showAlert, showConfirm } = useNotification()
+  useAppTour('urunler', [
+    {
+      element: '#tour-products-create',
+      popover: { title: 'Menü ürünü ekleyin', description: 'Yeni ürün için satış fiyatını ve reçetesini burada tanımlayın.' }
+    },
+    {
+      element: '#tour-products-filters',
+      popover: { title: 'Listeyi odaklayın', description: 'Arama, kategori ve sıralama ile uzun menüleri saniyeler içinde daraltın.' }
+    },
+    {
+      element: '#tour-products-kpis',
+      popover: { title: 'Marjı izleyin', description: 'Ciro, ortalama kâr marjı ve tahmini nakit katkısını birlikte değerlendirin.' }
+    }
+  ])
   const [products, setProducts] = useState<Product[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [subRecipes, setSubRecipes] = useState<SubRecipe[]>([])
@@ -494,7 +509,7 @@ export default function Urunler() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div id="tour-products-create" className="flex flex-wrap items-center gap-2 sm:gap-3">
             {bulkEditMode ? (
               <div className="flex items-center gap-2 bg-stone-950 p-1.5 rounded-xl border border-amber-500/40">
                 <span className="text-stone-300 text-xs px-2 font-medium">
@@ -580,7 +595,7 @@ export default function Urunler() {
       {/* ──────────────── MAIN CONTAINER ──────────────── */}
       <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
         {/* EXECUTIVE KPI METRIC CARDS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+        <div id="tour-products-kpis" className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
           <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
               <span className="text-stone-400 text-xs font-semibold">Toplam Menü Ürünü</span>
@@ -631,7 +646,7 @@ export default function Urunler() {
         </div>
 
         {/* SEARCH, FILTER & ACTION BAR */}
-        <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div id="tour-products-filters" className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           {/* Search Input */}
           <div className="flex-1 relative">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">🔍</span>

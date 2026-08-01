@@ -6,6 +6,7 @@ import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devError } from '@/lib/debug'
 import { formatCurrency } from '@/lib/format'
+import { useAppTour } from '@/hooks/useAppTour'
 
 type Material = {
   id: string
@@ -32,6 +33,20 @@ type SubRecipe = {
 
 export default function YariMamuller() {
   const { showConfirm } = useNotification()
+  useAppTour('yari_mamuller', [
+    {
+      element: '#tour-subrecipes-create',
+      popover: { title: 'Üretim reçetesi oluşturun', description: 'Tepsi, tencere veya sos üretimi için verim ve fire bilgisini buradan girin.' }
+    },
+    {
+      element: '#tour-subrecipes-search',
+      popover: { title: 'Reçeteyi hızla bulun', description: 'Büyüyen üretim listenizi ad ile arayarak doğru reçeteye ulaşın.' }
+    },
+    {
+      element: '#tour-subrecipes-kpis',
+      popover: { title: 'Porsiyon maliyetini yönetin', description: 'Ortalama maliyet ve fire oranı, üretim verimliliğini tek ekranda görünür kılar.' }
+    }
+  ])
   const [subRecipes, setSubRecipes] = useState<SubRecipe[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [loading, setLoading] = useState(true)
@@ -250,6 +265,7 @@ export default function YariMamuller() {
           </div>
 
           <button
+            id="tour-subrecipes-create"
             onClick={() => {
               resetForm()
               setShowModal(true)
@@ -265,7 +281,7 @@ export default function YariMamuller() {
       {/* ──────────────── MAIN CONTAINER ──────────────── */}
       <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
         {/* EXECUTIVE KPI METRIC CARDS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+        <div id="tour-subrecipes-kpis" className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
           <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
               <span className="text-stone-400 text-xs font-semibold">Toplam Üretim Reçetesi</span>
@@ -318,7 +334,7 @@ export default function YariMamuller() {
         </div>
 
         {/* SEARCH BAR */}
-        <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 shadow-xl flex items-center justify-between gap-3">
+        <div id="tour-subrecipes-search" className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 shadow-xl flex items-center justify-between gap-3">
           <div className="flex-1 relative">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">🔍</span>
             <input

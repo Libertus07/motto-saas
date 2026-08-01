@@ -11,9 +11,24 @@ import { MovementsTab } from '@/features/inventory/components/tabs/MovementsTab'
 import { InventoryCountTab } from '@/features/inventory/components/tabs/InventoryCountTab'
 import { LossAnalysisTab } from '@/features/inventory/components/tabs/LossAnalysisTab'
 import { formatCurrency } from '@/lib/format'
+import { useAppTour } from '@/hooks/useAppTour'
 
 export default function InventoryPage() {
     const { showAlert, showConfirm } = useNotification()
+    useAppTour('stok', [
+        {
+            element: '#tour-stock-movement',
+            popover: { title: 'Stok hareketi kaydedin', description: 'Giriş, çıkış veya fireyi anında kaydederek stok seviyelerini güncel tutun.' }
+        },
+        {
+            element: '#tour-stock-tabs',
+            popover: { title: 'Doğru çalışma alanını seçin', description: 'Stok durumu, hareketler, sayım ve fire analizi arasında buradan geçin.' }
+        },
+        {
+            element: '#tour-stock-kpis',
+            popover: { title: 'Kritik seviyeleri izleyin', description: 'Toplam değer ve kritik stok uyarıları günlük önceliklerinizi gösterir.' }
+        }
+    ])
 
     const ui = useInventoryUI()
     const data = useInventoryData(showAlert, showConfirm)
@@ -72,6 +87,7 @@ export default function InventoryPage() {
                     </div>
 
                     <button
+                        id="tour-stock-movement"
                         onClick={() => ui.setShowForm(true)}
                         className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-extrabold px-4 py-2.5 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95 whitespace-nowrap"
                     >
@@ -84,7 +100,7 @@ export default function InventoryPage() {
             {/* ──────────────── MAIN CONTAINER ──────────────── */}
             <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
                 {/* EXECUTIVE KPI METRIC CARDS */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+                <div id="tour-stock-kpis" className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
                     <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden group">
                         <div className="flex justify-between items-start mb-2">
                             <span className="text-stone-400 text-xs font-semibold">Toplam Stok Kalemi</span>
@@ -169,7 +185,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ──────────────── TAB NAVIGATION BAR ──────────────── */}
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 bg-stone-900/60 p-2 rounded-2xl border border-stone-800/80 backdrop-blur-md scrollbar-none">
+                <div id="tour-stock-tabs" className="flex items-center gap-2 overflow-x-auto pb-1 bg-stone-900/60 p-2 rounded-2xl border border-stone-800/80 backdrop-blur-md scrollbar-none">
                     {tabs.map(tab => {
                         const isActive = ui.activeTab === tab.key
                         return (
