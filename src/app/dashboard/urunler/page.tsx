@@ -5,10 +5,17 @@ import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency } from '@/lib/format'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useAppTour } from '@/hooks/useAppTour'
-import type { Product, ProductBulkRow, ProductIngredient, ProductMaterial, SubRecipe } from '@/features/products/types'
+import { ProductFilters } from '@/features/products/components/ProductFilters'
+import type {
+  Product,
+  ProductBulkRow,
+  ProductIngredient,
+  ProductMaterial,
+  ProductSort,
+  SubRecipe,
+} from '@/features/products/types'
 import { productTourSteps } from '@/features/products/tour'
 import {
   calculateMargin,
@@ -29,7 +36,7 @@ export default function Urunler() {
   const [isBuildingAiRecipe, setIsBuildingAiRecipe] = useState(false)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('Tümü')
-  const [sortBy, setSortBy] = useState<'name' | 'price_desc' | 'price_asc' | 'margin_desc' | 'sales_desc'>('name')
+  const [sortBy, setSortBy] = useState<ProductSort>('name')
 
   // Accordion state
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set())
@@ -606,68 +613,18 @@ export default function Urunler() {
           </div>
         </div>
 
-        {/* SEARCH, FILTER & ACTION BAR */}
-        <div
-          id="tour-products-filters"
-          className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3"
-        >
-          {/* Search Input */}
-          <div className="flex-1 relative">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-sm">🔍</span>
-            <Input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Ürün adı ile hızlı ara..."
-              className="pl-9 pr-8"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300 text-xs"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* Category & Sorting Filters */}
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-300 text-xs focus:outline-none focus:border-amber-500/50 cursor-pointer"
-            >
-              <option value="Tümü">Tüm Kategoriler ({products.length})</option>
-              {allCategories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat} ({products.filter((p) => p.category === cat).length})
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={sortBy}
-              onChange={(e) =>
-                setSortBy(e.target.value as 'name' | 'price_desc' | 'price_asc' | 'margin_desc' | 'sales_desc')
-              }
-              className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-300 text-xs focus:outline-none focus:border-amber-500/50 cursor-pointer"
-            >
-              <option value="name">İsme Göre (A-Z)</option>
-              <option value="price_desc">Fiyat (En Yüksek)</option>
-              <option value="price_asc">Fiyat (En Düşük)</option>
-              <option value="margin_desc">Kar Marjı (En Yüksek)</option>
-              <option value="sales_desc">Son 30G Satış (En Çok)</option>
-            </select>
-
-            <button
-              onClick={() => toggleAll(openCategories.size === 0)}
-              className="bg-stone-950 hover:bg-stone-800 text-stone-300 hover:text-white text-xs font-semibold px-3 py-2 border border-stone-800 rounded-xl whitespace-nowrap transition-colors"
-            >
-              {openCategories.size === 0 ? '▼ Tümünü Aç' : '▲ Tümünü Kapat'}
-            </button>
-          </div>
-        </div>
+        <ProductFilters
+          search={search}
+          onSearchChange={setSearch}
+          categoryFilter={categoryFilter}
+          onCategoryFilterChange={setCategoryFilter}
+          products={products}
+          categories={allCategories}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+          allCategoriesOpen={openCategories.size > 0}
+          onToggleAll={() => toggleAll(openCategories.size === 0)}
+        />
 
         {/* ──────────────── PRODUCTS LIST / CATEGORY ACCORDIONS ──────────────── */}
         {loading ? (

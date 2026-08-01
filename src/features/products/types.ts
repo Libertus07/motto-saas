@@ -30,6 +30,8 @@ export type Product = {
   actual_sales_30d?: number
 }
 
+export type ProductSort = 'name' | 'price_desc' | 'price_asc' | 'margin_desc' | 'sales_desc'
+
 export type ProductBulkRow = {
   id: string
   sale_price: string
