@@ -7,6 +7,7 @@ import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { useAppTour } from '@/hooks/useAppTour'
+import { ProductCatalog } from '@/features/products/components/ProductCatalog'
 import { ProductFilters } from '@/features/products/components/ProductFilters'
 import type {
   Product,
@@ -17,12 +18,7 @@ import type {
   SubRecipe,
 } from '@/features/products/types'
 import { productTourSteps } from '@/features/products/tour'
-import {
-  calculateMargin,
-  calculateProductMetrics,
-  calculateRecipeCost,
-  getMarginColorClass,
-} from '@/features/products/utils'
+import { calculateMargin, calculateProductMetrics, calculateRecipeCost } from '@/features/products/utils'
 
 export default function Urunler() {
   const { showAlert, showConfirm } = useNotification()
@@ -626,288 +622,19 @@ export default function Urunler() {
           onToggleAll={() => toggleAll(openCategories.size === 0)}
         />
 
-        {/* ──────────────── PRODUCTS LIST / CATEGORY ACCORDIONS ──────────────── */}
-        {loading ? (
-          <div className="bg-stone-900/60 border border-stone-800 rounded-2xl p-16 text-center text-stone-400 backdrop-blur-md">
-            <div className="animate-spin text-amber-500 text-3xl mb-3">⚙️</div>
-            <p className="text-sm font-medium">Menü ve Reçeteler Yükleniyor...</p>
-          </div>
-        ) : groupedByCategory.length === 0 ? (
-          <div className="bg-stone-900/60 border border-stone-800 rounded-2xl p-16 text-center text-stone-500 backdrop-blur-md">
-            <div className="text-5xl mb-3">📋</div>
-            <h3 className="text-lg font-bold text-stone-300 mb-1">Aramanıza Uygun Ürün Bulunamadı</h3>
-            <p className="text-xs text-stone-400 max-w-sm mx-auto">
-              Arama filtrenizi temizleyerek veya &quot;+ Yeni Ürün Ekle&quot; butonunu kullanarak yeni ürün
-              tanımlayabilirsiniz.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {groupedByCategory.map(({ cat, items }) => {
-              const isOpen = openCategories.has(cat)
-              const avgMargin =
-                items.reduce(
-                  (total, product) => total + calculateMargin(product.sale_price, product.calculated_cost || 0),
-                  0,
-                ) / items.length
-
-              return (
-                <div
-                  key={cat}
-                  className="bg-stone-900/80 border border-stone-800/80 rounded-2xl overflow-hidden backdrop-blur-md shadow-xl transition-all"
-                >
-                  {/* Category Header Bar */}
-                  <button
-                    onClick={() => toggleCategory(cat)}
-                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-stone-800/40 transition-colors group select-none"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="text-stone-400 text-xs transition-transform duration-200"
-                        style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}
-                      >
-                        ▶
-                      </span>
-                      <span className="font-extrabold text-stone-100 text-sm sm:text-base">{cat}</span>
-                      <span className="bg-stone-800 text-stone-400 border border-stone-700 text-xs px-2.5 py-0.5 rounded-full font-semibold">
-                        {items.length} ürün
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <span
-                          className={`font-bold text-xs sm:text-sm px-2 py-0.5 rounded-lg border ${getMarginColorClass(avgMargin)}`}
-                        >
-                          Ort. %{avgMargin.toFixed(1)}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Category Content Area */}
-                  {isOpen && (
-                    <div className="border-t border-stone-800/80">
-                      {/* Desktop Table View */}
-                      <div className="hidden md:block overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                          <thead>
-                            <tr className="bg-stone-950/60 border-b border-stone-800 text-stone-400 text-[11px] uppercase tracking-wider font-semibold">
-                              <th className="px-5 py-3">Ürün Adı</th>
-                              <th className="px-4 py-3 text-right">Food Cost</th>
-                              <th className="px-4 py-3 text-right">Satış Fiyatı</th>
-                              <th className="px-4 py-3 text-right">Tahmini Aylık</th>
-                              <th className="px-4 py-3 text-right text-amber-400">Son 30G Satış</th>
-                              <th className="px-4 py-3 text-right">Kâr Marjı</th>
-                              <th className="px-5 py-3 text-right">{bulkEditMode ? 'Durum' : 'İşlem'}</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-stone-800/50 text-xs sm:text-sm">
-                            {items.map((product) => {
-                              const cost = product.calculated_cost || 0
-                              const margin = calculateMargin(product.sale_price, cost)
-                              const isEditing = editingId === product.id
-                              const row = bulkRows[product.id]
-
-                              if (bulkEditMode && row) {
-                                const isChanged = changedIds.has(product.id)
-                                const inputCls =
-                                  'w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1 text-white text-xs focus:outline-none focus:border-amber-500'
-                                return (
-                                  <tr
-                                    key={product.id}
-                                    className={`transition-colors ${isChanged ? 'bg-amber-500/10' : ''}`}
-                                  >
-                                    <td className="px-5 py-3 font-semibold text-white">{product.name}</td>
-                                    <td className="px-4 py-3 text-right text-stone-400">₺{cost.toFixed(2)}</td>
-                                    <td className="px-2 py-2">
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span className="text-stone-500 text-xs">₺</span>
-                                        <input
-                                          type="number"
-                                          value={row.sale_price}
-                                          onChange={(e) => updateBulkRow(product.id, 'sale_price', e.target.value)}
-                                          className={inputCls + ' text-right w-24 font-bold text-amber-400'}
-                                        />
-                                      </div>
-                                    </td>
-                                    <td className="px-2 py-2">
-                                      <input
-                                        type="number"
-                                        value={row.estimated_monthly_sales}
-                                        onChange={(e) =>
-                                          updateBulkRow(product.id, 'estimated_monthly_sales', e.target.value)
-                                        }
-                                        className={inputCls + ' text-right w-20'}
-                                      />
-                                    </td>
-                                    <td className="px-4 py-3 text-right text-amber-400 font-bold">
-                                      {product.actual_sales_30d || 0}
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                      <span
-                                        className={`font-bold px-2 py-0.5 rounded-lg border ${getMarginColorClass(margin)}`}
-                                      >
-                                        %{margin.toFixed(1)}
-                                      </span>
-                                    </td>
-                                    <td className="px-5 py-3 text-right font-medium text-amber-400">
-                                      {isChanged && <span>● Değişti</span>}
-                                    </td>
-                                  </tr>
-                                )
-                              }
-
-                              return (
-                                <tr
-                                  key={product.id}
-                                  className={`hover:bg-stone-800/30 transition-colors ${
-                                    isEditing ? 'bg-amber-500/10' : ''
-                                  }`}
-                                >
-                                  <td className="px-5 py-3.5 font-bold text-stone-100">{product.name}</td>
-                                  <td className="px-4 py-3.5 text-right text-stone-400 font-medium">
-                                    ₺{cost.toFixed(2)}
-                                  </td>
-                                  <td className="px-4 py-3.5 text-right text-white font-extrabold text-base">
-                                    ₺{product.sale_price.toFixed(2)}
-                                  </td>
-                                  <td className="px-4 py-3.5 text-right text-stone-400">
-                                    {product.estimated_monthly_sales} adet
-                                  </td>
-                                  <td className="px-4 py-3.5 text-right text-amber-400 font-bold">
-                                    {product.actual_sales_30d || 0} adet
-                                  </td>
-                                  <td className="px-4 py-3.5 text-right">
-                                    <span
-                                      className={`font-bold px-2.5 py-0.5 rounded-lg border ${getMarginColorClass(margin)}`}
-                                    >
-                                      %{margin.toFixed(1)}
-                                    </span>
-                                  </td>
-                                  <td className="px-5 py-3.5 text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                      <button
-                                        onClick={() => handleEdit(product)}
-                                        className="p-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white rounded-lg border border-stone-700 transition-colors active:scale-95"
-                                        title="Düzenle"
-                                      >
-                                        ✏️
-                                      </button>
-                                      <button
-                                        onClick={() => handleDelete(product.id)}
-                                        className="p-1.5 bg-stone-800 hover:bg-red-500/20 text-stone-400 hover:text-red-400 rounded-lg border border-stone-700 hover:border-red-500/30 transition-colors active:scale-95"
-                                        title="Sil"
-                                      >
-                                        🗑️
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Mobile Cards View */}
-                      <div className="md:hidden divide-y divide-stone-800/60">
-                        {items.map((product) => {
-                          const cost = product.calculated_cost || 0
-                          const margin = calculateMargin(product.sale_price, cost)
-                          const row = bulkRows[product.id]
-
-                          if (bulkEditMode && row) {
-                            const isChanged = changedIds.has(product.id)
-                            return (
-                              <div key={product.id} className={`p-4 space-y-3 ${isChanged ? 'bg-amber-500/10' : ''}`}>
-                                <div className="flex justify-between items-center">
-                                  <span className="font-bold text-white text-sm">{product.name}</span>
-                                  {isChanged && <span className="text-amber-400 text-xs font-bold">● Değişti</span>}
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                  <div>
-                                    <label className="text-stone-400 block mb-1">Satış Fiyatı (₺)</label>
-                                    <input
-                                      type="number"
-                                      value={row.sale_price}
-                                      onChange={(e) => updateBulkRow(product.id, 'sale_price', e.target.value)}
-                                      className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1.5 text-amber-400 font-bold text-sm"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-stone-400 block mb-1">Tahmini Satış</label>
-                                    <input
-                                      type="number"
-                                      value={row.estimated_monthly_sales}
-                                      onChange={(e) =>
-                                        updateBulkRow(product.id, 'estimated_monthly_sales', e.target.value)
-                                      }
-                                      className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1.5 text-white text-sm"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          }
-
-                          return (
-                            <div key={product.id} className="p-4 space-y-2.5 hover:bg-stone-800/20 transition-colors">
-                              <div className="flex items-center justify-between">
-                                <h4 className="font-bold text-white text-sm sm:text-base">{product.name}</h4>
-                                <span
-                                  className={`font-bold text-xs px-2 py-0.5 rounded-lg border ${getMarginColorClass(margin)}`}
-                                >
-                                  %{margin.toFixed(1)} Kar
-                                </span>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-2 bg-stone-950/60 p-2.5 rounded-xl border border-stone-800/60 text-xs">
-                                <div>
-                                  <span className="text-stone-400 block text-[10px]">Food Cost</span>
-                                  <span className="font-semibold text-stone-200">₺{cost.toFixed(2)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-stone-400 block text-[10px]">Satış Fiyatı</span>
-                                  <span className="font-extrabold text-amber-400">
-                                    ₺{product.sale_price.toFixed(2)}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-stone-400 block text-[10px]">Tahmini Satış</span>
-                                  <span className="text-stone-300">{product.estimated_monthly_sales} adet</span>
-                                </div>
-                                <div>
-                                  <span className="text-stone-400 block text-[10px]">Son 30G Satış</span>
-                                  <span className="font-bold text-amber-400">{product.actual_sales_30d || 0} adet</span>
-                                </div>
-                              </div>
-
-                              <div className="flex justify-end gap-2 pt-1">
-                                <button
-                                  onClick={() => handleEdit(product)}
-                                  className="px-3 py-1 bg-stone-800 text-stone-200 hover:text-white rounded-lg text-xs font-semibold border border-stone-700"
-                                >
-                                  ✏️ Düzenle
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(product.id)}
-                                  className="px-3 py-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg text-xs font-semibold border border-red-500/20"
-                                >
-                                  🗑️ Sil
-                                </button>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
+        <ProductCatalog
+          loading={loading}
+          groups={groupedByCategory}
+          openCategories={openCategories}
+          bulkEditMode={bulkEditMode}
+          bulkRows={bulkRows}
+          changedIds={changedIds}
+          editingId={editingId}
+          onToggleCategory={toggleCategory}
+          onBulkRowChange={updateBulkRow}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
       </main>
 
       {/* ──────────────── PRODUCT FORM MODAL / DRAWER ──────────────── */}
