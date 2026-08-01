@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
@@ -36,6 +36,14 @@ type ParsedExpenseItem = {
     category?: string
 }
 
+type PaymentMethods = {
+    cash: number
+    credit_card: number
+    other: number
+}
+
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Bilinmeyen hata'
+
 export default function ZRaporuYukle() {
     const { showAlert, showConfirm } = useNotification()
     const { activeOrg } = useOrganization()
@@ -45,7 +53,7 @@ export default function ZRaporuYukle() {
     const [fileType, setFileType] = useState<'image' | 'pdf' | 'xml' | 'json' | null>(null)
     const [loading, setLoading] = useState(false)
     const [analyzing, setAnalyzing] = useState(false)
-    const [parsedData, setParsedData] = useState<{ date: string, total_revenue: number, payment_methods?: { cash: number, credit_card: number, other: number }, items: ParsedSaleItem[], expenses: ParsedExpenseItem[], discounts?: { total_amount: number, details?: string[] } } | null>(null)
+    const [parsedData, setParsedData] = useState<{ date: string, total_revenue: number, payment_methods?: PaymentMethods, items: ParsedSaleItem[], expenses: ParsedExpenseItem[], discounts?: { total_amount: number, details?: string[] } } | null>(null)
     const [products, setProducts] = useState<Product[]>([])
     const [accounts, setAccounts] = useState<{id: string, name: string, type: string}[]>([])
 
@@ -53,7 +61,7 @@ export default function ZRaporuYukle() {
     const [newProductModal, setNewProductModal] = useState<{ isOpen: boolean, itemIndex: number, name: string, price: number, category: string } | null>(null)
     const [savingProduct, setSavingProduct] = useState(false)
 
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
     const router = useRouter()
 
     useEffect(() => {
@@ -65,7 +73,7 @@ export default function ZRaporuYukle() {
             setAccounts(accData || [])
         }
         fetchProductsAndAccounts()
-    }, [activeOrg?.id])
+    }, [activeOrg, supabase])
 
     const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)))
     // Default kategoriler eğer sistemde hiç yoksa diye
@@ -240,8 +248,8 @@ export default function ZRaporuYukle() {
             })
 
             setParsedData({ ...data, items: mappedItems, expenses: mappedExpenses })
-        } catch (error: any) {
-            let errorMsg = error.message;
+        } catch (error: unknown) {
+            let errorMsg = getErrorMessage(error);
             if (errorMsg === 'The string did not match the expected pattern.') {
                 errorMsg = 'Tarayıcı kaynaklı bir hata oluştu. Yüklediğiniz fotoğrafın formatı (HEIC vb.) veya boyutu desteklenmiyor olabilir. Lütfen ekran görüntüsü alıp veya kırparak tekrar deneyin.';
             } else if (errorMsg.includes('Failed to fetch')) {
@@ -286,8 +294,8 @@ export default function ZRaporuYukle() {
 
                 setNewProductModal(null)
             }
-        } catch (err: any) {
-            await showAlert('Ürün eklenirken hata oluştu: ' + err.message, 'error')
+        } catch (err: unknown) {
+            await showAlert('Ürün eklenirken hata oluştu: ' + getErrorMessage(err), 'error')
         } finally {
             setSavingProduct(false)
         }
@@ -341,7 +349,14 @@ export default function ZRaporuYukle() {
 
         try {
             const reportDate = parsedData.date || new Date().toISOString().split('T')[0]
-            const { data: { user } } = await supabase.auth.getUser()
+            const expenses = [
+                ...(parsedData.expenses ?? []),
+                ...((parsedData.discounts?.total_amount ?? 0) > 0 ? [{
+                    expense_name: 'Z-Raporu İndirim ve İkramlar',
+                    category: 'indirim-ikram',
+                    amount: parsedData.discounts?.total_amount ?? 0,
+                }] : []),
+            ]
 
             // --- ÇİFT KAYIT KONTROLÜ BAŞLANGIÇ ---
             const { data: dupData } = await supabase
@@ -407,19 +422,9 @@ export default function ZRaporuYukle() {
             const { error: salesError } = await supabase.from('sales').insert(salesInserts)
             if (salesError) throw salesError
 
-            // 1.5. İndirim ve İkramları Gider (Eksi Bakiye) olarak ekle
-            if (parsedData.discounts && parsedData.discounts.total_amount > 0) {
-                if (!parsedData.expenses) parsedData.expenses = [];
-                parsedData.expenses.push({
-                    expense_name: 'Z-Raporu İndirim ve İkramlar',
-                    category: 'indirim-ikram',
-                    amount: parsedData.discounts.total_amount
-                });
-            }
-
             // 1.6. Giderleri Expenses tablosuna kaydet
-            if (parsedData.expenses && parsedData.expenses.length > 0) {
-                const expenseInserts = parsedData.expenses.map(exp => ({
+            if (expenses.length > 0) {
+                const expenseInserts = expenses.map(exp => ({
                     batch_id: batchId,
                     name: exp.expense_name,
                     category: exp.category || 'Genel',
@@ -462,8 +467,8 @@ export default function ZRaporuYukle() {
                     })
                 }
 
-                if (cashAccount && parsedData.expenses && parsedData.expenses.length > 0) {
-                    const realExpenses = parsedData.expenses.filter(exp => exp.category !== 'indirim-ikram')
+                if (cashAccount && expenses.length > 0) {
+                    const realExpenses = expenses.filter(exp => exp.category !== 'indirim-ikram')
                     const totalExpense = realExpenses.reduce((acc, exp) => acc + Number(exp.amount), 0)
                     if (totalExpense > 0) {
                         accountMovements.push({
@@ -562,9 +567,6 @@ export default function ZRaporuYukle() {
                 }
             }
 
-            const logDetails = Object.keys(stockDeductions).length > 0 ? "Stoklar detaylarda düşüldü." : "Stok düşümü yapılmadı."
-            // Note: Since auditDetails is scoped inside the if block, we can just pass the JSON of stockDeductions if it's simpler, 
-            // but let's actually just use the JSON representation of stockDeductions.
             logActivity('Z-Raporu', 'EKLEME', `${reportDate} tarihli Z-Raporu sisteme eklendi ve toplam ${matchedSales.length} kalem satıldı.`, { 
                 batchId,
                 toplam_gelir: parsedData.total_revenue,
@@ -572,8 +574,9 @@ export default function ZRaporuYukle() {
             })
             await showAlert('Z Raporu başarıyla işlendi ve stoklar düşüldü!', 'success')
             router.push('/dashboard/raporlar')
-        } catch (err: any) {
-            await showAlert('Kayıt sırasında hata oluştu: ' + err.message, 'error')
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Bilinmeyen hata'
+            await showAlert('Kayıt sırasında hata oluştu: ' + message, 'error')
         } finally {
             setLoading(false)
         }
@@ -683,7 +686,7 @@ export default function ZRaporuYukle() {
                                     <input 
                                         type="number"
                                         value={parsedData.payment_methods?.cash || 0}
-                                        onChange={(e) => setParsedData({...parsedData, payment_methods: { ...parsedData.payment_methods, cash: parseFloat(e.target.value) || 0 } as any})}
+                                        onChange={(e) => setParsedData({...parsedData, payment_methods: { cash: parseFloat(e.target.value) || 0, credit_card: parsedData.payment_methods?.credit_card || 0, other: parsedData.payment_methods?.other || 0 }})}
                                         className="w-24 bg-stone-900 border border-stone-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400 font-bold"
                                     />
                                 </div>
@@ -692,7 +695,7 @@ export default function ZRaporuYukle() {
                                     <input 
                                         type="number"
                                         value={parsedData.payment_methods?.credit_card || 0}
-                                        onChange={(e) => setParsedData({...parsedData, payment_methods: { ...parsedData.payment_methods, credit_card: parseFloat(e.target.value) || 0 } as any})}
+                                        onChange={(e) => setParsedData({...parsedData, payment_methods: { cash: parsedData.payment_methods?.cash || 0, credit_card: parseFloat(e.target.value) || 0, other: parsedData.payment_methods?.other || 0 }})}
                                         className="w-24 bg-stone-900 border border-stone-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-400 font-bold"
                                     />
                                 </div>
@@ -958,7 +961,7 @@ export default function ZRaporuYukle() {
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
                     <div className="bg-stone-900 border border-stone-700 rounded-2xl p-6 w-full max-w-md">
                         <h3 className="text-xl font-bold mb-4 text-amber-400">Yeni Ürün Ekle</h3>
-                        <p className="text-stone-400 text-sm mb-6">"{newProductModal.name}" sistemde bulunamadı. Yeni bir ürün olarak kataloga ekleyebilirsiniz.</p>
+                        <p className="text-stone-400 text-sm mb-6">&quot;{newProductModal.name}&quot; sistemde bulunamadı. Yeni bir ürün olarak kataloga ekleyebilirsiniz.</p>
 
                         <div className="space-y-4">
                             <div>

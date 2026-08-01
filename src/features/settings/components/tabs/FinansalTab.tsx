@@ -101,7 +101,7 @@ export function FinansalTab({ s, set, onSave, saving, categories, setCategories 
               <option value="nearest">En Yakın Tam Sayı (₺34)</option>
               <option value="ceil">Yukarı Yuvarla (₺35)</option>
               <option value="floor">Aşağı Yuvarla (₺34)</option>
-              <option value="nearest5">En Yakın 5'e Yuvarla (₺35)</option>
+              <option value="nearest5">En Yakın 5&apos;e Yuvarla (₺35)</option>
               <option value="none">Yuvarlama Yapma</option>
             </select>
           </FormRow>

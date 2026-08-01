@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
-import { devLog, devError } from '@/lib/debug';
+import { devError } from '@/lib/debug';
 import { isSafeImageUrl } from '@/lib/ai-security';
 import { z } from 'zod';
 
@@ -86,7 +86,7 @@ Yanıtı SADECE aşağıdaki formatta saf JSON olarak dön (markdown kullanma). 
     "notes": "Belge hakkında önemli özet bilgi"
 }`;
 
-        const contentParts: any[] = [prompt];
+        const contentParts: Array<string | { inlineData: { data: string; mimeType: string } }> = [prompt];
 
         if (image) {
             contentParts.push({

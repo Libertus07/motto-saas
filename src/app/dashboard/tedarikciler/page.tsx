@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
@@ -49,6 +48,15 @@ type GroupedReceipt = {
   items: SupplierMovement[]
 }
 
+type AccountNameResult = { name: string } | { name: string }[]
+
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error
+    ? error.message
+    : typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
+      ? error.message
+      : 'Bilinmeyen hata'
+
 export default function Tedarikciler() {
   const { showAlert, showConfirm } = useNotification()
   const { activeOrg } = useOrganization()
@@ -74,32 +82,32 @@ export default function Tedarikciler() {
   const [accounts, setAccounts] = useState<{ id: string; name: string; type: string }[]>([])
   const [paymentAccountId, setPaymentAccountId] = useState<string>('')
 
-  const supabase = createClient()
-  const router = useRouter()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    if (!activeOrg) return;
-    fetchSuppliers()
-    fetchAccounts()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeOrg?.id])
-
-  const fetchAccounts = async () => {
+  const fetchAccounts = useCallback(async () => {
     if (!activeOrg) return;
     const { data } = await supabase.from('accounts').select('*').eq('organization_id', activeOrg.id).order('created_at')
     if (data && data.length > 0) {
       setAccounts(data)
       setPaymentAccountId(data[0].id)
     }
-  }
+  }, [activeOrg, supabase])
 
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = useCallback(async () => {
     if (!activeOrg) return;
     setLoading(true)
     const { data } = await supabase.from('suppliers').select('*').eq('organization_id', activeOrg.id).order('name')
     setSuppliers(data || [])
     setLoading(false)
-  }
+  }, [activeOrg, supabase])
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void fetchSuppliers()
+      void fetchAccounts()
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [fetchAccounts, fetchSuppliers])
 
   const viewTransactions = async (supplier: Supplier) => {
     setSelectedSupplier(supplier)
@@ -126,7 +134,7 @@ export default function Tedarikciler() {
     // Group stock movements by batch_id or date
     const movs = movData || []
     const groups: Record<string, GroupedReceipt> = {}
-    movs.forEach((item: any) => {
+    ;(movs as unknown as SupplierMovement[]).forEach(item => {
       const dateStr = item.created_at.split('T')[0]
       const key = item.batch_id || dateStr
 
@@ -206,9 +214,9 @@ export default function Tedarikciler() {
         { amount, note: paymentNote }
       )
       await showAlert('Ödeme başarıyla kaydedildi!', 'success')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Ödeme ekleme hatası:', error)
-      await showAlert('Hata oluştu: ' + (error.message || 'Bilinmeyen hata'), 'error')
+      await showAlert('Hata oluştu: ' + getErrorMessage(error), 'error')
     }
   }
 
@@ -224,7 +232,8 @@ export default function Tedarikciler() {
         .eq('source_id', trx.id)
         .single()
       if (mov && mov.accounts) {
-        accountName = (mov.accounts as any).name
+        const account = mov.accounts as unknown as AccountNameResult
+        accountName = Array.isArray(account) ? account[0]?.name ?? null : account.name
       }
     }
 
@@ -286,8 +295,8 @@ export default function Tedarikciler() {
         { transaction: trx }
       )
       await showAlert('İşlem silindi ve bakiye güncellendi!', 'success')
-    } catch (error: any) {
-      await showAlert('Silme işlemi başarısız oldu: ' + (error.message || 'Bilinmeyen hata'), 'error')
+    } catch (error: unknown) {
+      await showAlert('Silme işlemi başarısız oldu: ' + getErrorMessage(error), 'error')
     }
   }
 
@@ -338,7 +347,7 @@ export default function Tedarikciler() {
   const handleAddSupplier = async () => {
     if (!newSupplier.name) return
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('suppliers')
       .insert({
         name: newSupplier.name,

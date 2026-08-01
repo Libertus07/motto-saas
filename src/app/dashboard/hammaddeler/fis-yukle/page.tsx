@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
-import { devLog, devError } from '@/lib/debug';
+import { devError } from '@/lib/debug';
 import { formatCurrency } from "@/lib/format"
 import { useNotification } from '@/components/NotificationProvider'
 import dynamic from 'next/dynamic'
@@ -55,7 +55,7 @@ export default function FisYukle() {
     const [isPreprocessOpen, setIsPreprocessOpen] = useState(false)
     const [preprocessFiles, setPreprocessFiles] = useState<File[] | File | null>(null)
     const { showAlert, showConfirm } = useNotification()
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
     const router = useRouter()
 
     // Tedarikçi adı değiştiğinde borcunu getir
@@ -78,7 +78,7 @@ export default function FisYukle() {
             const timer = setTimeout(checkDebt, 500)
             return () => clearTimeout(timer)
         }
-    }, [step, parsedSupplier?.name])
+    }, [parsedSupplier?.name, step, supabase])
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const fileList = Array.from(e.target.files || [])
@@ -194,7 +194,7 @@ export default function FisYukle() {
 
             setParsedItems(itemsWithMatch)
             setStep('review')
-        } catch (err: any) {
+        } catch {
             setError('Fiş okunamadı, bağlantıyı kontrol edin veya tekrar deneyin.')
         }
 
@@ -319,10 +319,10 @@ export default function FisYukle() {
             }
         }
 
-        const parseNum = (val: any) => {
-            if (typeof val === 'number') return val;
-            if (!val) return 0;
-            return parseFloat(val.toString().replace(/,/g, '.')) || 0;
+        const parseNum = (value: unknown) => {
+            if (typeof value === 'number') return value;
+            if (typeof value === 'string') return parseFloat(value.replace(/,/g, '.')) || 0;
+            return 0;
         }
 
         const payload = {
@@ -706,7 +706,7 @@ export default function FisYukle() {
                                                 }}
                                                 className="bg-indigo-600/20 border border-indigo-500/50 hover:bg-indigo-600 hover:text-white text-indigo-400 font-medium px-4 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-2"
                                               >
-                                                ⚖️ {(item.unit.toLowerCase() === 'kg' || item.unit.toLowerCase() === 'kilogram') ? 'Gram' : 'Ml'}'a Dönüştür
+                                                ⚖️ {(item.unit.toLowerCase() === 'kg' || item.unit.toLowerCase() === 'kilogram') ? 'Gram' : 'Ml'}&apos;a Dönüştür
                                               </button>
                                             )}
                                             {(item.unit.toLowerCase() === 'kutu' || item.unit.toLowerCase() === 'koli' || item.unit.toLowerCase() === 'paket' || item.unit.toLowerCase() === 'adet') && (

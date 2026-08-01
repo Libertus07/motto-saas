@@ -42,7 +42,7 @@ export default function InventoryPage() {
             .reduce((acc, mov) => acc + (mov.quantity * (mov.unit_price || 0)), 0)
     }, [data.movements])
 
-    const tabs = [
+    const tabs: Array<{ key: 'stok' | 'hareket' | 'sayim' | 'zayi'; label: string; icon: string; badge?: number; badgeColor?: string }> = [
         { key: 'stok', label: 'Stok Durumu', icon: '📦', badge: totalMaterialsCount },
         { key: 'hareket', label: 'Hareketler', icon: '📋', badge: data.movements.length },
         { key: 'sayim', label: 'Sayım Yap', icon: '🔢' },
@@ -175,7 +175,7 @@ export default function InventoryPage() {
                         return (
                             <button
                                 key={tab.key}
-                                onClick={() => ui.setActiveTab(tab.key as any)}
+                                onClick={() => ui.setActiveTab(tab.key)}
                                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap active:scale-95 ${
                                     isActive
                                         ? 'bg-amber-500 text-stone-950 shadow-lg shadow-amber-500/20'

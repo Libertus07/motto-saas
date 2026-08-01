@@ -13,13 +13,6 @@ type InvestmentTransactionRecord = {
   created_at?: string | null
 }
 
-type InvestmentRecord = {
-  id: string
-  name?: string | null
-  quantity: number
-  average_cost: number
-}
-
 type AccountMovementRecord = {
   id: string
   account_id: string

@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devError } from '@/lib/debug'
@@ -48,14 +47,9 @@ export default function YariMamuller() {
   })
   const [ingredients, setIngredients] = useState<SubRecipeIngredient[]>([])
 
-  const supabase = createClient()
-  const router = useRouter()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     const { data: mats } = await supabase.from('materials').select('*').order('name')
     setMaterials(mats || [])
@@ -84,7 +78,14 @@ export default function YariMamuller() {
       setSubRecipes([])
     }
     setLoading(false)
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void fetchData()
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [fetchData])
 
   const resetForm = () => {
     setForm({ name: '', yield_quantity: '', yield_unit: 'Porsiyon', wastage_percent: '5' })
@@ -349,7 +350,7 @@ export default function YariMamuller() {
             <div className="text-5xl mb-3">🥣</div>
             <h3 className="text-lg font-bold text-stone-300 mb-1">Henüz Üretim Reçetesi Eklemediniz</h3>
             <p className="text-xs text-stone-400 max-w-sm mx-auto">
-              Tepsi tatlıları, soslar veya toplu pişirilen yarı mamülleri "+ Yeni Üretim Reçetesi" butonuna basarak ekleyebilirsiniz.
+              Tepsi tatlıları, soslar veya toplu pişirilen yarı mamülleri &quot;+ Yeni Üretim Reçetesi&quot; butonuna basarak ekleyebilirsiniz.
             </p>
           </div>
         ) : (
@@ -565,7 +566,7 @@ export default function YariMamuller() {
 
                 {ingredients.length === 0 ? (
                   <div className="text-center py-6 text-stone-500 text-xs">
-                    Henüz reçeteye hammadde eklenmedi. Yukarıdaki "+ Hammadde Ekle" butonunu kullanın.
+                    Henüz reçeteye hammadde eklenmedi. Yukarıdaki &quot;+ Hammadde Ekle&quot; butonunu kullanın.
                   </div>
                 ) : (
                   <div className="space-y-2.5">

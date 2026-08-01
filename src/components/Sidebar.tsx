@@ -4,13 +4,13 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { OrganizationSwitcher } from '@/components/OrganizationSwitcher'
 
 export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [userName, setUserName] = useState('Yükleniyor...')
@@ -43,8 +43,8 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
       }
       setLoadingSettings(false)
     }
-    fetchData()
-  }, [])
+    void fetchData()
+  }, [supabase])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()

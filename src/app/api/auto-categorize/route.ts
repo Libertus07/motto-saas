@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
-import { devLog, devError } from '@/lib/debug';
+import { devError } from '@/lib/debug';
 
 import { z } from 'zod';
 
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
 
         const categoryList = (categories || []).join(', ');
         const materialLines = materials
-            .map((m: any) => `- id: ${m.id} | ad: ${m.name} | mevcut_kategori: ${m.category || 'Yok'}`)
+            .map(m => `- id: ${m.id} | ad: ${m.name} | mevcut_kategori: ${m.category || 'Yok'}`)
             .join('\n');
 
         const prompt = `Sen bir restoran/kafe tedarik zinciri uzmanısın.

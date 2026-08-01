@@ -1,12 +1,18 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 
 export interface OrganizationItem {
   id: string
   name: string
   role: string
+}
+
+type OrganizationMember = {
+  organization_id: string
+  role: string | null
+  organizations: { name: string } | null
 }
 
 interface OrganizationContextType {
@@ -19,7 +25,7 @@ interface OrganizationContextType {
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined)
 
 export function OrganizationProvider({ children }: { children: React.ReactNode }) {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [organizations, setOrganizations] = useState<OrganizationItem[]>([])
   const [activeOrg, setActiveOrgState] = useState<OrganizationItem | null>(null)
   const [loading, setLoading] = useState(true)
@@ -40,7 +46,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           .eq('status', 'active')
 
         if (members && members.length > 0) {
-          const list: OrganizationItem[] = members.map((m: any) => ({
+          const list: OrganizationItem[] = (members as unknown as OrganizationMember[]).map(m => ({
             id: m.organization_id,
             name: m.organizations?.name || 'Motto Varsayılan Şube',
             role: m.role || 'owner'
@@ -71,7 +77,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       }
     }
     loadOrganizations()
-  }, [])
+  }, [supabase])
 
   const setActiveOrg = (org: OrganizationItem) => {
     setActiveOrgState(org)

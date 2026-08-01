@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
@@ -26,9 +26,10 @@ type ParsedInvestment = {
     name: string
 }
 
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Bilinmeyen hata'
+
 export default function YatirimFisiYukle() {
     const [imageUrl, setImageUrl] = useState<string | null>(null)
-    const [fileText, setFileText] = useState<string | null>(null)
     const [fileType, setFileType] = useState<'image' | 'pdf' | null>(null)
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [loading, setLoading] = useState(false)
@@ -69,11 +70,9 @@ export default function YatirimFisiYukle() {
             return;
         }
 
-        const fileExt = file.name.split('.').pop()?.toLowerCase()
         if (file.type === 'application/pdf') {
             const reader = new FileReader()
             reader.onload = () => {
-                setFileText(null)
                 setImageUrl(reader.result as string)
                 setFileType('pdf')
             }
@@ -81,7 +80,6 @@ export default function YatirimFisiYukle() {
         } else {
             const reader = new FileReader()
             reader.onload = () => {
-                setFileText(null)
                 setImageUrl(reader.result as string)
                 setFileType('image')
             }
@@ -116,8 +114,8 @@ export default function YatirimFisiYukle() {
                 purchase_date: data.purchase_date || new Date().toISOString().split('T')[0],
                 notes: data.notes || 'Yapay Zeka ile oluşturuldu'
             })
-        } catch (error: any) {
-            await showAlert('Analiz Hatası: ' + error.message, 'error')
+        } catch (error: unknown) {
+            await showAlert('Analiz Hatası: ' + getErrorMessage(error), 'error')
         } finally {
             setAnalyzing(false)
         }
@@ -219,8 +217,8 @@ export default function YatirimFisiYukle() {
             await showAlert('Yatırım fişi başarıyla kaydedildi!', 'success')
             router.push('/dashboard/raporlar/yatirim-gecmisi')
 
-        } catch (err: any) {
-            await showAlert('Kayıt sırasında hata oluştu: ' + err.message, 'error')
+        } catch (err: unknown) {
+            await showAlert('Kayıt sırasında hata oluştu: ' + getErrorMessage(err), 'error')
         } finally {
             setLoading(false)
         }
@@ -409,7 +407,7 @@ export default function YatirimFisiYukle() {
                                 {loading ? 'Kaydediliyor...' : 'Onayla ve Portföye Ekle 🚀'}
                             </button>
                             <button
-                                onClick={() => { setParsedData(null); setImageUrl(null); setFileText(null); setFileType(null); setSelectedFile(null); }}
+                                onClick={() => { setParsedData(null); setImageUrl(null); setFileType(null); setSelectedFile(null); }}
                                 disabled={loading}
                                 className="bg-stone-800 hover:bg-stone-700 text-white font-bold px-8 py-4 rounded-xl transition-colors disabled:opacity-50"
                             >

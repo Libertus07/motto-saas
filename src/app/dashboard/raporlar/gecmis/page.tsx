@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
-import { devLog, devError } from '@/lib/debug';
+import { devError } from '@/lib/debug';
 import { formatCurrency, formatDate } from "@/lib/format";
 import { HistoryAccordion } from '@/components/ui/HistoryAccordion';
 
@@ -39,11 +39,14 @@ type GroupedMonth = {
     days: GroupedSale[]
 }
 
+type SortBy = 'date_desc' | 'date_asc' | 'revenue_desc'
+
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Bilinmeyen hata'
+
 export default function GecmisRaporlar() {
     const [allGroups, setAllGroups] = useState<GroupedSale[]>([])
     const [loading, setLoading] = useState(true)
     const [deletingDate, setDeletingDate] = useState<string | null>(null)
-    const [expandedMonth, setExpandedMonth] = useState<string | null>(null)
     const [expandedDate, setExpandedDate] = useState<string | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const { showAlert, showConfirm } = useNotification()
@@ -51,19 +54,13 @@ export default function GecmisRaporlar() {
     
     // Filters & Sorting
     const [selectedMonth, setSelectedMonth] = useState<string>('all')
-    const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'revenue_desc'>('date_desc')
+    const [sortBy, setSortBy] = useState<SortBy>('date_desc')
     
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
     const router = useRouter()
 
-    useEffect(() => {
-        if (activeOrg?.id) {
-            fetchSales()
-        }
-    }, [activeOrg?.id])
-
-    const fetchSales = async () => {
-        if (!activeOrg) return;
+    const fetchSales = useCallback(async () => {
+        if (!activeOrg?.id) return;
         setLoading(true)
         const { data, error } = await supabase
             .from('sales')
@@ -94,7 +91,7 @@ export default function GecmisRaporlar() {
         }
 
         const groups: Record<string, GroupedSale> = {}
-        data?.forEach((item: any) => {
+        ;(data ?? []).forEach((item: SaleItem) => {
             const date = item.sale_date
             item.product_name = item.product_id && productMap[item.product_id] 
                 ? productMap[item.product_id] 
@@ -118,7 +115,17 @@ export default function GecmisRaporlar() {
         const sortedGroups = Object.values(groups).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         setAllGroups(sortedGroups)
         setLoading(false)
-    }
+    }, [activeOrg, supabase])
+
+    useEffect(() => {
+        if (!activeOrg?.id) return
+
+        const timer = setTimeout(() => {
+            void fetchSales()
+        }, 0)
+
+        return () => clearTimeout(timer)
+    }, [activeOrg, fetchSales])
 
     // Gruplama, Filtreleme ve Sıralama işlemleri
     const groupedMonths = useMemo(() => {
@@ -189,10 +196,6 @@ export default function GecmisRaporlar() {
         return name.charAt(0).toUpperCase() + name.slice(1)
     }
 
-    const toggleMonthExpand = (monthKey: string) => {
-        setExpandedMonth(expandedMonth === monthKey ? null : monthKey)
-    }
-
     const toggleDateExpand = (date: string) => {
         setExpandedDate(expandedDate === date ? null : date)
     }
@@ -224,8 +227,8 @@ export default function GecmisRaporlar() {
             
             await showAlert('Z-Raporu başarıyla silindi ve stoklar geri alındı.', 'success')
             fetchSales()
-        } catch (err: any) {
-            await showAlert('Silme işlemi başarısız: ' + err.message, 'error')
+        } catch (err: unknown) {
+            await showAlert('Silme işlemi başarısız: ' + getErrorMessage(err), 'error')
         } finally {
             setDeletingDate(null)
         }
@@ -264,7 +267,7 @@ export default function GecmisRaporlar() {
 
                         <select 
                             value={sortBy} 
-                            onChange={(e) => setSortBy(e.target.value as any)}
+                            onChange={(e) => setSortBy(e.target.value as SortBy)}
                             className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-stone-200 focus:outline-none focus:border-amber-400"
                         >
                             <option value="date_desc">En Yeniler Önce</option>

@@ -1,11 +1,19 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
-import { formatCurrency, formatDate } from '@/lib/format'
+import { formatDate } from '@/lib/format'
 import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
+
+type ActivityLogDetails = Record<string, unknown> & {
+  detay?: string
+  _meta?: {
+    ip?: string
+    userAgent?: string
+  }
+}
 
 type ActivityLog = {
   id: string
@@ -13,7 +21,7 @@ type ActivityLog = {
   module: string
   action_type: 'EKLEME' | 'SILME' | 'GUNCELLEME'
   description: string
-  details?: any
+  details?: ActivityLogDetails
   user_id: string
 }
 
@@ -25,13 +33,9 @@ export default function IslemGecmisi() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null)
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    fetchLogs()
-  }, [])
-
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true)
     const { data, error } = await supabase
       .from('activity_logs')
@@ -42,7 +46,15 @@ export default function IslemGecmisi() {
       setLogs(data)
     }
     setLoading(false)
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void fetchLogs()
+    }, 0)
+
+    return () => clearTimeout(timer)
+  }, [fetchLogs])
 
   const processedLogs = useMemo(() => {
     return logs.filter(log => {
@@ -567,7 +579,7 @@ export default function IslemGecmisi() {
                               return dict[k] || k
                             }
 
-                            const renderValue = (v: any) => {
+                            const renderValue = (v: unknown) => {
                               if (
                                 typeof v === 'string' &&
                                 v.startsWith('http') &&

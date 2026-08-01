@@ -49,7 +49,7 @@ export default function FiyatMotoruPage() {
       }))
       
       showAlert('Birim maliyetler ürün kartlarına kaydedildi.', 'success')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Kaydetme hatası:', err)
       showAlert('Kaydetme işlemi başarısız oldu.', 'error')
     } finally {

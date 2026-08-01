@@ -56,3 +56,6 @@ public/swe-worker-*.js
 public/swe-worker-*.js.map
 
 *.backup
+
+# Local database exports may contain production data.
+/backups/

@@ -1,4 +1,4 @@
-import React, { Fragment } from 'react'
+import React from 'react'
 import { Material } from '../../types'
 
 type InventoryCountTabProps = {

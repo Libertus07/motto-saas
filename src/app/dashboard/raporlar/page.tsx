@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
-import { devLog, devError } from '@/lib/debug';
+import { devError } from '@/lib/debug';
 import { formatCurrency } from "@/lib/format";
 
 type Product = {
@@ -15,6 +15,9 @@ type Product = {
     sale_price: number
     calculated_cost: number
 }
+
+type Sale = { product_id: string; quantity: number; total_price: number }
+type AiRecommendation = { product_name: string; issue: string; action: string; impact: string }
 
 type Expense = {
     amount: number
@@ -28,7 +31,7 @@ export default function Raporlar() {
     const { showAlert } = useNotification()
     const [products, setProducts] = useState<Product[]>([])
     const [expenses, setExpenses] = useState<Expense[]>([])
-    const [sales, setSales] = useState<any[]>([])
+    const [sales, setSales] = useState<Sale[]>([])
     const [loading, setLoading] = useState(true)
 
     const [targetMargin, setTargetMargin] = useState(35)
@@ -41,17 +44,12 @@ export default function Raporlar() {
     // AI States
     const [aiLoading, setAiLoading] = useState(false)
     const [aiModalOpen, setAiModalOpen] = useState(false)
-    const [aiReport, setAiReport] = useState<{ summary: string; recommendations: any[] } | null>(null)
+    const [aiReport, setAiReport] = useState<{ summary: string; recommendations: AiRecommendation[] } | null>(null)
 
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
     const router = useRouter()
 
-    useEffect(() => {
-        fetchStats()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeOrg?.id])
-
-    const fetchStats = async () => {
+    const fetchStats = useCallback(async () => {
         if (!activeOrg) return;
         setLoading(true)
         const [{ data: prods }, { data: exps }, { data: salesData }, { data: settings }] = await Promise.all([
@@ -73,7 +71,15 @@ export default function Raporlar() {
         }
 
         setLoading(false)
-    }
+    }, [activeOrg, supabase])
+
+    useEffect(() => {
+        if (!activeOrg?.id) return
+        const timer = setTimeout(() => {
+            void fetchStats()
+        }, 0)
+        return () => clearTimeout(timer)
+    }, [activeOrg, fetchStats])
 
 
 

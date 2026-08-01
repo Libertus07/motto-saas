@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
-import { devLog, devError } from '@/lib/debug'
+import { devError } from '@/lib/debug'
 import { formatCurrency, formatDate } from "@/lib/format"
 import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
 
@@ -24,8 +24,21 @@ type AccountMovement = {
     description: string
     source_type: string
     created_at: string
-    z_details?: any
+    z_details?: {
+        hasilat: number
+        gider: number
+        acikFazla: number
+        acikFazlaTipi: string
+        net: number
+    }
 }
+
+const getErrorMessage = (error: unknown) =>
+    error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
+            ? error.message
+            : 'Bilinmeyen hata'
 
 export default function FinansPage() {
     const { showAlert, showConfirm } = useNotification()
@@ -46,21 +59,9 @@ export default function FinansPage() {
     const [manualForm, setManualForm] = useState({ movement_type: 'giris', amount: '', description: '' })
     const [saving, setSaving] = useState(false)
 
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
-    useEffect(() => {
-        fetchAccounts()
-    }, [])
-
-    useEffect(() => {
-        if (selectedAccount) {
-            fetchMovements(selectedAccount.id)
-        } else {
-            setMovements([])
-        }
-    }, [selectedAccount])
-
-    const fetchAccounts = async () => {
+    const fetchAccounts = useCallback(async () => {
         setLoading(true)
         const { data, error } = await supabase.from('accounts').select('*').order('created_at', { ascending: true })
         if (error) {
@@ -72,9 +73,9 @@ export default function FinansPage() {
             }
         }
         setLoading(false)
-    }
+    }, [selectedAccount, supabase])
 
-    const fetchMovements = async (accountId: string) => {
+    const fetchMovements = useCallback(async (accountId: string) => {
         const { data, error } = await supabase
             .from('account_movements')
             .select('*')
@@ -86,7 +87,25 @@ export default function FinansPage() {
         } else {
             setMovements(data || [])
         }
-    }
+    }, [supabase])
+
+    useEffect(() => {
+        const id = window.setTimeout(() => {
+            void fetchAccounts()
+        }, 0)
+        return () => window.clearTimeout(id)
+    }, [fetchAccounts])
+
+    useEffect(() => {
+        const id = window.setTimeout(() => {
+            if (selectedAccount) {
+                void fetchMovements(selectedAccount.id)
+            } else {
+                setMovements([])
+            }
+        }, 0)
+        return () => window.clearTimeout(id)
+    }, [fetchMovements, selectedAccount])
 
     // Top Executive KPIs
     const totalLiquidity = useMemo(() => {
@@ -274,8 +293,8 @@ export default function FinansPage() {
 
             await showAlert('Manuel işlem başarıyla eklendi ve hesap bakiyesi güncellendi.', 'success')
 
-        } catch (error: any) {
-            await showAlert('İşlem başarısız: ' + error.message, 'error')
+        } catch (error: unknown) {
+            await showAlert('İşlem başarısız: ' + getErrorMessage(error), 'error')
         } finally {
             setSaving(false)
         }
@@ -317,8 +336,8 @@ export default function FinansPage() {
                 fetchMovements(selectedAccount.id)
             }
 
-        } catch (error: any) {
-            await showAlert('Silme işlemi başarısız: ' + error.message, 'error')
+        } catch (error: unknown) {
+            await showAlert('Silme işlemi başarısız: ' + getErrorMessage(error), 'error')
         }
     }
 

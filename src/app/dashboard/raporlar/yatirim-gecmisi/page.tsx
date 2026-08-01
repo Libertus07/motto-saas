@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
-import { devLog, devError } from '@/lib/debug';
+import { devError } from '@/lib/debug';
 import { formatCurrency, formatDate } from "@/lib/format";
 import { deleteInvestmentTransactionWithRefund } from '@/lib/investment-transactions'
 import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
@@ -36,26 +36,20 @@ type GroupedMonth = {
     items: InvestmentTransaction[]
 }
 
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : 'Bilinmeyen hata'
+
 export default function YatirimGecmisi() {
     const [transactions, setTransactions] = useState<InvestmentTransaction[]>([])
     const [loading, setLoading] = useState(true)
-    const [expandedMonth, setExpandedMonth] = useState<string | null>(null)
     const [selectedMonth, setSelectedMonth] = useState<string>('all')
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const { showAlert, showConfirm } = useNotification()
     const { activeOrg } = useOrganization()
     
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
     const router = useRouter()
 
-    useEffect(() => {
-        if (activeOrg?.id) {
-            fetchInvestments()
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeOrg?.id])
-
-    const fetchInvestments = async () => {
+    const fetchInvestments = useCallback(async () => {
         if (!activeOrg) return;
         setLoading(true)
         const { data, error } = await supabase
@@ -76,7 +70,15 @@ export default function YatirimGecmisi() {
 
         setTransactions(data || [])
         setLoading(false)
-    }
+    }, [activeOrg, supabase])
+
+    useEffect(() => {
+        if (!activeOrg?.id) return
+        const timer = setTimeout(() => {
+            void fetchInvestments()
+        }, 0)
+        return () => clearTimeout(timer)
+    }, [activeOrg, fetchInvestments])
 
     // Ay Listesi (Filtre için)
     const availableMonths = useMemo(() => {
@@ -144,9 +146,9 @@ export default function YatirimGecmisi() {
 
             await showAlert('Yatırım işlemi başarıyla silindi ve iade gerçekleştirildi.', 'success')
             fetchInvestments()
-        } catch (error: any) {
+        } catch (error: unknown) {
             devError('Silme işlemi başarısız oldu:', error)
-            await showAlert('Silme işlemi başarısız oldu: ' + error.message, 'error')
+            await showAlert('Silme işlemi başarısız oldu: ' + getErrorMessage(error), 'error')
         }
     }
 
@@ -173,7 +175,6 @@ export default function YatirimGecmisi() {
                             value={selectedMonth} 
                             onChange={(e) => {
                                 setSelectedMonth(e.target.value)
-                                setExpandedMonth(null)
                             }}
                             className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-stone-200 focus:outline-none focus:border-purple-400"
                         >

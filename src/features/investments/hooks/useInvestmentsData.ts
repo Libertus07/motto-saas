@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
@@ -8,10 +8,17 @@ import { Account, Rates, BuyFormState, EditFormState, RentFormState, ValueFormSt
 import { deleteInvestmentTransactionWithRefund } from '@/lib/investment-transactions'
 import { useOrganization } from '@/context/OrganizationContext'
 
+const getErrorMessage = (error: unknown) =>
+    error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
+            ? error.message
+            : 'Bilinmeyen hata'
+
 export function useInvestmentsData() {
     const { showAlert, showConfirm } = useNotification()
     const { activeOrg } = useOrganization()
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
     const [accounts, setAccounts] = useState<Account[]>([])
     const [investments, setInvestments] = useState<Investment[]>([])
@@ -105,8 +112,8 @@ export function useInvestmentsData() {
             await showAlert('Yatırım başarıyla silindi ve ilişkili ödemeler kasalarınıza iade edildi.', 'success')
             fetchData()
             return true
-        } catch(error: any) {
-            await showAlert('Hata: ' + error.message, 'error')
+        } catch(error: unknown) {
+            await showAlert('Hata: ' + getErrorMessage(error), 'error')
             setLoading(false)
             return false
         }
@@ -152,8 +159,8 @@ export function useInvestmentsData() {
             await showAlert('Yatırım başarıyla eklendi!', 'success')
             fetchData()
             return true
-        } catch (error: any) {
-            await showAlert('Hata: ' + error.message, 'error')
+        } catch (error: unknown) {
+            await showAlert('Hata: ' + getErrorMessage(error), 'error')
             return false
         } finally {
             setSaving(false)
@@ -166,7 +173,7 @@ export function useInvestmentsData() {
             const qty = parseFloat(form.quantity)
             const cost = parseFloat(form.average_cost)
 
-            await supabase.from('investments').update({
+            const { error: updateError } = await supabase.from('investments').update({
                 name: form.name,
                 quantity: qty,
                 average_cost: cost,
@@ -175,6 +182,7 @@ export function useInvestmentsData() {
                 document_url: form.document_url,
                 updated_at: new Date().toISOString()
             }).eq('id', investmentId)
+            if (updateError) throw updateError
 
             const changes = []
             if (originalInvestment.name !== form.name) changes.push(`İsim: ${originalInvestment.name} -> ${form.name}`)
@@ -190,8 +198,8 @@ export function useInvestmentsData() {
             await showAlert('Yatırım başarıyla güncellendi!', 'success')
             fetchData()
             return true
-        } catch(error: any) {
-            await showAlert('Hata: ' + error.message, 'error')
+        } catch(error: unknown) {
+            await showAlert('Hata: ' + getErrorMessage(error), 'error')
             return false
         } finally {
             setSaving(false)
@@ -221,8 +229,8 @@ export function useInvestmentsData() {
             await showAlert('Kira başarıyla tahsil edildi!', 'success')
             fetchData()
             return true
-        } catch (error: any) {
-            await showAlert('Hata: ' + error.message, 'error')
+        } catch (error: unknown) {
+            await showAlert('Hata: ' + getErrorMessage(error), 'error')
             return false
         } finally {
             setSaving(false)
@@ -233,10 +241,11 @@ export function useInvestmentsData() {
         setSaving(true)
         try {
             const newVal = parseFloat(form.current_value)
-            await supabase.from('investments').update({
+            const { error: updateError } = await supabase.from('investments').update({
                 current_manual_value: newVal,
                 updated_at: new Date().toISOString()
             }).eq('id', investmentId)
+            if (updateError) throw updateError
 
             await logActivity('Yatırımlar', 'GUNCELLEME', `Değer Güncellemesi: ${investmentName}`, {
                 detay: `Yeni Değer (₺${newVal}) | Eski Değer (₺${oldManualValue})`
@@ -245,8 +254,8 @@ export function useInvestmentsData() {
             await showAlert('Gayrimenkul değeri başarıyla güncellendi!', 'success')
             fetchData()
             return true
-        } catch(error: any) {
-            await showAlert('Hata: ' + error.message, 'error')
+        } catch(error: unknown) {
+            await showAlert('Hata: ' + getErrorMessage(error), 'error')
             return false
         } finally {
             setSaving(false)

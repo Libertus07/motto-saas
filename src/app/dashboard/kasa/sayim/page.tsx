@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { formatCurrency } from "@/lib/format"
 
@@ -21,6 +20,13 @@ interface RecentReconciliation {
     created_at: string
 }
 
+const getErrorMessage = (error: unknown) =>
+    error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
+            ? error.message
+            : 'Veriler yüklenirken hata oluştu'
+
 const DENOMINATIONS = [
     { value: 200, label: '200 ₺ Banknot', icon: '💵', type: 'note' },
     { value: 100, label: '100 ₺ Banknot', icon: '💵', type: 'note' },
@@ -34,8 +40,7 @@ const DENOMINATIONS = [
 ]
 
 export default function KasaSayimPage() {
-    const supabase = createClient()
-    const router = useRouter()
+    const supabase = useMemo(() => createClient(), [])
 
     const [date, setDate] = useState(new Date().toISOString().split('T')[0])
     const [loading, setLoading] = useState(true)
@@ -68,16 +73,11 @@ export default function KasaSayimPage() {
     })
 
     // Geçmiş Mutabakatlar & Aktif Mutabakat State'i
-    const [existingReconciliation, setExistingReconciliation] = useState<any>(null)
+    const [existingReconciliation, setExistingReconciliation] = useState<RecentReconciliation | null>(null)
     const [recentReconciliations, setRecentReconciliations] = useState<RecentReconciliation[]>([])
     const [activeTab, setActiveTab] = useState<'count' | 'history'>('count')
 
-    useEffect(() => {
-        fetchExpectedTotals()
-        fetchRecentHistory()
-    }, [date])
-
-    const fetchExpectedTotals = async () => {
+    const fetchExpectedTotals = useCallback(async () => {
         setLoading(true)
         setError(null)
         setSuccess(false)
@@ -98,6 +98,7 @@ export default function KasaSayimPage() {
                 .eq('date', date)
                 .maybeSingle()
 
+            if (recError) throw recError
             if (recData) {
                 setExistingReconciliation(recData)
                 setCountedCash(recData.counted_cash)
@@ -169,14 +170,14 @@ export default function KasaSayimPage() {
             setExpectedCashRaw(totalExpectedCash)
             setExpectedCreditRaw(totalExpectedCredit)
 
-        } catch (err: any) {
-            setError(err.message || 'Veriler yüklenirken hata oluştu')
+        } catch (err: unknown) {
+            setError(getErrorMessage(err))
         } finally {
             setLoading(false)
         }
-    }
+    }, [date, supabase])
 
-    const fetchRecentHistory = async () => {
+    const fetchRecentHistory = useCallback(async () => {
         try {
             const { data, error } = await supabase
                 .from('cash_reconciliations')
@@ -190,7 +191,15 @@ export default function KasaSayimPage() {
         } catch (e) {
             console.error('Geçmiş mutabakatlar yüklenemedi:', e)
         }
-    }
+    }, [supabase])
+
+    useEffect(() => {
+        const id = window.setTimeout(() => {
+            void fetchExpectedTotals()
+            void fetchRecentHistory()
+        }, 0)
+        return () => window.clearTimeout(id)
+    }, [fetchExpectedTotals, fetchRecentHistory])
 
     // Para Sayma Asistanı Hesaplama
     const handleDenomChange = (val: number, count: number) => {
@@ -273,7 +282,7 @@ export default function KasaSayimPage() {
                 is_movement_found: isMovementFound
             }
 
-            const { data: rpcResult, error: rpcError } = await supabase.rpc('process_cash_reconciliation', { payload })
+            const { error: rpcError } = await supabase.rpc('process_cash_reconciliation', { payload })
 
             if (rpcError) {
                 throw new Error(rpcError.message || 'Kasa sayım onayı (RPC) sırasında bir hata oluştu.')
@@ -307,8 +316,8 @@ export default function KasaSayimPage() {
             setTimeout(() => setSuccess(false), 3000)
             fetchExpectedTotals()
             fetchRecentHistory()
-        } catch (err: any) {
-            setError(err.message || 'Kaydetme sırasında hata oluştu')
+        } catch (err: unknown) {
+            setError(getErrorMessage(err))
         } finally {
             setSaving(false)
         }
@@ -632,7 +641,7 @@ export default function KasaSayimPage() {
                                                 <label className="block text-[11px] font-bold text-stone-400 mb-1.5">Oluşan Durum</label>
                                                 <select 
                                                     value={adjustmentType}
-                                                    onChange={(e) => setAdjustmentType(e.target.value as any)}
+                                                    onChange={(e) => setAdjustmentType(e.target.value as typeof adjustmentType)}
                                                     className="w-full bg-stone-950 border border-stone-800 rounded-xl py-2.5 px-3 text-white text-xs font-bold focus:outline-none focus:border-amber-500 cursor-pointer"
                                                 >
                                                     <option value="none">Düzeltme Yok</option>

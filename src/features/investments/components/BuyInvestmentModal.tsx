@@ -10,7 +10,7 @@ type BuyInvestmentModalProps = {
     accounts: Account[]
     onSubmit: (e: FormEvent) => void
     saving: boolean
-    onFileUpload: (e: ChangeEvent<HTMLInputElement>, setter: any, state: any) => void
+    onFileUpload: (e: ChangeEvent<HTMLInputElement>, setter: (form: BuyFormState) => void, state: BuyFormState) => void
     onAnalyzeReceipt: (e: ChangeEvent<HTMLInputElement>) => void
     isAnalyzing: boolean
 }
@@ -78,7 +78,7 @@ export function BuyInvestmentModal({
                                 <button 
                                     key={type}
                                     type="button"
-                                    onClick={() => setForm({...form, asset_type: type as any})}
+                                    onClick={() => setForm({...form, asset_type: type as BuyFormState['asset_type']})}
                                     className={`py-3 px-1 rounded-xl font-bold border flex flex-col items-center gap-1 transition-all ${form.asset_type === type ? 'bg-amber-500/10 border-amber-500 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : 'bg-stone-950 border-stone-800 text-stone-500 hover:border-stone-700 hover:text-stone-300'}`}
                                 >
                                     <span className="text-2xl">{type === 'gold' ? '🥇' : type === 'usd' ? '💵' : type === 'eur' ? '💶' : '🏠'}</span>
