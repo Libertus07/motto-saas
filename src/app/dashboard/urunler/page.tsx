@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { useAppTour } from '@/hooks/useAppTour'
@@ -11,15 +10,14 @@ import { ProductFilters } from '@/features/products/components/ProductFilters'
 import { ProductFormDrawer } from '@/features/products/components/ProductFormDrawer'
 import { ProductMetrics } from '@/features/products/components/ProductMetrics'
 import { ProductPageHeader } from '@/features/products/components/ProductPageHeader'
+import { useProductsData } from '@/features/products/hooks/useProductsData'
 import type {
   Product,
   ProductBulkRow,
   ProductCategorySuggestion,
   ProductFormValues,
   ProductIngredient,
-  ProductMaterial,
   ProductSort,
-  SubRecipe,
 } from '@/features/products/types'
 import { productTourSteps } from '@/features/products/tour'
 import { calculateMargin, calculateProductMetrics, calculateRecipeCost } from '@/features/products/utils'
@@ -27,10 +25,15 @@ import { calculateMargin, calculateProductMetrics, calculateRecipeCost } from '@
 export default function Urunler() {
   const { showAlert, showConfirm } = useNotification()
   useAppTour('urunler', productTourSteps)
-  const [products, setProducts] = useState<Product[]>([])
-  const [materials, setMaterials] = useState<ProductMaterial[]>([])
-  const [subRecipes, setSubRecipes] = useState<SubRecipe[]>([])
-  const [loading, setLoading] = useState(true)
+  const {
+    supabase,
+    products,
+    materials,
+    subRecipes,
+    loading,
+    error: productsError,
+    refresh: fetchData,
+  } = useProductsData()
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isBuildingAiRecipe, setIsBuildingAiRecipe] = useState(false)
@@ -62,76 +65,23 @@ export default function Urunler() {
   })
   const [recipeItems, setRecipeItems] = useState<ProductIngredient[]>([])
 
-  const supabase = createClient()
-
   const defaultCategories = ['Sıcak Kahveler', 'Soğuk Kahveler', 'Tatlılar', 'Çaylar', 'Kutu İçecekler', 'Diğer']
   const uniqueCategories = Array.from(new Set(products.map((p) => p.category).filter(Boolean)))
   const allCategories = Array.from(new Set([...defaultCategories, ...uniqueCategories]))
 
-  const fetchData = async () => {
-    setLoading(true)
-    const { data: mats } = await supabase.from('materials').select('*').order('name')
-    setMaterials(mats || [])
+  useEffect(() => {
+    if (loading) return
 
-    const { data: s_recipes } = await supabase.from('sub_recipes').select('*').order('name')
-    const { data: s_recipe_ings } = await supabase.from('sub_recipe_ingredients').select('*')
-    let processedSubRecipes: SubRecipe[] = []
-    if (s_recipes && s_recipe_ings && mats) {
-      processedSubRecipes = s_recipes.map((r) => {
-        const myIngs = s_recipe_ings.filter((i) => i.sub_recipe_id === r.id)
-        let totalCost = 0
-        myIngs.forEach((ing) => {
-          const mat = mats.find((m) => m.id === ing.material_id)
-          if (mat) totalCost += mat.price_per_unit * ing.quantity
-        })
-        const finalCost = totalCost * (1 + r.wastage_percent / 100)
-        return { ...r, cost_per_yield: r.yield_quantity > 0 ? finalCost / r.yield_quantity : 0 }
-      })
-    }
-    setSubRecipes(processedSubRecipes)
+    const timeoutId = window.setTimeout(() => {
+      setOpenCategories(new Set(products.map((product) => product.category)))
+    }, 0)
 
-    const { data: prods } = await supabase.from('products').select('*').order('name')
-    const { data: prod_ings } = await supabase.from('product_ingredients').select('*')
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    const { data: recentSales } = await supabase
-      .from('sales')
-      .select('product_id, quantity')
-      .gte('sale_date', thirtyDaysAgo.toISOString().split('T')[0])
-
-    const salesByProduct: Record<string, number> = {}
-    recentSales?.forEach((s) => {
-      salesByProduct[s.product_id] = (salesByProduct[s.product_id] || 0) + s.quantity
-    })
-
-    if (prods) {
-      const productsWithCost = prods.map((p) => {
-        const myIngs = prod_ings?.filter((i) => i.product_id === p.id) || []
-        let cost = 0
-        myIngs.forEach((ing) => {
-          if (ing.material_id) {
-            const mat = mats?.find((m) => m.id === ing.material_id)
-            if (mat) cost += mat.price_per_unit * ing.quantity
-          } else if (ing.sub_recipe_id) {
-            const sr = processedSubRecipes.find((s) => s.id === ing.sub_recipe_id)
-            if (sr?.cost_per_yield) cost += sr.cost_per_yield * ing.quantity
-          }
-        })
-        return { ...p, calculated_cost: cost, actual_sales_30d: salesByProduct[p.id] || 0 }
-      })
-      setProducts(productsWithCost)
-      setOpenCategories(new Set(productsWithCost.map((p) => p.category)))
-    }
-    setLoading(false)
-  }
+    return () => window.clearTimeout(timeoutId)
+  }, [loading, products])
 
   useEffect(() => {
-    const id = window.setTimeout(() => {
-      fetchData()
-    }, 0)
-    return () => clearTimeout(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (productsError) void showAlert(`Ürün verileri yüklenemedi: ${productsError.message}`, 'error')
+  }, [productsError, showAlert])
 
   // ─── Accordion Toggle ──────────────────────────────────────
   const toggleCategory = (cat: string) => {
