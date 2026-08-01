@@ -9,6 +9,12 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useAppTour } from '@/hooks/useAppTour'
 import type { Product, ProductBulkRow, ProductIngredient, ProductMaterial, SubRecipe } from '@/features/products/types'
+import {
+  calculateMargin,
+  calculateProductMetrics,
+  calculateRecipeCost,
+  getMarginColorClass,
+} from '@/features/products/utils'
 
 export default function Urunler() {
   const { showAlert, showConfirm } = useNotification()
@@ -281,21 +287,6 @@ export default function Urunler() {
 
   const removeRecipeItem = (index: number) => setRecipeItems(recipeItems.filter((_, i) => i !== index))
 
-  const calculateLiveCost = () => {
-    let total = 0
-    recipeItems.forEach((item) => {
-      if (!item.item_id || !item.quantity) return
-      if (item.type === 'material') {
-        const mat = materials.find((m) => m.id === item.item_id)
-        if (mat) total += mat.price_per_unit * item.quantity
-      } else {
-        const sr = subRecipes.find((s) => s.id === item.item_id)
-        if (sr?.cost_per_yield) total += sr.cost_per_yield * item.quantity
-      }
-    })
-    return total
-  }
-
   const handleSubmit = async () => {
     if (!form.name) return
     const payload = {
@@ -425,37 +416,16 @@ export default function Urunler() {
   }
 
   // ─── Computed Statistics & Calculations ─────────────────────
-  const liveCost = calculateLiveCost()
+  const liveCost = calculateRecipeCost(recipeItems, materials, subRecipes)
   const salePrice = parseFloat(form.sale_price || '0')
-  const liveMargin = salePrice > 0 ? ((salePrice - liveCost) / salePrice) * 100 : 0
+  const liveMargin = calculateMargin(salePrice, liveCost)
   const liveCashContribution = (salePrice - liveCost) * parseInt(form.estimated_monthly_sales || '0')
 
-  const totalRevenue = useMemo(
-    () => products.reduce((t, p) => t + p.sale_price * (p.actual_sales_30d || 0), 0),
-    [products],
-  )
-
-  const totalEstContribution = useMemo(
-    () =>
-      products.reduce((t, p) => t + (p.sale_price - (p.calculated_cost || 0)) * (p.estimated_monthly_sales || 0), 0),
-    [products],
-  )
-
-  const overallAvgMargin = useMemo(() => {
-    if (products.length === 0) return 0
-    const totalMargin = products.reduce((t, p) => {
-      const cost = p.calculated_cost || 0
-      return t + (p.sale_price > 0 ? ((p.sale_price - cost) / p.sale_price) * 100 : 0)
-    }, 0)
-    return totalMargin / products.length
-  }, [products])
-
-  const getMarginColor = (margin: number) =>
-    margin >= 50
-      ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-      : margin >= 30
-        ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-        : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+  const {
+    totalRevenue,
+    totalEstimatedContribution: totalEstContribution,
+    averageMargin: overallAvgMargin,
+  } = useMemo(() => calculateProductMetrics(products), [products])
 
   // Filtered and sorted products
   const processedProducts = useMemo(() => {
@@ -473,8 +443,8 @@ export default function Urunler() {
     result.sort((a, b) => {
       const costA = a.calculated_cost || 0
       const costB = b.calculated_cost || 0
-      const marginA = a.sale_price > 0 ? ((a.sale_price - costA) / a.sale_price) * 100 : 0
-      const marginB = b.sale_price > 0 ? ((b.sale_price - costB) / b.sale_price) * 100 : 0
+      const marginA = calculateMargin(a.sale_price, costA)
+      const marginB = calculateMargin(b.sale_price, costB)
 
       if (sortBy === 'price_desc') return b.sale_price - a.sale_price
       if (sortBy === 'price_asc') return a.sale_price - b.sale_price
@@ -740,10 +710,10 @@ export default function Urunler() {
             {groupedByCategory.map(({ cat, items }) => {
               const isOpen = openCategories.has(cat)
               const avgMargin =
-                items.reduce((t, p) => {
-                  const cost = p.calculated_cost || 0
-                  return t + (p.sale_price > 0 ? ((p.sale_price - cost) / p.sale_price) * 100 : 0)
-                }, 0) / items.length
+                items.reduce(
+                  (total, product) => total + calculateMargin(product.sale_price, product.calculated_cost || 0),
+                  0,
+                ) / items.length
 
               return (
                 <div
@@ -771,7 +741,7 @@ export default function Urunler() {
                     <div className="flex items-center gap-3">
                       <div className="text-right">
                         <span
-                          className={`font-bold text-xs sm:text-sm px-2 py-0.5 rounded-lg border ${getMarginColor(avgMargin)}`}
+                          className={`font-bold text-xs sm:text-sm px-2 py-0.5 rounded-lg border ${getMarginColorClass(avgMargin)}`}
                         >
                           Ort. %{avgMargin.toFixed(1)}
                         </span>
@@ -799,8 +769,7 @@ export default function Urunler() {
                           <tbody className="divide-y divide-stone-800/50 text-xs sm:text-sm">
                             {items.map((product) => {
                               const cost = product.calculated_cost || 0
-                              const margin =
-                                product.sale_price > 0 ? ((product.sale_price - cost) / product.sale_price) * 100 : 0
+                              const margin = calculateMargin(product.sale_price, cost)
                               const isEditing = editingId === product.id
                               const row = bulkRows[product.id]
 
@@ -841,7 +810,7 @@ export default function Urunler() {
                                     </td>
                                     <td className="px-4 py-3 text-right">
                                       <span
-                                        className={`font-bold px-2 py-0.5 rounded-lg border ${getMarginColor(margin)}`}
+                                        className={`font-bold px-2 py-0.5 rounded-lg border ${getMarginColorClass(margin)}`}
                                       >
                                         %{margin.toFixed(1)}
                                       </span>
@@ -875,7 +844,7 @@ export default function Urunler() {
                                   </td>
                                   <td className="px-4 py-3.5 text-right">
                                     <span
-                                      className={`font-bold px-2.5 py-0.5 rounded-lg border ${getMarginColor(margin)}`}
+                                      className={`font-bold px-2.5 py-0.5 rounded-lg border ${getMarginColorClass(margin)}`}
                                     >
                                       %{margin.toFixed(1)}
                                     </span>
@@ -909,8 +878,7 @@ export default function Urunler() {
                       <div className="md:hidden divide-y divide-stone-800/60">
                         {items.map((product) => {
                           const cost = product.calculated_cost || 0
-                          const margin =
-                            product.sale_price > 0 ? ((product.sale_price - cost) / product.sale_price) * 100 : 0
+                          const margin = calculateMargin(product.sale_price, cost)
                           const row = bulkRows[product.id]
 
                           if (bulkEditMode && row) {
@@ -952,7 +920,7 @@ export default function Urunler() {
                               <div className="flex items-center justify-between">
                                 <h4 className="font-bold text-white text-sm sm:text-base">{product.name}</h4>
                                 <span
-                                  className={`font-bold text-xs px-2 py-0.5 rounded-lg border ${getMarginColor(margin)}`}
+                                  className={`font-bold text-xs px-2 py-0.5 rounded-lg border ${getMarginColorClass(margin)}`}
                                 >
                                   %{margin.toFixed(1)} Kar
                                 </span>
