@@ -8,6 +8,7 @@ import { useNotification } from '@/components/NotificationProvider'
 import { devError } from '@/lib/debug'
 import { formatCurrency, formatDate } from "@/lib/format"
 import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
+import { useAppTour } from '@/hooks/useAppTour'
 
 type Account = {
     id: string
@@ -41,6 +42,20 @@ const getErrorMessage = (error: unknown) =>
             : 'Bilinmeyen hata'
 
 export default function FinansPage() {
+    useAppTour('finans', [
+        {
+            element: '#tour-finance-actions',
+            popover: { title: 'İşlem başlatın', description: 'Kasa sayımına geçin veya modüllerden gelmeyen gelir–gideri manuel olarak kaydedin.' }
+        },
+        {
+            element: '#tour-finance-kpis',
+            popover: { title: 'Likiditeyi takip edin', description: 'Kasa, banka ve aylık net akış tek bir finansal özet içinde sunulur.' }
+        },
+        {
+            element: '#tour-finance-accounts',
+            popover: { title: 'Hesap hareketlerini yönetin', description: 'Hesap bakiyelerini ve işlem geçmişini kontrol ederek nakit akışını izleyin.' }
+        }
+    ])
     const { showAlert, showConfirm } = useNotification()
     const router = useRouter()
     const [accounts, setAccounts] = useState<Account[]>([])
@@ -398,7 +413,7 @@ export default function FinansPage() {
                     </div>
 
                     {/* Quick Executive Action Buttons */}
-                    <div className="flex items-center gap-3 w-full md:w-auto">
+                    <div id="tour-finance-actions" className="flex items-center gap-3 w-full md:w-auto">
                         <button
                             onClick={() => router.push('/dashboard/kasa/sayim')}
                             className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-700/80 text-stone-200 text-sm font-semibold transition-all duration-200 hover:border-amber-500/40 flex items-center justify-center gap-2 group shadow-sm active:scale-95"
@@ -422,7 +437,7 @@ export default function FinansPage() {
 
             <main className="max-w-7xl mx-auto p-6 space-y-8 mt-4">
                 {/* Executive Finance KPI Cards Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div id="tour-finance-kpis" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* KPI 1: Toplam Likidite */}
                     <div className="bg-gradient-to-br from-stone-900/90 via-stone-900/60 to-stone-950/80 rounded-2xl p-5 border border-amber-500/30 shadow-[0_4px_25px_rgba(245,158,11,0.05)] relative overflow-hidden group hover:border-amber-500/50 transition-all">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all pointer-events-none"></div>
@@ -484,7 +499,7 @@ export default function FinansPage() {
                 </div>
 
                 {/* Symmetrical Account Cards (Cüzdanlar) Grid */}
-                <section aria-labelledby="accounts-heading">
+                <section id="tour-finance-accounts" aria-labelledby="accounts-heading">
                     <div className="flex justify-between items-center mb-4">
                         <h2 id="accounts-heading" className="text-lg font-bold text-white flex items-center gap-2">
                             <span>💳</span> Hesap Yönetimi & Cüzdanlar

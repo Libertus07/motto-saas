@@ -11,9 +11,24 @@ import { CalculationParameters } from '@/features/pricing/components/Calculation
 import { SalesInputTab } from '@/features/pricing/components/tabs/SalesInputTab'
 import { AnalysisTab } from '@/features/pricing/components/tabs/AnalysisTab'
 import { ReportsTab } from '@/features/pricing/components/tabs/ReportsTab'
+import { useAppTour } from '@/hooks/useAppTour'
 
 export default function FiyatMotoruPage() {
   const [activeTab, setActiveTab] = useState<'sales' | 'results' | 'reports'>('sales')
+  useAppTour('fiyat_motoru', [
+    {
+      element: '#tour-pricing-kpis',
+      popover: { title: 'Günlük resmi görün', description: 'Ciro, gider ve tahmini kâr birlikte hesaplanır; önce bu özeti kontrol edin.' }
+    },
+    {
+      element: '#tour-pricing-parameters',
+      popover: { title: 'Hedef marjı belirleyin', description: 'Fiyat önerilerinin temelini oluşturan hedef ve maliyet parametrelerini buradan yönetin.' }
+    },
+    {
+      element: '#tour-pricing-tabs',
+      popover: { title: 'Üç adımlı karar akışı', description: 'Satış adetlerini girin, fiyat analizini inceleyin ve sonucu görsel raporlara taşıyın.' }
+    }
+  ])
   const [saving, setSaving] = useState(false)
   const { showAlert } = useNotification()
 
@@ -99,16 +114,20 @@ export default function FiyatMotoruPage() {
       <PricingHeader saving={saving} loading={loading} onSave={handleSaveCosts} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
-        <PricingKpiMetrics 
+        <div id="tour-pricing-kpis">
+          <PricingKpiMetrics
           productCount={products.length}
           totalDailyRevenue={totalDailyRevenue}
           dailyExpenses={dailyExpenses}
           totalDailyProfit={totalDailyProfit}
-        />
+          />
+        </div>
 
-        <CalculationParameters settings={settings} onSettingsChange={setSettings} />
+        <div id="tour-pricing-parameters">
+          <CalculationParameters settings={settings} onSettingsChange={setSettings} />
+        </div>
 
-        <div className="border-b border-stone-800 flex items-center overflow-x-auto scrollbar-none sticky top-[73px] z-20 bg-stone-950/80 backdrop-blur-xl">
+        <div id="tour-pricing-tabs" className="border-b border-stone-800 flex items-center overflow-x-auto scrollbar-none sticky top-[73px] z-20 bg-stone-950/80 backdrop-blur-xl">
           <button
             onClick={() => setActiveTab('sales')}
             className={`px-4 sm:px-6 py-3.5 sm:py-4 font-bold text-xs sm:text-sm border-b-2 whitespace-nowrap transition-colors ${
