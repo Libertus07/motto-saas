@@ -16,8 +16,14 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
 
     // Reset view state when modal opens or URL changes
     useEffect(() => {
-        setZoom(1)
-        setViewMode('fitWidth')
+        if (!isOpen) return
+        
+        const id = window.setTimeout(() => {
+            setZoom(1)
+            setViewMode('fitWidth')
+        }, 0)
+        
+        return () => clearTimeout(id)
     }, [url, isOpen])
 
     // Handle escape key
