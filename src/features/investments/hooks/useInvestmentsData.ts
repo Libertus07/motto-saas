@@ -46,11 +46,14 @@ export function useInvestmentsData() {
             setAccounts(accData)
         }
         setLoading(false)
-    }, [supabase, activeOrg?.id])
+    }, [supabase, activeOrg])
 
     useEffect(() => {
-        fetchData()
-        fetchRates()
+        const id = window.setTimeout(() => {
+            fetchData()
+            fetchRates()
+        }, 0)
+        return () => clearTimeout(id)
     }, [fetchData, fetchRates])
 
     const deleteInvestment = async (id: string) => {
