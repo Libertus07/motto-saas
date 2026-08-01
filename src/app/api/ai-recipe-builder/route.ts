@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
-import { devLog, devError } from '@/lib/debug';
+import { devError } from '@/lib/debug';
 import { z } from 'zod';
 
 const RecipeIngredientSchema = z.object({
@@ -13,6 +13,12 @@ const RecipeIngredientSchema = z.object({
 
 const RecipeBuilderSchema = z.object({
   ingredients: z.array(RecipeIngredientSchema).default([])
+});
+
+const RecipeRequestSchema = z.object({
+  productName: z.string().trim().min(1),
+  materials: z.array(z.object({ id: z.string(), name: z.string(), unit: z.string(), price_per_unit: z.number() })).optional(),
+  subRecipes: z.array(z.object({ id: z.string(), name: z.string(), total_cost: z.number(), yield_quantity: z.number().nullable().optional() })).optional()
 });
 
 export async function POST(req: Request) {
@@ -28,7 +34,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }, { status: 429 });
         }
 
-        const { productName, materials, subRecipes, option } = await req.json();
+        const requestResult = RecipeRequestSchema.safeParse(await req.json());
+        if (!requestResult.success) {
+            return NextResponse.json({ error: 'Geçerli bir ürün adı gerekli.' }, { status: 400 });
+        }
+        const { productName, materials, subRecipes } = requestResult.data;
 
         if (!productName) {
             return NextResponse.json({ error: 'Ürün adı gerekli.' }, { status: 400 });
@@ -45,8 +55,8 @@ export async function POST(req: Request) {
             generationConfig: { responseMimeType: "application/json" }
         });
 
-        const materialsContext = materials?.map((m: any) => `- ${m.id} | ${m.name} | ${m.unit} | ₺${m.price_per_unit}`).join('\n') || 'Yok';
-        const subRecipesContext = subRecipes?.map((s: any) => `- ${s.id} | ${s.name} | Porsiyon Maliyeti: ₺${(s.total_cost / (s.yield_quantity || 1)).toFixed(2)}`).join('\n') || 'Yok';
+        const materialsContext = materials?.map(m => `- ${m.id} | ${m.name} | ${m.unit} | ₺${m.price_per_unit}`).join('\n') || 'Yok';
+        const subRecipesContext = subRecipes?.map(s => `- ${s.id} | ${s.name} | Porsiyon Maliyeti: ₺${(s.total_cost / (s.yield_quantity || 1)).toFixed(2)}`).join('\n') || 'Yok';
 
         const { data: settings } = await supabase.from('settings').select('*');
         const takeawayRatioSetting = settings?.find(s => s.key === 'takeaway_ratio')?.value || '60';

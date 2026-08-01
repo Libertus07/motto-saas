@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -38,8 +37,7 @@ export default function Giderler() {
     period: 'monthly',
     expense_date: new Date().toISOString().split('T')[0]
   })
-  const supabase = createClient()
-  const router = useRouter()
+  const supabase = useMemo(() => createClient(), [])
 
   const defaultCategories = [
     { value: 'kira', label: 'Kira' },
@@ -64,16 +62,22 @@ export default function Giderler() {
 
   const categories = defaultCategories
 
-  useEffect(() => { fetchExpenses() }, [])
-
-  const fetchExpenses = async () => {
+  const fetchExpenses = useCallback(async () => {
     const { data } = await supabase
       .from('expenses')
       .select('*')
       .order('expense_date', { ascending: false })
     setExpenses(data || [])
     setLoading(false)
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void fetchExpenses()
+    }, 0)
+
+    return () => clearTimeout(timer)
+  }, [fetchExpenses])
 
   const resetForm = () => {
     setForm({
@@ -250,7 +254,7 @@ export default function Giderler() {
       icon: <span className="text-xl">📅</span>,
       items
     }))
-  }, [expenses])
+  }, [processedExpenses])
 
   return (
     <div className="flex flex-col-reverse xl:flex-row min-h-screen bg-stone-950 text-white">

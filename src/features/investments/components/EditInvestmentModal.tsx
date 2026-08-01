@@ -10,7 +10,7 @@ type EditInvestmentModalProps = {
     setForm: (form: EditFormState) => void
     onSubmit: (e: FormEvent) => void
     saving: boolean
-    onFileUpload: (e: ChangeEvent<HTMLInputElement>, setter: any, state: any) => void
+    onFileUpload: (e: ChangeEvent<HTMLInputElement>, setter: (form: EditFormState) => void, state: EditFormState) => void
 }
 
 export function EditInvestmentModal({

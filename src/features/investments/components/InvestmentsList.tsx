@@ -142,7 +142,7 @@ export function InvestmentsList({
     if (Object.keys(groupedInvestments).length === 0) {
         return (
             <div className="bg-stone-900 border border-stone-800 rounded-2xl p-10 text-center text-stone-500">
-                Henüz bir yatırımınız bulunmuyor. "Yeni Yatırım Yap" butonuyla ilk varlığınızı ekleyebilirsiniz.
+                Henüz bir yatırımınız bulunmuyor. &quot;Yeni Yatırım Yap&quot; butonuyla ilk varlığınızı ekleyebilirsiniz.
             </div>
         )
     }

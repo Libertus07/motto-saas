@@ -26,6 +26,9 @@ jobs:
     - name: Run Linter
       run: npm run lint
 
+    - name: Run TypeScript check
+      run: npm run typecheck
+
     - name: Run Tests (including RLS integration)
       run: npm run test
       env:

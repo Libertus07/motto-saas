@@ -1,0 +1,6 @@
+# Graphify code graph: configuration metadata does not expose code symbols.
+mcp_config.json
+style-guide.json
+hooks.json
+.infisical.json
+skills-lock.json

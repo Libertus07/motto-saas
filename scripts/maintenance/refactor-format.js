@@ -1,5 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { Project, SyntaxKind } = require('ts-morph');
-const fs = require('fs');
 
 const project = new Project({
     tsConfigFilePath: "tsconfig.json",

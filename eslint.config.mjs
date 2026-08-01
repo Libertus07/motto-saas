@@ -22,6 +22,15 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Agent examples and one-off diagnostics are not shipped application code.
+    ".agents/**",
+    "scripts/debug/**",
+    // Local Supabase writes generated runtime bundles here when Docker starts.
+    "supabase/.temp/**",
+    // PWA build artifacts are generated from the service-worker configuration.
+    "public/sw.js",
+    "public/swe-worker-*.js",
+    "public/workbox-*.js",
   ]),
 ]);
 

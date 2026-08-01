@@ -127,7 +127,7 @@ export function ReportsTab({ calculations, productSales, totalDailyProfit, daily
                 </Pie>
                 <Tooltip
                   contentStyle={{ backgroundColor: '#1c1917', borderColor: '#292524', color: '#fff' }}
-                  formatter={(value: any) => formatCurrency(Number(value) || 0)}
+                  formatter={(value: unknown) => formatCurrency(Number(value) || 0)}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -168,9 +168,9 @@ export function ReportsTab({ calculations, productSales, totalDailyProfit, daily
                 <Tooltip
                   cursor={{ strokeDasharray: '3 3' }}
                   contentStyle={{ backgroundColor: '#1c1917', borderColor: '#292524', color: '#fff' }}
-                  formatter={(value: any, name: any) => [
-                    name === 'Satış Adedi' ? `${value} adet` : `%${value}`,
-                    name
+                  formatter={(value: unknown, name: unknown) => [
+                    name === 'Satış Adedi' ? `${String(value)} adet` : `%${String(value)}`,
+                    String(name)
                   ]}
                   labelFormatter={() => ''}
                 />

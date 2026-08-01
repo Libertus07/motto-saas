@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { devLog, devError } from '@/lib/debug';
+import { devError } from '@/lib/debug';
 import { requireUser } from '@/lib/supabase-server';
 
 // String formatındaki Türk lirası tutarını (örn: 6.180,61) Float'a çevirir
@@ -43,7 +43,7 @@ export async function GET() {
 
         return NextResponse.json({ success: true, rates })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         devError('Exchange rates fetch error:', error)
         return NextResponse.json({ 
             success: true, 

@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect, useMemo, Fragment } from 'react'
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
-import { formatDate, formatCurrency } from '@/lib/format'
+import { formatCurrency } from '@/lib/format'
 import dynamic from 'next/dynamic'
 
 const MaterialHistoryModal = dynamic(
@@ -45,6 +44,17 @@ type EditRow = {
   critical_stock_level: string
   category: string
 }
+
+type SettingRow = { key: string; value: unknown }
+type AutoCategorySuggestion = { id: string; suggested_category: string }
+type AutoCategoryResponse = { error?: string; suggestions?: AutoCategorySuggestion[] }
+
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error
+    ? error.message
+    : typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
+      ? error.message
+      : 'Bilinmeyen hata'
 
 export default function Hammaddeler() {
   const { showAlert, showConfirm } = useNotification()
@@ -92,16 +102,11 @@ export default function Hammaddeler() {
     critical_stock_level: '0'
   })
 
-  const supabase = createClient()
-  const router = useRouter()
+  const supabase = useMemo(() => createClient(), [])
 
   const units = ['Kg', 'Gram', 'Litre', 'Ml', 'Adet', 'Paket', 'Koli', 'Kutu']
 
-  useEffect(() => {
-    fetchMaterials()
-  }, [])
-
-  const fetchMaterials = async () => {
+  const fetchMaterials = useCallback(async () => {
     setLoading(true)
     const [{ data }, { data: settings }] = await Promise.all([
       supabase.from('materials').select('*').order('name'),
@@ -110,9 +115,11 @@ export default function Hammaddeler() {
 
     setMaterials(data || [])
 
-    const catsSetting = settings?.find((s: any) => s.key === 'material_categories')?.value
+    const catsSetting = (settings as SettingRow[] | null)?.find(s => s.key === 'material_categories')?.value
     if (catsSetting) {
-      const cats: string[] = Array.isArray(catsSetting) ? catsSetting : JSON.parse(catsSetting)
+      const cats = Array.isArray(catsSetting)
+        ? catsSetting.filter((category): category is string => typeof category === 'string')
+        : JSON.parse(String(catsSetting)) as string[]
       setCategories(cats)
       setOpenCategories(new Set(cats))
     } else {
@@ -120,7 +127,14 @@ export default function Hammaddeler() {
     }
 
     setLoading(false)
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void fetchMaterials()
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [fetchMaterials])
 
   // ─── Bulk Edit Management ───────────────────────────────────
   const enterBulkEdit = () => {
@@ -272,11 +286,11 @@ export default function Hammaddeler() {
           categories
         })
       })
-      const data = await res.json()
+      const data = await res.json() as AutoCategoryResponse
       if (data.error) throw new Error(data.error)
 
       const suggestions = (data.suggestions || [])
-        .map((s: any) => {
+        .map(s => {
           const mat = materials.find(m => m.id === s.id)
           return {
             id: s.id,
@@ -285,26 +299,41 @@ export default function Hammaddeler() {
             suggested: s.suggested_category
           }
         })
-        .filter((s: any) => s.suggested !== s.current)
+        .filter(s => s.suggested !== s.current)
 
       setAutoCatSuggestions(suggestions)
       setAutoCatModalOpen(true)
-    } catch (e: any) {
-      await showAlert('Hata: ' + e.message, 'error')
+    } catch (e: unknown) {
+      await showAlert('Hata: ' + getErrorMessage(e), 'error')
     }
     setAutoCatLoading(false)
   }
 
   const handleApplyAutoCat = async (approved: { id: string; suggested: string }[]) => {
     setAutoCatSaving(true)
-    for (const item of approved) {
-      await supabase.from('materials').update({ category: item.suggested }).eq('id', item.id)
+    try {
+      await Promise.all(approved.map(async item => {
+        const { error } = await supabase
+          .from('materials')
+          .update({ category: item.suggested })
+          .eq('id', item.id)
+        if (error) throw error
+      }))
+
+      await logActivity(
+        'Hammadde',
+        'GUNCELLEME',
+        `${approved.length} adet hammaddenin kategorisi yapay zeka ile otomatik güncellendi.`,
+        { material_ids: approved.map(item => item.id) }
+      )
+      setAutoCatModalOpen(false)
+      setAutoCatSuggestions([])
+      await fetchMaterials()
+    } catch (error: unknown) {
+      await showAlert('Kategoriler güncellenemedi: ' + getErrorMessage(error), 'error')
+    } finally {
+      setAutoCatSaving(false)
     }
-    setAutoCatModalOpen(false)
-    setAutoCatSuggestions([])
-    setAutoCatSaving(false)
-    fetchMaterials()
-    logActivity('Hammadde', 'GUNCELLEME', `${approved.length} adet hammaddenin kategorisi yapay zeka ile otomatik güncellendi.`)
   }
 
   // ─── Accordion Helpers ─────────────────────────────────────
@@ -809,7 +838,7 @@ export default function Hammaddeler() {
 
             <select
               value={sortBy}
-              onChange={e => setSortBy(e.target.value as any)}
+              onChange={e => setSortBy(e.target.value as typeof sortBy)}
               className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-300 text-xs focus:outline-none focus:border-amber-500/50 cursor-pointer"
             >
               <option value="name">İsme Göre (A-Z)</option>
@@ -838,7 +867,7 @@ export default function Hammaddeler() {
             <div className="text-5xl mb-3">🧪</div>
             <h3 className="text-lg font-bold text-stone-300 mb-1">Aramanıza Uygun Hammadde Bulunamadı</h3>
             <p className="text-xs text-stone-400 max-w-sm mx-auto">
-              Arama kriterinizi değiştirerek veya "+ Yeni Hammadde" butonuna basarak yeni hammadde tanımlayabilirsiniz.
+              Arama kriterinizi değiştirerek veya &quot;+ Yeni Hammadde&quot; butonuna basarak yeni hammadde tanımlayabilirsiniz.
             </p>
           </div>
         ) : (
@@ -1349,7 +1378,7 @@ export default function Hammaddeler() {
                       className="bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/30 text-indigo-300 font-semibold px-3 py-1.5 rounded-xl text-xs transition-all active:scale-95"
                     >
                       ⚖️ {form.unit.toLowerCase() === 'kg' || form.unit.toLowerCase() === 'kilogram' ? 'Gram' : 'Ml'}
-                      'a Dönüştür (x1000)
+                      &apos;a Dönüştür (x1000)
                     </button>
                   )}
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { Material, Movement, MovementFormState, InlineFormState } from '../types'
@@ -17,11 +17,10 @@ export function useInventoryData(
     const [inventoryCountDay, setInventoryCountDay] = useState<number>(1)
     const [lastCountDate, setLastCountDate] = useState<Date | null>(null)
 
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
 
     const fetchData = useCallback(async () => {
-        if (!activeOrg) return;
-        setLoading(true)
+        if (!activeOrg) return
         const [{ data: mats }, { data: movs }, { data: settingsData }] = await Promise.all([
             supabase.from('materials').select('*').eq('organization_id', activeOrg.id).order('name'),
             supabase.from('stock_movements')
@@ -41,11 +40,17 @@ export function useInventoryData(
             if (lastDate && lastDate.value) setLastCountDate(new Date(lastDate.value))
         }
         setLoading(false)
-    }, [activeOrg?.id])
+    }, [activeOrg, supabase])
 
     useEffect(() => {
-        fetchData()
-    }, [fetchData, activeOrg?.id])
+        let active = true
+        void Promise.resolve().then(async () => {
+            if (active) await fetchData()
+        })
+        return () => {
+            active = false
+        }
+    }, [fetchData])
 
     const handleMovement = async (form: MovementFormState, onSuccess: () => void) => {
         if (!form.material_id || !form.quantity) return

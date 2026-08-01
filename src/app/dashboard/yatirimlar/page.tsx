@@ -1,10 +1,8 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import * as XLSX from 'xlsx'
 import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency, formatDate } from "@/lib/format"
-import { devError } from '@/lib/debug'
 import { EnhancedInvestment } from '@/features/investments/types'
 
 // Hooks
@@ -42,15 +40,32 @@ const NotePreviewModal = dynamic(
 )
 import { useAppTour } from '@/hooks/useAppTour'
 
+type InvestmentAnalysisResponse = {
+    error?: string
+    asset_type?: 'gold' | 'usd' | 'eur' | 'real_estate'
+    quantity?: number
+    price_per_unit?: number
+    notes?: string
+    purchase_date?: string
+}
+
+const getErrorMessage = (error: unknown) =>
+    error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
+            ? error.message
+            : 'Bilinmeyen hata'
+
 export default function YatirimlarPage() {
     const { showAlert } = useNotification()
     const {
         accounts, investments, transactions, rates,
-        loading, saving, fetchData, deleteInvestment,
+        loading, saving, deleteInvestment,
         buyInvestment, editInvestment, collectRent, updateValue
     } = useInvestmentsData()
 
     const ui = useInvestmentsUI()
+    const { buyForm, setBuyForm } = ui
 
     const [isAnalyzing, setIsAnalyzing] = useState(false)
 
@@ -79,11 +94,11 @@ export default function YatirimlarPage() {
                         })
                     })
 
-                    const data = await response.json()
+                    const data = await response.json() as InvestmentAnalysisResponse
 
                     if (data.error) throw new Error(data.error)
 
-                    ui.setBuyForm(prev => ({
+                    setBuyForm(prev => ({
                         ...prev,
                         asset_type: data.asset_type || 'gold',
                         quantity: data.quantity?.toString() || prev.quantity,
@@ -92,13 +107,13 @@ export default function YatirimlarPage() {
                     }))
                     
                     if (data.purchase_date) {
-                        ui.setBuyForm(prev => ({...prev, purchase_date: data.purchase_date}))
+                        setBuyForm(prev => ({...prev, purchase_date: data.purchase_date ?? prev.purchase_date}))
                     }
                     
                     await showAlert('Fiş başarıyla okundu ve form dolduruldu.', 'success')
-                } catch (err: any) {
+                } catch (err: unknown) {
                     console.error(err)
-                    let errorMsg = err.message;
+                    let errorMsg = getErrorMessage(err)
                     if (errorMsg === 'The string did not match the expected pattern.') {
                         errorMsg = 'Tarayıcı kaynaklı bir hata oluştu. Yüklediğiniz fotoğrafın formatı (HEIC vb.) desteklenmiyor olabilir.';
                     }
@@ -108,13 +123,13 @@ export default function YatirimlarPage() {
                 }
             }
             reader.readAsDataURL(file)
-        } catch (err: any) {
+        } catch (err: unknown) {
             setIsAnalyzing(false)
-            await showAlert(err.message || 'Dosya okunamadı.', 'error')
+            await showAlert(getErrorMessage(err), 'error')
         }
     }
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, formSetter: any, formState: any) => {
+    const handleFileUpload = async <T extends { document_url?: string }>(e: React.ChangeEvent<HTMLInputElement>, formSetter: (value: T) => void, formState: T) => {
         const file = e.target.files?.[0]
         if (file) {
             if (file.size > 2 * 1024 * 1024) {
@@ -246,11 +261,11 @@ export default function YatirimlarPage() {
     }
 
     useEffect(() => {
-        if (rates && ui.buyForm.asset_type && ui.buyForm.asset_type !== 'real_estate') {
-            const assetType = ui.buyForm.asset_type as 'gold' | 'usd' | 'eur';
-            ui.setBuyForm(prev => ({ ...prev, price_per_unit: rates[assetType].toString() }))
+        if (rates && buyForm.asset_type && buyForm.asset_type !== 'real_estate') {
+            const assetType = buyForm.asset_type as 'gold' | 'usd' | 'eur';
+            setBuyForm(prev => ({ ...prev, price_per_unit: rates[assetType].toString() }))
         }
-    }, [ui.buyForm.asset_type, rates])
+    }, [buyForm.asset_type, rates, setBuyForm])
 
 
     // Handlers for List Actions

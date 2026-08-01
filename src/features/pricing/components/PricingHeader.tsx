@@ -41,7 +41,7 @@ export function PricingHeader({ saving, loading, onSave }: PricingHeaderProps) {
           ) : (
             <>
               <span className="mr-2">💾</span>
-              Maliyetleri DB'ye Kaydet
+              Maliyetleri DB&apos;ye Kaydet
             </>
           )}
         </Button>

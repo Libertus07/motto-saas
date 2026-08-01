@@ -45,10 +45,11 @@ export default function Ayarlar() {
       const params = new URLSearchParams(window.location.search)
       const tab = params.get('tab') as Tab
       if (tab && ['genel', 'profil', 'finansal', 'bildirimler', 'ekip', 'entegrasyonlar'].includes(tab)) {
-        setActiveTab(tab)
+        const timer = setTimeout(() => setActiveTab(tab), 0)
+        return () => clearTimeout(timer)
       }
     }
-  }, [])
+  }, [setActiveTab])
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'genel', label: 'Genel', icon: '🏪' },

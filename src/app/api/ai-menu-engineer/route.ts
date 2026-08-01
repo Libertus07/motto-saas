@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/lib/supabase-server';
-import { devLog, devError } from '@/lib/debug';
+import { devError } from '@/lib/debug';
 import { z } from 'zod';
 
 const MenuEngineerRecommendationSchema = z.object({
@@ -14,6 +14,10 @@ const MenuEngineerRecommendationSchema = z.object({
 const MenuEngineerSchema = z.object({
   summary: z.string().optional().nullable(),
   recommendations: z.array(MenuEngineerRecommendationSchema).default([])
+});
+
+const MenuEngineerRequestSchema = z.object({
+  products: z.array(z.object({ name: z.string(), category: z.string(), calculated_cost: z.number(), sale_price: z.number(), estimated_monthly_sales: z.number().optional() })).min(1)
 });
 
 export async function POST(req: Request) {
@@ -29,11 +33,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }, { status: 429 });
         }
 
-        const { products } = await req.json();
+        const requestResult = MenuEngineerRequestSchema.safeParse(await req.json());
 
-        if (!products || products.length === 0) {
+        if (!requestResult.success) {
             return NextResponse.json({ error: 'Ürün verisi bulunamadı.' }, { status: 400 });
         }
+        const { products } = requestResult.data;
 
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
@@ -46,7 +51,7 @@ export async function POST(req: Request) {
             generationConfig: { responseMimeType: "application/json" }
         });
 
-        const productData = products.map((p: any) => ({
+        const productData = products.map(p => ({
             isim: p.name,
             kategori: p.category,
             maliyet: p.calculated_cost,

@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
-import { devLog, devError } from '@/lib/debug';
+import { devError } from '@/lib/debug';
 import { formatCurrency, formatDate } from "@/lib/format";
 import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
 
@@ -55,6 +55,15 @@ type GroupedMonth = {
     receipts: GroupedReceipt[]
 }
 
+type MainGroup = GroupedSupplier | GroupedMonth
+
+const getErrorMessage = (error: unknown) =>
+    error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
+            ? error.message
+            : 'Bilinmeyen hata'
+
 export default function TedarikciGecmisi() {
     const { showAlert, showConfirm } = useNotification()
     const { activeOrg } = useOrganization()
@@ -63,7 +72,7 @@ export default function TedarikciGecmisi() {
     const [deletingId, setDeletingId] = useState<string | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     
-    const [expandedMain, setExpandedMain] = useState<string | null>(null) // Ay veya Tedarikçi
+    const [, setExpandedMain] = useState<string | null>(null) // Ay veya Tedarikçi
     const [expandedReceipt, setExpandedReceipt] = useState<string | null>(null) // Fişin içi
     
     // Filters & Sorting
@@ -71,18 +80,11 @@ export default function TedarikciGecmisi() {
     const [selectedMonth, setSelectedMonth] = useState<string>('all')
     const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'amount_desc'>('date_desc')
     
-    const supabase = createClient()
+    const supabase = useMemo(() => createClient(), [])
     const router = useRouter()
 
-    useEffect(() => {
-        if (activeOrg?.id) {
-            fetchReceipts()
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeOrg?.id])
-
-    const fetchReceipts = async () => {
-        if (!activeOrg) return;
+    const fetchReceipts = useCallback(async () => {
+        if (!activeOrg) return
         setLoading(true)
         const { data, error } = await supabase
             .from('stock_movements')
@@ -116,7 +118,7 @@ export default function TedarikciGecmisi() {
 
         const groups: Record<string, GroupedReceipt> = {}
         
-        data?.forEach((item: any) => {
+        ;(data as unknown as StockMovement[] | null)?.forEach(item => {
             const dateObj = new Date(item.created_at)
             const timeKey = `${dateObj.getFullYear()}-${dateObj.getMonth()}-${dateObj.getDate()}_${dateObj.getHours()}:${dateObj.getMinutes()}`
             const groupId = item.batch_id || timeKey
@@ -141,7 +143,14 @@ export default function TedarikciGecmisi() {
         const sortedGroups = Object.values(groups).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         setAllReceipts(sortedGroups)
         setLoading(false)
-    }
+    }, [activeOrg, supabase])
+
+    useEffect(() => {
+        const id = window.setTimeout(() => {
+            void fetchReceipts()
+        }, 0)
+        return () => window.clearTimeout(id)
+    }, [fetchReceipts])
 
     const viewDocument = async (batchId: string | null) => {
         if (!batchId) {
@@ -186,7 +195,7 @@ export default function TedarikciGecmisi() {
     }
 
     // Verileri Hesapla ve Grupla
-    const displayData = useMemo(() => {
+    const displayData = useMemo<MainGroup[]>(() => {
         let filtered = [...allReceipts]
 
         // Ay Filtresi
@@ -273,8 +282,8 @@ export default function TedarikciGecmisi() {
             
             await showAlert('Fiş başarıyla silindi ve işlemler geri alındı.', 'success')
             fetchReceipts()
-        } catch (err: any) {
-            await showAlert('Silme işlemi başarısız: ' + err.message, 'error')
+        } catch (err: unknown) {
+            await showAlert('Silme işlemi başarısız: ' + getErrorMessage(err), 'error')
         } finally {
             setDeletingId(null)
         }
@@ -328,7 +337,7 @@ export default function TedarikciGecmisi() {
 
                         <select 
                             value={sortBy} 
-                            onChange={(e) => setSortBy(e.target.value as any)}
+                            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                             className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-sm text-stone-200 focus:outline-none focus:border-green-400"
                         >
                             <option value="date_desc">En Yeniler Önce</option>
@@ -350,10 +359,10 @@ export default function TedarikciGecmisi() {
                         <p className="text-stone-500">Seçili kriterlere uygun fiş bulunmuyor.</p>
                     </div>
                 ) : (
-                    <HistoryAccordion
-                        groups={displayData.map((mainGroup: any) => {
-                            const mainKey = groupBy === 'supplier' ? mainGroup.supplierName : mainGroup.monthKey;
-                            const mainTitle = groupBy === 'supplier' ? mainGroup.supplierName : mainGroup.monthLabel;
+                    <HistoryAccordion<GroupedReceipt>
+                        groups={displayData.map(mainGroup => {
+                            const mainKey = 'supplierName' in mainGroup ? mainGroup.supplierName : mainGroup.monthKey
+                            const mainTitle = 'supplierName' in mainGroup ? mainGroup.supplierName : mainGroup.monthLabel
 
                             return {
                                 id: mainKey,
@@ -363,9 +372,9 @@ export default function TedarikciGecmisi() {
                                 items: mainGroup.receipts
                             }
                         })}
-                        defaultExpandedIds={displayData.length > 0 ? [groupBy === 'supplier' ? (displayData[0] as any).supplierName : (displayData[0] as any).monthKey] : []}
+                        defaultExpandedIds={displayData.length > 0 ? ['supplierName' in displayData[0] ? displayData[0].supplierName : displayData[0].monthKey] : []}
                         renderHeaderRight={(group) => {
-                            const mainGroup = displayData.find((g: any) => (groupBy === 'supplier' ? g.supplierName : g.monthKey) === group.id)
+                            const mainGroup = displayData.find(g => ('supplierName' in g ? g.supplierName : g.monthKey) === group.id)
                             return (
                                 <div className="text-right">
                                     <p className="text-xs text-stone-500 uppercase tracking-wider font-bold mb-1">Toplam Alış Tutarı</p>
@@ -373,7 +382,7 @@ export default function TedarikciGecmisi() {
                                 </div>
                             )
                         }}
-                        renderContent={(receipts: any[]) => (
+                        renderContent={(receipts) => (
                             <div className="p-4 sm:p-6 space-y-4">
                                 {receipts.map((receipt: GroupedReceipt) => {
                                     const isReceiptExpanded = expandedReceipt === receipt.id;
