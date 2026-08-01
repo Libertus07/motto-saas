@@ -7,6 +7,7 @@ import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
 import { formatCurrency, formatDate } from '@/lib/format'
+import { useAppTour } from '@/hooks/useAppTour'
 
 type Supplier = {
   id: string
@@ -58,6 +59,20 @@ const getErrorMessage = (error: unknown) =>
       : 'Bilinmeyen hata'
 
 export default function Tedarikciler() {
+  useAppTour('tedarikciler', [
+    {
+      element: '#tour-suppliers-create',
+      popover: { title: 'Tedarikçi kartı açın', description: 'Firma, yetkili ve iletişim bilgisini ekleyerek cari takibi bu noktadan başlatın.' }
+    },
+    {
+      element: '#tour-suppliers-list',
+      popover: { title: 'Cari hesabı inceleyin', description: 'Firmayı arayın, seçin ve alış–ödeme hareketlerini sağ panelde detaylandırın.' }
+    },
+    {
+      element: '#tour-suppliers-kpis',
+      popover: { title: 'Ödeme önceliklerini görün', description: 'Toplam borç ve borçlu firma sayısı, nakit planlaması için hızlı bir özet sunar.' }
+    }
+  ])
   const { showAlert, showConfirm } = useNotification()
   const { activeOrg } = useOrganization()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -411,6 +426,7 @@ export default function Tedarikciler() {
           </div>
 
           <button
+            id="tour-suppliers-create"
             onClick={() => setShowAddModal(true)}
             className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-extrabold px-4 py-2.5 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all active:scale-95 whitespace-nowrap"
           >
@@ -423,7 +439,7 @@ export default function Tedarikciler() {
       {/* ──────────────── MAIN CONTAINER ──────────────── */}
       <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
         {/* EXECUTIVE KPI METRIC CARDS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+        <div id="tour-suppliers-kpis" className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
           <div className="bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl p-4 sm:p-5 shadow-xl relative overflow-hidden group">
             <div className="flex justify-between items-start mb-2">
               <span className="text-stone-400 text-xs font-semibold">Toplam Tedarikçi</span>
@@ -482,7 +498,7 @@ export default function Tedarikciler() {
         {/* ──────────────── DUAL PANEL CONTENT ──────────────── */}
         <div className="flex flex-col lg:flex-row gap-6">
           {/* SOL PANEL: Tedarikçi Listesi */}
-          <div className="w-full lg:w-96 bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl overflow-hidden shadow-xl flex flex-col h-auto lg:h-[calc(100vh-260px)]">
+          <div id="tour-suppliers-list" className="w-full lg:w-96 bg-stone-900/80 border border-stone-800/80 backdrop-blur-md rounded-2xl overflow-hidden shadow-xl flex flex-col h-auto lg:h-[calc(100vh-260px)]">
             <div className="p-4 border-b border-stone-800/80 bg-stone-950/60 space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="font-extrabold text-stone-100 text-sm sm:text-base flex items-center gap-2">
