@@ -26,7 +26,7 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 
 export default function Ayarlar() {
   const [activeTab, setActiveTab] = useState<Tab>('genel')
-  
+
   const {
     loading,
     saving,
@@ -37,7 +37,7 @@ export default function Ayarlar() {
     setCategories,
     setSetting,
     handleSave,
-    activeNotificationCount
+    activeNotificationCount,
   } = useSettings()
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export default function Ayarlar() {
     { id: 'finansal', label: 'Finansal', icon: '💰' },
     { id: 'bildirimler', label: 'Bildirimler', icon: '🔔' },
     { id: 'ekip', label: 'Ekip', icon: '👥' },
-    { id: 'entegrasyonlar', label: 'Entegrasyonlar', icon: '🔗' }
+    { id: 'entegrasyonlar', label: 'Entegrasyonlar', icon: '🔗' },
   ]
 
   return (
@@ -130,16 +130,14 @@ export default function Ayarlar() {
                 🔔
               </span>
             </div>
-            <div className="text-xl sm:text-2xl font-black text-rose-400">
-              {activeNotificationCount} / 4 Açık
-            </div>
+            <div className="text-xl sm:text-2xl font-black text-rose-400">{activeNotificationCount} / 4 Açık</div>
             <div className="text-stone-400 text-[11px] mt-1">Uyarı & Ciro Takibi</div>
           </div>
         </div>
 
         {/* ──────────────── TAB NAVIGATION BAR ──────────────── */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 bg-stone-900/60 p-2 rounded-2xl border border-stone-800/80 backdrop-blur-md scrollbar-none">
-          {tabs.map(tab => {
+          {tabs.map((tab) => {
             const isActive = activeTab === tab.id
             return (
               <button
@@ -166,9 +164,7 @@ export default function Ayarlar() {
           </div>
         ) : (
           <>
-            {activeTab === 'genel' && (
-              <GenelTab s={settings} set={setSetting} onSave={handleSave} saving={saving} />
-            )}
+            {activeTab === 'genel' && <GenelTab s={settings} set={setSetting} onSave={handleSave} saving={saving} />}
             {activeTab === 'profil' && <ProfilTab />}
             {activeTab === 'finansal' && (
               <FinansalTab

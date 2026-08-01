@@ -19,25 +19,25 @@ export function BildirimlerTab({ s, set, onSave, saving }: BildirimlerTabProps) 
         <div>
           <Toggle
             checked={s.notify_critical_stock}
-            onChange={v => set('notify_critical_stock', v)}
+            onChange={(v) => set('notify_critical_stock', v)}
             label="Kritik Stok Uyarısı"
             description="Bir hammadde kritik stok seviyesinin altına düştüğünde uyar."
           />
           <Toggle
             checked={s.notify_low_margin}
-            onChange={v => set('notify_low_margin', v)}
+            onChange={(v) => set('notify_low_margin', v)}
             label="Düşük Kâr Marjı Uyarısı"
             description="Hedef marjın altında kalan ürünler için uyarı göster."
           />
           <Toggle
             checked={s.notify_daily_revenue}
-            onChange={v => set('notify_daily_revenue', v)}
+            onChange={(v) => set('notify_daily_revenue', v)}
             label="Günlük Ciro Hedefi Bildirimi"
             description="Günlük ciro hedefine ulaşıldığında bildirim al."
           />
           <Toggle
             checked={s.notify_supplier_price}
-            onChange={v => set('notify_supplier_price', v)}
+            onChange={(v) => set('notify_supplier_price', v)}
             label="Tedarikçi Fiyat Değişimi"
             description="Hammadde fiyatları güncellendiğinde uyarı ver."
           />
@@ -51,7 +51,7 @@ export function BildirimlerTab({ s, set, onSave, saving }: BildirimlerTabProps) 
         <FormRow label="WhatsApp Numarası" hint="Uluslararası formatta girin: +90 532 000 0000">
           <Input
             value={s.whatsapp_number}
-            onChange={e => set('whatsapp_number', e.target.value)}
+            onChange={(e) => set('whatsapp_number', e.target.value)}
             placeholder="+90 532 000 0000"
           />
         </FormRow>

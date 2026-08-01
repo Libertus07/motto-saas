@@ -1,6 +1,6 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -63,13 +63,23 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes scaleUp {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .animate-fade-in {
@@ -89,7 +99,9 @@
   border-radius: 1.25rem !important; /* rounded-2xl */
   color: #fff !important;
   font-family: inherit !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(245, 158, 11, 0.15) !important;
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(245, 158, 11, 0.15) !important;
   padding: 24px !important;
   max-width: 380px !important;
 }
@@ -176,10 +188,14 @@
 /* Mobil Uyumlu Eğitim Turu (Driver.js) Stilleri */
 @media (max-width: 640px) {
   .driver-popover.motto-tour-theme {
+    width: min(calc(100vw - 24px), 28rem) !important;
     max-width: calc(100vw - 24px) !important;
-    margin: 0 12px !important;
-    padding: 16px !important;
+    max-height: min(70dvh, 34rem) !important;
+    margin: 0 12px calc(12px + env(safe-area-inset-bottom)) !important;
+    padding: 18px !important;
     border-radius: 1rem !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
   }
   .driver-popover.motto-tour-theme .driver-popover-title {
     font-size: 1.05rem !important;
@@ -190,15 +206,24 @@
   }
   .driver-popover.motto-tour-theme .driver-popover-footer {
     margin-top: 1rem !important;
+    gap: 0.5rem !important;
+    flex-wrap: wrap !important;
   }
   .driver-popover.motto-tour-theme button.driver-popover-next-btn,
   .driver-popover.motto-tour-theme button.driver-popover-done-btn {
-    padding: 0.5rem 0.9rem !important;
-    font-size: 0.8rem !important;
+    min-height: 44px !important;
+    padding: 0.6rem 1rem !important;
+    font-size: 0.85rem !important;
   }
   .driver-popover.motto-tour-theme button.driver-popover-prev-btn {
-    padding: 0.45rem 0.75rem !important;
-    font-size: 0.75rem !important;
+    min-height: 44px !important;
+    padding: 0.55rem 0.9rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  .driver-popover.motto-tour-theme button:focus-visible {
+    outline: 2px solid #fbbf24 !important;
+    outline-offset: 2px !important;
   }
 }
 

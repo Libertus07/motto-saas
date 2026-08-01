@@ -26,7 +26,7 @@ export function FinansalTab({ s, set, onSave, saving, categories, setCategories 
     setCategories(updated)
     set('material_categories', updated)
     const {
-      data: { user }
+      data: { user },
     } = await supabase.auth.getUser()
     await supabase
       .from('settings')
@@ -36,11 +36,11 @@ export function FinansalTab({ s, set, onSave, saving, categories, setCategories 
   }
 
   const handleRemoveCat = async (cat: string) => {
-    const updated = categories.filter(c => c !== cat)
+    const updated = categories.filter((c) => c !== cat)
     setCategories(updated)
     set('material_categories', updated)
     const {
-      data: { user }
+      data: { user },
     } = await supabase.auth.getUser()
     await supabase
       .from('settings')
@@ -52,28 +52,22 @@ export function FinansalTab({ s, set, onSave, saving, categories, setCategories 
     <div className="space-y-6">
       <SectionCard title="Fiyat & Maliyet Ayarları" description="Hesaplama motorlarının temel parametreleri.">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormRow
-            label="Hedef Minimum Kâr Marjı (%)"
-            hint="Bu değerin altındaki ürünler kırmızı uyarı verir."
-          >
+          <FormRow label="Hedef Minimum Kâr Marjı (%)" hint="Bu değerin altındaki ürünler kırmızı uyarı verir.">
             <div className="flex gap-2 items-center">
-              <Input type="number" value={s.target_margin} onChange={e => set('target_margin', e.target.value)} />
+              <Input type="number" value={s.target_margin} onChange={(e) => set('target_margin', e.target.value)} />
               <span className="text-amber-400 font-extrabold text-sm">%</span>
             </div>
           </FormRow>
-          <FormRow
-            label="Paket Servis Oranı (%)"
-            hint="Yapay zeka reçete ve ambalaj maliyet hesabı için."
-          >
+          <FormRow label="Paket Servis Oranı (%)" hint="Yapay zeka reçete ve ambalaj maliyet hesabı için.">
             <div className="flex gap-2 items-center">
-              <Input type="number" value={s.takeaway_ratio} onChange={e => set('takeaway_ratio', e.target.value)} />
+              <Input type="number" value={s.takeaway_ratio} onChange={(e) => set('takeaway_ratio', e.target.value)} />
               <span className="text-amber-400 font-extrabold text-sm">%</span>
             </div>
           </FormRow>
           <FormRow label="Varsayılan KDV Oranı (%)">
             <select
               value={s.default_vat}
-              onChange={e => set('default_vat', e.target.value)}
+              onChange={(e) => set('default_vat', e.target.value)}
               className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500/50 transition-all"
             >
               <option value="1">%1</option>
@@ -84,7 +78,7 @@ export function FinansalTab({ s, set, onSave, saving, categories, setCategories 
           <FormRow label="Para Birimi">
             <select
               value={s.currency}
-              onChange={e => set('currency', e.target.value)}
+              onChange={(e) => set('currency', e.target.value)}
               className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500/50 transition-all"
             >
               <option value="TRY">₺ Türk Lirası (TRY)</option>
@@ -95,7 +89,7 @@ export function FinansalTab({ s, set, onSave, saving, categories, setCategories 
           <FormRow label="Fiyat Yuvarlama Kuralı" hint="₺34.15 için ne yapılsın?">
             <select
               value={s.price_rounding}
-              onChange={e => set('price_rounding', e.target.value)}
+              onChange={(e) => set('price_rounding', e.target.value)}
               className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500/50 transition-all"
             >
               <option value="nearest">En Yakın Tam Sayı (₺34)</option>
@@ -108,7 +102,7 @@ export function FinansalTab({ s, set, onSave, saving, categories, setCategories 
           <FormRow label="Gider Paylaştırma Yöntemi">
             <select
               value={s.cost_method}
-              onChange={e => set('cost_method', e.target.value)}
+              onChange={(e) => set('cost_method', e.target.value)}
               className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500/50 transition-all"
             >
               <option value="equal">Eşit Dağıtım</option>
@@ -125,7 +119,7 @@ export function FinansalTab({ s, set, onSave, saving, categories, setCategories 
             <Input
               type="number"
               value={s.inventory_count_day}
-              onChange={e => set('inventory_count_day', e.target.value)}
+              onChange={(e) => set('inventory_count_day', e.target.value)}
               placeholder="1"
             />
           </FormRow>
@@ -137,8 +131,8 @@ export function FinansalTab({ s, set, onSave, saving, categories, setCategories 
           <Input
             type="text"
             value={newCat}
-            onChange={e => setNewCat(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAddCat()}
+            onChange={(e) => setNewCat(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddCat()}
             placeholder="Yeni kategori ekle..."
           />
           <button

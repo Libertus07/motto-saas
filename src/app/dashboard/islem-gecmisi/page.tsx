@@ -37,10 +37,7 @@ export default function IslemGecmisi() {
 
   const fetchLogs = useCallback(async () => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('activity_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('activity_logs').select('*').order('created_at', { ascending: false })
 
     if (!error && data) {
       setLogs(data)
@@ -57,7 +54,7 @@ export default function IslemGecmisi() {
   }, [fetchLogs])
 
   const processedLogs = useMemo(() => {
-    return logs.filter(log => {
+    return logs.filter((log) => {
       const matchModule = activeFilter === 'Tümü' || log.module === activeFilter
       const matchAction = actionFilter === 'Tümü' || log.action_type === actionFilter
       const matchSearch =
@@ -74,7 +71,7 @@ export default function IslemGecmisi() {
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
 
-    processedLogs.forEach(log => {
+    processedLogs.forEach((log) => {
       const date = new Date(log.created_at)
       let dateKey = formatDate(date)
 
@@ -98,7 +95,7 @@ export default function IslemGecmisi() {
     let guncelleme = 0
     let silme = 0
 
-    logs.forEach(l => {
+    logs.forEach((l) => {
       if (l.action_type === 'EKLEME') ekleme++
       if (l.action_type === 'GUNCELLEME') guncelleme++
       if (l.action_type === 'SILME') silme++
@@ -107,7 +104,7 @@ export default function IslemGecmisi() {
     return { total: logs.length, ekleme, guncelleme, silme }
   }, [logs])
 
-  const modules = ['Tümü', ...Array.from(new Set(logs.map(l => l.module)))]
+  const modules = ['Tümü', ...Array.from(new Set(logs.map((l) => l.module)))]
 
   const getModulePath = (moduleName: string) => {
     const map: Record<string, string> = {
@@ -117,7 +114,7 @@ export default function IslemGecmisi() {
       Hammadde: '/dashboard/hammaddeler',
       Stok: '/dashboard/stok',
       Giderler: '/dashboard/giderler',
-      Ayarlar: '/dashboard/ayarlar'
+      Ayarlar: '/dashboard/ayarlar',
     }
     return map[moduleName] || null
   }
@@ -207,7 +204,7 @@ export default function IslemGecmisi() {
                 type="text"
                 placeholder="Açıklama veya kullanıcı ara..."
                 value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-9 pr-4 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500/50"
               />
             </div>
@@ -216,7 +213,7 @@ export default function IslemGecmisi() {
             <div className="w-full md:w-56">
               <select
                 value={actionFilter}
-                onChange={e => setActionFilter(e.target.value)}
+                onChange={(e) => setActionFilter(e.target.value)}
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500/50"
               >
                 <option value="Tümü">Tüm İşlem Tipleri</option>
@@ -230,7 +227,7 @@ export default function IslemGecmisi() {
           {/* Module Filter Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-t border-stone-800/60 pt-3">
             <span className="text-stone-400 text-xs font-semibold mr-1 shrink-0">Modül:</span>
-            {modules.map(mod => {
+            {modules.map((mod) => {
               const isActive = activeFilter === mod
               return (
                 <button
@@ -270,15 +267,11 @@ export default function IslemGecmisi() {
                 id: dateKey,
                 title: dateKey,
                 subtitle: `${groupLogs.length} aktivite kaydı`,
-                icon: (
-                  <span className="text-lg">
-                    {dateKey === 'Bugün' ? '📅' : dateKey === 'Dün' ? '⏱️' : '🗓️'}
-                  </span>
-                ),
-                items: groupLogs
+                icon: <span className="text-lg">{dateKey === 'Bugün' ? '📅' : dateKey === 'Dün' ? '⏱️' : '🗓️'}</span>,
+                items: groupLogs,
               }))}
               defaultExpandedIds={['Bugün']}
-              renderContent={items => (
+              renderContent={(items) => (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -291,7 +284,7 @@ export default function IslemGecmisi() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-800/50 text-xs sm:text-sm">
-                      {items.map(log => (
+                      {items.map((log) => (
                         <tr
                           key={log.id}
                           onClick={() => setSelectedLog(log)}
@@ -323,9 +316,7 @@ export default function IslemGecmisi() {
                             )}
                           </td>
                           <td className="px-5 py-3.5">
-                            <p className="text-stone-200 font-semibold text-xs sm:text-sm">
-                              {log.description}
-                            </p>
+                            <p className="text-stone-200 font-semibold text-xs sm:text-sm">{log.description}</p>
                             {log.details?.detay && typeof log.details.detay === 'string' && (
                               <p className="text-stone-400 text-[11px] mt-0.5 truncate max-w-md">
                                 {log.details.detay.replace(/[()]/g, '')}
@@ -354,7 +345,7 @@ export default function IslemGecmisi() {
         >
           <div
             className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden relative my-auto max-h-[90vh]"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="px-6 py-4 bg-stone-950 border-b border-stone-800 flex items-center justify-between">
@@ -382,9 +373,7 @@ export default function IslemGecmisi() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                 <div className="bg-stone-950 p-3 rounded-xl border border-stone-800">
                   <p className="text-stone-400 text-[10px] uppercase font-bold mb-0.5">Tarih / Saat</p>
-                  <p className="text-white font-mono font-semibold">
-                    {formatDate(new Date(selectedLog.created_at))}
-                  </p>
+                  <p className="text-white font-mono font-semibold">{formatDate(new Date(selectedLog.created_at))}</p>
                 </div>
 
                 <div className="bg-stone-950 p-3 rounded-xl border border-stone-800">
@@ -412,10 +401,7 @@ export default function IslemGecmisi() {
                 {selectedLog.details?._meta?.userAgent && (
                   <div className="bg-stone-950 p-3 rounded-xl border border-stone-800">
                     <p className="text-stone-400 text-[10px] uppercase font-bold mb-0.5">Cihaz / Tarayıcı</p>
-                    <p
-                      className="text-stone-300 font-semibold truncate"
-                      title={selectedLog.details._meta.userAgent}
-                    >
+                    <p className="text-stone-300 font-semibold truncate" title={selectedLog.details._meta.userAgent}>
                       {selectedLog.details._meta.userAgent.split(' ')[0]}...
                     </p>
                   </div>
@@ -425,9 +411,7 @@ export default function IslemGecmisi() {
               {/* General Description Box */}
               <div className="bg-stone-950 p-4 rounded-xl border border-stone-800">
                 <p className="text-stone-400 text-[10px] uppercase font-bold mb-1">Genel Açıklama</p>
-                <p className="text-stone-200 text-sm font-medium leading-relaxed">
-                  {selectedLog.description}
-                </p>
+                <p className="text-stone-200 text-sm font-medium leading-relaxed">{selectedLog.description}</p>
               </div>
 
               {/* Data Diff & Details */}
@@ -460,7 +444,7 @@ export default function IslemGecmisi() {
                               const formatTitle = (t: string) => {
                                 const dict: Record<string, string> = {
                                   business_logo: 'İşletme Logosu',
-                                  business_name: 'İşletme Adı'
+                                  business_name: 'İşletme Adı',
                                 }
                                 return dict[t] || t
                               }
@@ -574,7 +558,7 @@ export default function IslemGecmisi() {
                                 expenseId: 'Kayıt ID',
                                 paymentMethod: 'Ödeme Yöntemi',
                                 documentUrl: 'Belge/Fiş',
-                                transaction: 'İşlem Detayı'
+                                transaction: 'İşlem Detayı',
                               }
                               return dict[k] || k
                             }

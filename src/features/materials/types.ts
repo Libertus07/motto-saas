@@ -32,3 +32,8 @@ export type AutoCatSuggestion = {
   current: string
   suggested: string
 }
+
+export type AutoCategoryResponse = {
+  error?: string
+  suggestions?: Array<{ id: string; suggested_category: string }>
+}

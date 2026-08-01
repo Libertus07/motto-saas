@@ -1,59 +1,99 @@
-import { useEffect } from 'react';
-import { driver, DriveStep } from 'driver.js';
-import 'driver.js/dist/driver.css';
+import { useCallback, useEffect, useRef } from 'react'
+import { driver, type DriveStep, type Driver } from 'driver.js'
 
-export function useAppTour(tourId: string, steps: DriveStep[], delayMs: number = 800) {
+const tourStorageKey = (tourId: string) => `tour_status_${tourId}`
+const replayEventName = 'motto:replay-tour'
+
+type TourStatus = 'completed' | 'dismissed'
+
+/**
+ * Starts a concise, interruptible product tour. A dismissed tour never counts
+ * as completed and can always be replayed from the application sidebar.
+ */
+export function useAppTour(tourId: string, steps: DriveStep[], delayMs = 800) {
+  const tourRef = useRef<Driver | null>(null)
+  const stepsRef = useRef(steps)
+
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    stepsRef.current = steps
+  }, [steps])
 
-    const hasSeen = localStorage.getItem(`tour_completed_${tourId}`);
-    if (hasSeen === 'true') return;
+  const startTour = useCallback(() => {
+    if (typeof window === 'undefined') return
 
-    // Eğer bu global bir tur değilse ve global tur henüz tamamlanmadıysa, bunu başlatma.
-    if (tourId !== 'global_dashboard') {
-      const globalSeen = localStorage.getItem('tour_completed_global_dashboard');
-      if (globalSeen !== 'true') return;
+    const validSteps = stepsRef.current.filter((step) =>
+      typeof step.element === 'string' ? document.querySelector(step.element) !== null : true,
+    )
+
+    if (validSteps.length === 0) return
+
+    let completed = false
+    const instance = driver({
+      steps: validSteps,
+      showProgress: true,
+      animate: true,
+      smoothScroll: true,
+      allowClose: true,
+      allowKeyboardControl: true,
+      overlayColor: '#0c0a09',
+      overlayOpacity: 0.78,
+      stagePadding: 8,
+      stageRadius: 14,
+      popoverClass: 'motto-tour-theme',
+      doneBtnText: 'Turu tamamla',
+      nextBtnText: 'İleri',
+      prevBtnText: 'Geri',
+      progressText: '{{current}} / {{total}}',
+      onDoneClick: (_, __, { driver: activeDriver }) => {
+        completed = true
+        activeDriver.destroy()
+      },
+      onDestroyed: () => {
+        const status: TourStatus = completed ? 'completed' : 'dismissed'
+        localStorage.setItem(tourStorageKey(tourId), status)
+        tourRef.current = null
+      },
+    })
+
+    tourRef.current = instance
+    instance.drive()
+  }, [tourId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const replay = (event: Event) => {
+      const requestedTourId = (event as CustomEvent<string>).detail
+      if (requestedTourId === tourId) startTour()
     }
 
-    const timer = setTimeout(() => {
-      // DOM üzerinde elementlerin var olup olmadığını kontrol edelim
-      const validSteps = steps.filter(step => {
-        if (typeof step.element === 'string') {
-          return document.querySelector(step.element) !== null;
-        }
-        return true;
-      });
+    window.addEventListener(replayEventName, replay)
+    return () => {
+      window.removeEventListener(replayEventName, replay)
+      tourRef.current?.destroy()
+    }
+  }, [startTour, tourId])
 
-      if (validSteps.length === 0) return;
+  useEffect(() => {
+    if (typeof window === 'undefined') return
 
-      const d = driver({
-        showProgress: true,
-        animate: true,
-        smoothScroll: true,
-        allowClose: true,
-        overlayColor: 'rgba(12, 10, 9, 0.85)', // bg-stone-950 hafif transparan
-        popoverClass: 'motto-tour-theme', // Global CSS içinde şekillendireceğiz
-        doneBtnText: 'Harika! 🚀',
-        nextBtnText: 'İleri ➔',
-        prevBtnText: '⬅ Geri',
-        progressText: '{{current}} / {{total}}',
-        steps: validSteps,
-        onDestroyed: () => {
-          // Tur kapatıldığında veya bittiğinde localStorage'a kaydet
-          localStorage.setItem(`tour_completed_${tourId}`, 'true');
-          
-          // Eğer global tur bittiyse ve sayfayı yenilemeden lokal turun başlamasını istiyorsak
-          // basitçe sayfayı yenileyebiliriz veya diğer turun tetiklenmesine izin verebiliriz.
-          if (tourId === 'global_dashboard') {
-            window.location.reload();
-          }
-        }
-      });
-      
-      d.drive();
-    }, delayMs);
+    const status = localStorage.getItem(tourStorageKey(tourId))
+    if (status === 'completed' || status === 'dismissed') return
 
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tourId, delayMs]);
+    if (tourId !== 'global_dashboard') {
+      const globalStatus = localStorage.getItem(tourStorageKey('global_dashboard'))
+      if (globalStatus !== 'completed') return
+    }
+
+    const timer = window.setTimeout(startTour, delayMs)
+    return () => window.clearTimeout(timer)
+  }, [delayMs, startTour, tourId])
+
+  return { startTour }
+}
+
+export function replayAppTour(tourId = 'global_dashboard') {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem(tourStorageKey(tourId))
+  window.dispatchEvent(new CustomEvent(replayEventName, { detail: tourId }))
 }

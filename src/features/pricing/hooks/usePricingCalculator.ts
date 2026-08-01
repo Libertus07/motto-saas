@@ -5,7 +5,7 @@ export function usePricingCalculator(
   products: Product[],
   expenses: Expense[],
   realSalesMeta: RealSalesMeta | null,
-  settings: PricingSettings
+  settings: PricingSettings,
 ) {
   const [productSales, setProductSales] = useState<ProductSales>({})
   const [calculations, setCalculations] = useState<Calculation[]>([])
@@ -15,26 +15,26 @@ export function usePricingCalculator(
     if (products.length === 0) return
 
     const id = window.setTimeout(() => {
-      setProductSales(prev => {
+      setProductSales((prev) => {
         const initial: ProductSales = {}
-      products.forEach(p => {
-        if (!prev[p.id]) {
-          if (realSalesMeta && realSalesMeta.salesByProduct[p.id] !== undefined) {
-            const realDaily = Math.round(realSalesMeta.salesByProduct[p.id] / realSalesMeta.activeDays)
-            initial[p.id] = { dailySales: realDaily, isRealData: true }
-          } else {
-            const daily = p.estimated_monthly_sales ? Math.round(p.estimated_monthly_sales / 30) : 0
-            initial[p.id] = { dailySales: daily, isRealData: false }
+        products.forEach((p) => {
+          if (!prev[p.id]) {
+            if (realSalesMeta && realSalesMeta.salesByProduct[p.id] !== undefined) {
+              const realDaily = Math.round(realSalesMeta.salesByProduct[p.id] / realSalesMeta.activeDays)
+              initial[p.id] = { dailySales: realDaily, isRealData: true }
+            } else {
+              const daily = p.estimated_monthly_sales ? Math.round(p.estimated_monthly_sales / 30) : 0
+              initial[p.id] = { dailySales: daily, isRealData: false }
+            }
           }
+        })
+        if (Object.keys(initial).length > 0) {
+          return { ...initial, ...prev }
         }
+        return prev
       })
-      if (Object.keys(initial).length > 0) {
-        return { ...initial, ...prev }
-      }
-      return prev
-    })
     }, 0)
-    
+
     return () => clearTimeout(id)
   }, [products, realSalesMeta])
 
@@ -69,7 +69,7 @@ export function usePricingCalculator(
       return t + (p.sale_price || 0) * sales
     }, 0)
 
-    const calcs = products.map(product => {
+    const calcs = products.map((product) => {
       const sales = productSales[product.id]?.dailySales || 0
       const sale_price = product.sale_price || 0
       const dailyRevenue = sale_price * sales
@@ -101,7 +101,7 @@ export function usePricingCalculator(
         suggestedPrice,
         currentMargin,
         dailyRevenue,
-        dailyProfit
+        dailyProfit,
       }
     })
 
@@ -111,15 +111,15 @@ export function usePricingCalculator(
   // Recalculate whenever inputs change
   useEffect(() => {
     const id = window.setTimeout(() => {
-        calculate()
+      calculate()
     }, 0)
     return () => clearTimeout(id)
   }, [calculate])
 
   const updateSales = (productId: string, field: 'dailySales', value: number) => {
-    setProductSales(prev => ({
+    setProductSales((prev) => ({
       ...prev,
-      [productId]: { ...prev[productId], [field]: Math.max(0, value), isRealData: false }
+      [productId]: { ...prev[productId], [field]: Math.max(0, value), isRealData: false },
     }))
   }
 
@@ -133,6 +133,6 @@ export function usePricingCalculator(
     calculations,
     updateSales,
     adjustSalesByDelta,
-    calculate
+    calculate,
   }
 }

@@ -21,7 +21,7 @@ export interface PreprocessOptions {
   doCrop?: boolean
   preset?: FilterPreset
   brightness?: number // -50 to +50
-  contrast?: number   // 0.5 to 2.5
+  contrast?: number // 0.5 to 2.5
 }
 
 const DEFAULTS: Required<PreprocessOptions> = {
@@ -32,7 +32,7 @@ const DEFAULTS: Required<PreprocessOptions> = {
   doCrop: true,
   preset: 'enhanced',
   brightness: 0,
-  contrast: 1.0
+  contrast: 1.0,
 }
 
 /** Convert Base64 dataUrl into a standard File object for Supabase Storage. */
@@ -123,7 +123,10 @@ export function autoCrop(canvas: HTMLCanvasElement, threshold: number): HTMLCanv
 
   const rowThresh = sw * 0.3
   const colThresh = sh * 0.3
-  let top = 0, bottom = sh - 1, left = 0, right = sw - 1
+  let top = 0,
+    bottom = sh - 1,
+    left = 0,
+    right = sw - 1
   while (top < sh && rowCount[top] < rowThresh) top++
   while (bottom > 0 && rowCount[bottom] < rowThresh) bottom--
   while (left < sw && colCount[left] < colThresh) left++
@@ -149,7 +152,7 @@ export function applyBwThreshold(canvas: HTMLCanvasElement): HTMLCanvasElement {
   const ctx = canvas.getContext('2d')!
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const d = imgData.data
-  
+
   // Calculate average luminance for adaptive threshold
   let sumLuma = 0
   for (let i = 0; i < d.length; i += 4) {
@@ -173,7 +176,7 @@ export function applyBwThreshold(canvas: HTMLCanvasElement): HTMLCanvasElement {
 export function enhance(
   canvas: HTMLCanvasElement,
   userBrightness: number = 0,
-  userContrast: number = 1.0
+  userContrast: number = 1.0,
 ): HTMLCanvasElement {
   const ctx = canvas.getContext('2d')!
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
@@ -233,10 +236,7 @@ export function calculateAiReadinessScore(canvas: HTMLCanvasElement): { score: n
 }
 
 /** Preprocess receipt photo with options. */
-export async function preprocessReceiptImage(
-  file: File,
-  options: PreprocessOptions = {}
-): Promise<PreprocessResult> {
+export async function preprocessReceiptImage(file: File, options: PreprocessOptions = {}): Promise<PreprocessResult> {
   const opts = { ...DEFAULTS, ...options }
 
   let canvas = await loadOriented(file)
@@ -268,7 +268,7 @@ export async function preprocessReceiptImage(
     width: canvas.width,
     height: canvas.height,
     readinessScore,
-    readinessLabel
+    readinessLabel,
   }
 }
 
@@ -289,25 +289,25 @@ export async function mergeImagesVertically(dataUrls: string[]): Promise<Preproc
       width: 0,
       height: 0,
       readinessScore: 95,
-      readinessLabel: '🟢 Tek Parça Belge'
+      readinessLabel: '🟢 Tek Parça Belge',
     }
   }
 
   const loadedImgs = await Promise.all(
     dataUrls.map(
-      url =>
+      (url) =>
         new Promise<HTMLImageElement>((resolve, reject) => {
           const img = new Image()
           img.onload = () => resolve(img)
           img.onerror = reject
           img.src = url
-        })
-    )
+        }),
+    ),
   )
 
-  const targetW = Math.max(...loadedImgs.map(i => i.width))
+  const targetW = Math.max(...loadedImgs.map((i) => i.width))
   let totalH = 0
-  const scaledHeights = loadedImgs.map(img => {
+  const scaledHeights = loadedImgs.map((img) => {
     const scaledH = Math.round(img.height * (targetW / img.width))
     totalH += scaledH
     return scaledH
@@ -338,6 +338,6 @@ export async function mergeImagesVertically(dataUrls: string[]): Promise<Preproc
     width: targetW,
     height: totalH,
     readinessScore: 100,
-    readinessLabel: `🟢 Birleştirildi (${loadedImgs.length} Parça Fiş/Z-Raporu)`
+    readinessLabel: `🟢 Birleştirildi (${loadedImgs.length} Parça Fiş/Z-Raporu)`,
   }
 }

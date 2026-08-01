@@ -4,7 +4,10 @@ import path from 'path'
 
 describe('RPC Fonksiyon İletişim ve İmza Doğrulama Testleri', () => {
   it('20260728000004_tenant_rpc_functions_sec102.sql içerisinde eski overload DROP komutları bulunmalıdır', () => {
-    const migrationFilePath = path.join(process.cwd(), 'supabase/migrations/20260728000004_tenant_rpc_functions_sec102.sql')
+    const migrationFilePath = path.join(
+      process.cwd(),
+      'supabase/migrations/20260728000004_tenant_rpc_functions_sec102.sql',
+    )
     expect(fs.existsSync(migrationFilePath)).toBe(true)
 
     const sqlContent = fs.readFileSync(migrationFilePath, 'utf8')

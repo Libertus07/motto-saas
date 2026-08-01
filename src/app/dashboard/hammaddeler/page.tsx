@@ -6,48 +6,21 @@ import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { formatCurrency } from '@/lib/format'
 import dynamic from 'next/dynamic'
+import type { AutoCategoryResponse, EditRow, Material, PriceHistory } from '@/features/materials/types'
+import { filterAndSortMaterials, type MaterialSort } from '@/features/materials/utils'
+import { materialTourSteps } from '@/features/materials/tour'
 
 const MaterialHistoryModal = dynamic(
-  () => import('@/features/materials/components/MaterialHistoryModal').then(mod => mod.MaterialHistoryModal),
-  { ssr: false }
+  () => import('@/features/materials/components/MaterialHistoryModal').then((mod) => mod.MaterialHistoryModal),
+  { ssr: false },
 )
 const MaterialAutoCatModal = dynamic(
-  () => import('@/features/materials/components/MaterialAutoCatModal').then(mod => mod.MaterialAutoCatModal),
-  { ssr: false }
+  () => import('@/features/materials/components/MaterialAutoCatModal').then((mod) => mod.MaterialAutoCatModal),
+  { ssr: false },
 )
 import { useAppTour } from '@/hooks/useAppTour'
 
-type Material = {
-  id: string
-  name: string
-  unit: string
-  price_per_unit: number
-  stock_quantity: number
-  category?: string
-  critical_stock_level?: number
-}
-
-type PriceHistory = {
-  id: string
-  old_price: number
-  new_price: number
-  source: string
-  created_at: string
-}
-
-type EditRow = {
-  id: string
-  name: string
-  unit: string
-  price_per_unit: string
-  stock_quantity: string
-  critical_stock_level: string
-  category: string
-}
-
 type SettingRow = { key: string; value: unknown }
-type AutoCategorySuggestion = { id: string; suggested_category: string }
-type AutoCategoryResponse = { error?: string; suggestions?: AutoCategorySuggestion[] }
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error
@@ -65,7 +38,7 @@ export default function Hammaddeler() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('Tümü')
-  const [sortBy, setSortBy] = useState<'name' | 'price_desc' | 'stock_desc' | 'critical_first'>('name')
+  const [sortBy, setSortBy] = useState<MaterialSort>('name')
 
   // Modals state
   const [historyModalOpen, setHistoryModalOpen] = useState(false)
@@ -85,7 +58,9 @@ export default function Hammaddeler() {
 
   // Auto Categorize
   const [autoCatLoading, setAutoCatLoading] = useState(false)
-  const [autoCatSuggestions, setAutoCatSuggestions] = useState<{ id: string; name: string; current: string; suggested: string }[]>([])
+  const [autoCatSuggestions, setAutoCatSuggestions] = useState<
+    { id: string; name: string; current: string; suggested: string }[]
+  >([])
   const [autoCatModalOpen, setAutoCatModalOpen] = useState(false)
   const [autoCatSaving, setAutoCatSaving] = useState(false)
 
@@ -99,7 +74,7 @@ export default function Hammaddeler() {
     unit: 'Kg',
     price_per_unit: '',
     stock_quantity: '0',
-    critical_stock_level: '0'
+    critical_stock_level: '0',
   })
 
   const supabase = useMemo(() => createClient(), [])
@@ -110,16 +85,16 @@ export default function Hammaddeler() {
     setLoading(true)
     const [{ data }, { data: settings }] = await Promise.all([
       supabase.from('materials').select('*').order('name'),
-      supabase.from('settings').select('*')
+      supabase.from('settings').select('*'),
     ])
 
     setMaterials(data || [])
 
-    const catsSetting = (settings as SettingRow[] | null)?.find(s => s.key === 'material_categories')?.value
+    const catsSetting = (settings as SettingRow[] | null)?.find((s) => s.key === 'material_categories')?.value
     if (catsSetting) {
       const cats = Array.isArray(catsSetting)
         ? catsSetting.filter((category): category is string => typeof category === 'string')
-        : JSON.parse(String(catsSetting)) as string[]
+        : (JSON.parse(String(catsSetting)) as string[])
       setCategories(cats)
       setOpenCategories(new Set(cats))
     } else {
@@ -139,7 +114,7 @@ export default function Hammaddeler() {
   // ─── Bulk Edit Management ───────────────────────────────────
   const enterBulkEdit = () => {
     const rows: Record<string, EditRow> = {}
-    materials.forEach(m => {
+    materials.forEach((m) => {
       rows[m.id] = {
         id: m.id,
         name: m.name,
@@ -147,7 +122,7 @@ export default function Hammaddeler() {
         price_per_unit: m.price_per_unit.toString(),
         stock_quantity: (m.stock_quantity || 0).toString(),
         critical_stock_level: (m.critical_stock_level || 0).toString(),
-        category: m.category || 'Diğer'
+        category: m.category || 'Diğer',
       }
     })
     setEditRows(rows)
@@ -164,9 +139,9 @@ export default function Hammaddeler() {
   }
 
   const updateEditRow = (id: string, field: keyof EditRow, value: string) => {
-    setEditRows(prev => ({
+    setEditRows((prev) => ({
       ...prev,
-      [id]: { ...prev[id], [field]: value }
+      [id]: { ...prev[id], [field]: value },
     }))
     const newChanged = new Set(changedIds)
     newChanged.add(id)
@@ -190,9 +165,9 @@ export default function Hammaddeler() {
     const bulkDetails: string[] = []
 
     await Promise.all(
-      toUpdate.map(async id => {
+      toUpdate.map(async (id) => {
         const row = editRows[id]
-        const oldMat = materials.find(m => m.id === id)
+        const oldMat = materials.find((m) => m.id === id)
         const newPrice = parseFloat(row.price_per_unit)
         const oldPrice = oldMat?.price_per_unit || 0
         const newStock = parseFloat(row.stock_quantity) || 0
@@ -220,7 +195,7 @@ export default function Hammaddeler() {
             category: row.category,
             price_per_unit: newPrice,
             stock_quantity: newStock,
-            critical_stock_level: newCritical
+            critical_stock_level: newCritical,
           })
           .eq('id', id)
 
@@ -229,10 +204,10 @@ export default function Hammaddeler() {
             material_id: id,
             old_price: oldPrice,
             new_price: newPrice,
-            source: 'manual'
+            source: 'manual',
           })
         }
-      })
+      }),
     )
 
     setBulkEditMode(false)
@@ -244,7 +219,7 @@ export default function Hammaddeler() {
       'Hammadde',
       'GUNCELLEME',
       `${changedIds.size} adet hammaddenin bilgileri (fiyat/stok/kategori) topluca güncellendi.`,
-      bulkDetails.length > 0 ? { detay: bulkDetails.join(' | ') } : undefined
+      bulkDetails.length > 0 ? { detay: bulkDetails.join(' | ') } : undefined,
     )
   }
 
@@ -252,13 +227,13 @@ export default function Hammaddeler() {
     if (selectedForDeletion.size === 0) return
     const confirmed = await showConfirm(
       `Seçili ${selectedForDeletion.size} adet hammaddeyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz!`,
-      'Seçilileri Sil 🗑️'
+      'Seçilileri Sil 🗑️',
     )
     if (!confirmed) return
 
     setBulkSaving(true)
     const deletedNames = Array.from(selectedForDeletion)
-      .map(id => materials.find(m => m.id === id)?.name)
+      .map((id) => materials.find((m) => m.id === id)?.name)
       .filter(Boolean)
 
     await supabase.from('materials').delete().in('id', Array.from(selectedForDeletion))
@@ -269,7 +244,7 @@ export default function Hammaddeler() {
     setBulkSaving(false)
     fetchMaterials()
     logActivity('Hammadde', 'SILME', `${selectedForDeletion.size} adet hammadde toplu olarak silindi.`, {
-      silinen_urunler: deletedNames.join(', ')
+      silinen_urunler: deletedNames.join(', '),
     })
     showAlert(`${selectedForDeletion.size} adet hammadde başarıyla silindi.`, 'success')
   }
@@ -282,24 +257,24 @@ export default function Hammaddeler() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          materials: materials.map(m => ({ id: m.id, name: m.name, category: m.category })),
-          categories
-        })
+          materials: materials.map((m) => ({ id: m.id, name: m.name, category: m.category })),
+          categories,
+        }),
       })
-      const data = await res.json() as AutoCategoryResponse
+      const data = (await res.json()) as AutoCategoryResponse
       if (data.error) throw new Error(data.error)
 
       const suggestions = (data.suggestions || [])
-        .map(s => {
-          const mat = materials.find(m => m.id === s.id)
+        .map((s) => {
+          const mat = materials.find((m) => m.id === s.id)
           return {
             id: s.id,
             name: mat?.name || s.id,
             current: mat?.category || 'Diğer',
-            suggested: s.suggested_category
+            suggested: s.suggested_category,
           }
         })
-        .filter(s => s.suggested !== s.current)
+        .filter((s) => s.suggested !== s.current)
 
       setAutoCatSuggestions(suggestions)
       setAutoCatModalOpen(true)
@@ -312,19 +287,18 @@ export default function Hammaddeler() {
   const handleApplyAutoCat = async (approved: { id: string; suggested: string }[]) => {
     setAutoCatSaving(true)
     try {
-      await Promise.all(approved.map(async item => {
-        const { error } = await supabase
-          .from('materials')
-          .update({ category: item.suggested })
-          .eq('id', item.id)
-        if (error) throw error
-      }))
+      await Promise.all(
+        approved.map(async (item) => {
+          const { error } = await supabase.from('materials').update({ category: item.suggested }).eq('id', item.id)
+          if (error) throw error
+        }),
+      )
 
       await logActivity(
         'Hammadde',
         'GUNCELLEME',
         `${approved.length} adet hammaddenin kategorisi yapay zeka ile otomatik güncellendi.`,
-        { material_ids: approved.map(item => item.id) }
+        { material_ids: approved.map((item) => item.id) },
       )
       setAutoCatModalOpen(false)
       setAutoCatSuggestions([])
@@ -338,7 +312,7 @@ export default function Hammaddeler() {
 
   // ─── Accordion Helpers ─────────────────────────────────────
   const toggleCategory = (cat: string) => {
-    setOpenCategories(prev => {
+    setOpenCategories((prev) => {
       const next = new Set(prev)
       if (next.has(cat)) next.delete(cat)
       else next.add(cat)
@@ -362,7 +336,7 @@ export default function Hammaddeler() {
       unit: 'Kg',
       price_per_unit: '',
       stock_quantity: '',
-      critical_stock_level: ''
+      critical_stock_level: '',
     })
     setEditingId(null)
     setPkgMultiplier(12)
@@ -372,7 +346,7 @@ export default function Hammaddeler() {
   const handleSubmit = async () => {
     if (!form.name || !form.price_per_unit) return
     const {
-      data: { user }
+      data: { user },
     } = await supabase.auth.getUser()
 
     const payload = {
@@ -382,13 +356,13 @@ export default function Hammaddeler() {
       price_per_unit: parseFloat(form.price_per_unit),
       stock_quantity: parseFloat(form.stock_quantity) || 0,
       critical_stock_level: parseFloat(form.critical_stock_level) || 0,
-      user_id: user?.id
+      user_id: user?.id,
     }
 
     let details = ''
 
     if (editingId) {
-      const oldMat = materials.find(m => m.id === editingId)
+      const oldMat = materials.find((m) => m.id === editingId)
       const oldPrice = oldMat ? oldMat.price_per_unit : 0
       const oldStock = oldMat ? oldMat.stock_quantity || 0 : 0
       const newPrice = payload.price_per_unit
@@ -411,7 +385,7 @@ export default function Hammaddeler() {
           material_id: editingId,
           old_price: oldPrice,
           new_price: newPrice,
-          source: 'manual'
+          source: 'manual',
         })
       }
     } else {
@@ -422,7 +396,7 @@ export default function Hammaddeler() {
           material_id: data.id,
           old_price: 0,
           new_price: payload.price_per_unit,
-          source: 'manual'
+          source: 'manual',
         })
       }
     }
@@ -433,7 +407,7 @@ export default function Hammaddeler() {
       'Hammadde',
       editingId ? 'GUNCELLEME' : 'EKLEME',
       `${form.name} isimli hammadde ${editingId ? 'güncellendi' : 'sisteme eklendi'}.`,
-      { detay: details }
+      { detay: details },
     )
   }
 
@@ -444,7 +418,7 @@ export default function Hammaddeler() {
       unit: mat.unit,
       price_per_unit: mat.price_per_unit.toString(),
       stock_quantity: (mat.stock_quantity || 0).toString(),
-      critical_stock_level: (mat.critical_stock_level || 0).toString()
+      critical_stock_level: (mat.critical_stock_level || 0).toString(),
     })
     setEditingId(mat.id)
     setPkgMultiplier(12) // Reset multiplier
@@ -452,10 +426,10 @@ export default function Hammaddeler() {
   }
 
   const handleDelete = async (id: string) => {
-    const matToDelete = materials.find(m => m.id === id)
+    const matToDelete = materials.find((m) => m.id === id)
     const confirmed = await showConfirm(
       `"${matToDelete?.name}" isimli hammaddeyi silmek istediğinize emin misiniz?`,
-      'Hammaddeyi Sil 🗑️'
+      'Hammaddeyi Sil 🗑️',
     )
     if (!confirmed) return
     await supabase.from('materials').delete().eq('id', id)
@@ -479,17 +453,14 @@ export default function Hammaddeler() {
   const handleDeleteAll = async () => {
     const confirmed = await showConfirm(
       'DİKKAT: Sistemdeki TÜM hammaddeleri silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm stok verileriniz sıfırlanır!',
-      'TÜMÜNÜ SİL 🚨'
+      'TÜMÜNÜ SİL 🚨',
     )
     if (!confirmed) return
 
     setLoading(true)
-    const allNames = materials.map(m => m.name)
+    const allNames = materials.map((m) => m.name)
 
-    const { error } = await supabase
-      .from('materials')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000')
+    const { error } = await supabase.from('materials').delete().neq('id', '00000000-0000-0000-0000-000000000000')
 
     if (error) {
       await showAlert('Silme hatası: ' + error.message, 'error')
@@ -498,7 +469,9 @@ export default function Hammaddeler() {
     }
 
     await fetchMaterials()
-    logActivity('Hammadde', 'SILME', `Tüm hammaddeler sistemden toptan silindi.`, { silinen_urunler: allNames.join(', ') })
+    logActivity('Hammadde', 'SILME', `Tüm hammaddeler sistemden toptan silindi.`, {
+      silinen_urunler: allNames.join(', '),
+    })
     await showAlert('Tüm hammaddeler başarıyla silindi!', 'success')
     setLoading(false)
   }
@@ -506,98 +479,40 @@ export default function Hammaddeler() {
   // ─── Computed Stats & Filters ────────────────────────────────
   const totalValue = useMemo(
     () => materials.reduce((t, m) => t + (m.stock_quantity || 0) * m.price_per_unit, 0),
-    [materials]
+    [materials],
   )
 
   const criticalMaterialsCount = useMemo(
     () =>
       materials.filter(
-        m => m.critical_stock_level != null && m.critical_stock_level > 0 && (m.stock_quantity || 0) <= m.critical_stock_level
+        (m) =>
+          m.critical_stock_level != null &&
+          m.critical_stock_level > 0 &&
+          (m.stock_quantity || 0) <= m.critical_stock_level,
       ).length,
-    [materials]
+    [materials],
   )
 
-  const activeCategoriesCount = useMemo(
-    () => new Set(materials.map(m => m.category || 'Diğer')).size,
-    [materials]
+  const activeCategoriesCount = useMemo(() => new Set(materials.map((m) => m.category || 'Diğer')).size, [materials])
+
+  const processedMaterials = useMemo(
+    () => filterAndSortMaterials(materials, search, categoryFilter, sortBy),
+    [materials, search, categoryFilter, sortBy],
   )
-
-  const processedMaterials = useMemo(() => {
-    let result = [...materials]
-
-    if (search.trim()) {
-      const query = search.toLowerCase()
-      result = result.filter(m => m.name.toLowerCase().includes(query))
-    }
-
-    if (categoryFilter !== 'Tümü') {
-      result = result.filter(m => (m.category || 'Diğer') === categoryFilter)
-    }
-
-    result.sort((a, b) => {
-      const isCriticalA =
-        a.critical_stock_level != null && a.critical_stock_level > 0 && (a.stock_quantity || 0) <= a.critical_stock_level
-      const isCriticalB =
-        b.critical_stock_level != null && b.critical_stock_level > 0 && (b.stock_quantity || 0) <= b.critical_stock_level
-
-      if (sortBy === 'critical_first') {
-        if (isCriticalA && !isCriticalB) return -1
-        if (!isCriticalA && isCriticalB) return 1
-      }
-      if (sortBy === 'price_desc') return b.price_per_unit - a.price_per_unit
-      if (sortBy === 'stock_desc') return (b.stock_quantity || 0) - (a.stock_quantity || 0)
-      return a.name.localeCompare(b.name)
-    })
-
-    return result
-  }, [materials, search, categoryFilter, sortBy])
 
   const groupedByCategory = useMemo(() => {
-    const allCats = [...new Set([...categories, 'Diğer', ...processedMaterials.map(m => m.category || 'Diğer')])]
+    const allCats = [...new Set([...categories, 'Diğer', ...processedMaterials.map((m) => m.category || 'Diğer')])]
     const filteredCats = categoryFilter !== 'Tümü' ? [categoryFilter] : allCats
 
     return filteredCats
-      .map(cat => ({
+      .map((cat) => ({
         cat,
-        items: processedMaterials.filter(m => (m.category || 'Diğer') === cat)
+        items: processedMaterials.filter((m) => (m.category || 'Diğer') === cat),
       }))
-      .filter(g => g.items.length > 0)
+      .filter((g) => g.items.length > 0)
   }, [categories, processedMaterials, categoryFilter])
 
-  // Driver Tour
-  useAppTour(
-    'hammaddeler',
-    [
-      {
-        element: '#tour-mat-add',
-        popover: {
-          title: 'Hammadde Ekle ➕',
-          description: 'Tedarikçinizden aldığınız hammaddeleri sisteme buradan tek tek girebilirsiniz.',
-          side: 'bottom',
-          align: 'end'
-        }
-      },
-      {
-        element: '#tour-mat-bulk-edit',
-        popover: {
-          title: 'Hızlı Düzenleme ⚡',
-          description: 'Excel gibi çalışır! Fiyat güncellemelerini veya stok sayımlarını ekrana tıklayarak hızlıca yapıp toplu kaydedebilirsiniz.',
-          side: 'bottom',
-          align: 'center'
-        }
-      },
-      {
-        element: '#tour-mat-autocat',
-        popover: {
-          title: 'Yapay Zeka ile Düzenle 🤖',
-          description: 'Yüzlerce hammaddeniz mi var? Yapay zeka asistanımız hepsini saniyeler içinde "Süt Ürünleri", "Paketleme" gibi kategorilere ayırır.',
-          side: 'bottom',
-          align: 'center'
-        }
-      }
-    ],
-    800
-  )
+  useAppTour('hammaddeler', materialTourSteps, 800)
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 pb-16">
@@ -638,7 +553,7 @@ export default function Hammaddeler() {
                     if (selectedForDeletion.size === processedMaterials.length && processedMaterials.length > 0) {
                       setSelectedForDeletion(new Set())
                     } else {
-                      setSelectedForDeletion(new Set(processedMaterials.map(m => m.id)))
+                      setSelectedForDeletion(new Set(processedMaterials.map((m) => m.id)))
                     }
                   }}
                   className="bg-stone-800 hover:bg-stone-700 text-stone-300 px-3 py-1.5 rounded-lg text-xs font-semibold border border-stone-700 transition-colors"
@@ -807,7 +722,7 @@ export default function Hammaddeler() {
             <input
               type="text"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Hammadde adı ile arama yapın..."
               className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-9 pr-4 py-2 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500/50 transition-colors placeholder:text-stone-600"
             />
@@ -825,20 +740,20 @@ export default function Hammaddeler() {
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={categoryFilter}
-              onChange={e => setCategoryFilter(e.target.value)}
+              onChange={(e) => setCategoryFilter(e.target.value)}
               className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-300 text-xs focus:outline-none focus:border-amber-500/50 cursor-pointer"
             >
               <option value="Tümü">Tüm Kategoriler ({materials.length})</option>
-              {categories.map(cat => (
+              {categories.map((cat) => (
                 <option key={cat} value={cat}>
-                  {cat} ({materials.filter(m => (m.category || 'Diğer') === cat).length})
+                  {cat} ({materials.filter((m) => (m.category || 'Diğer') === cat).length})
                 </option>
               ))}
             </select>
 
             <select
               value={sortBy}
-              onChange={e => setSortBy(e.target.value as typeof sortBy)}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
               className="bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-300 text-xs focus:outline-none focus:border-amber-500/50 cursor-pointer"
             >
               <option value="name">İsme Göre (A-Z)</option>
@@ -867,7 +782,8 @@ export default function Hammaddeler() {
             <div className="text-5xl mb-3">🧪</div>
             <h3 className="text-lg font-bold text-stone-300 mb-1">Aramanıza Uygun Hammadde Bulunamadı</h3>
             <p className="text-xs text-stone-400 max-w-sm mx-auto">
-              Arama kriterinizi değiştirerek veya &quot;+ Yeni Hammadde&quot; butonuna basarak yeni hammadde tanımlayabilirsiniz.
+              Arama kriterinizi değiştirerek veya &quot;+ Yeni Hammadde&quot; butonuna basarak yeni hammadde
+              tanımlayabilirsiniz.
             </p>
           </div>
         ) : (
@@ -876,7 +792,10 @@ export default function Hammaddeler() {
               const isOpen = openCategories.has(cat)
               const catTotal = items.reduce((t, m) => t + (m.stock_quantity || 0) * m.price_per_unit, 0)
               const criticalCount = items.filter(
-                m => m.critical_stock_level != null && m.critical_stock_level > 0 && (m.stock_quantity || 0) <= m.critical_stock_level
+                (m) =>
+                  m.critical_stock_level != null &&
+                  m.critical_stock_level > 0 &&
+                  (m.stock_quantity || 0) <= m.critical_stock_level,
               ).length
 
               return (
@@ -923,9 +842,7 @@ export default function Hammaddeler() {
                         <table className="w-full text-left border-collapse">
                           <thead>
                             <tr className="bg-stone-950/60 border-b border-stone-800 text-stone-400 text-[11px] uppercase tracking-wider font-semibold">
-                              {bulkEditMode && (
-                                <th className="px-4 py-3 text-center w-12 text-rose-400">Sil</th>
-                              )}
+                              {bulkEditMode && <th className="px-4 py-3 text-center w-12 text-rose-400">Sil</th>}
                               <th className="px-5 py-3">Hammadde Adı</th>
                               <th className="px-4 py-3">Birim</th>
                               <th className="px-4 py-3 text-right">Birim Fiyat (₺)</th>
@@ -936,7 +853,7 @@ export default function Hammaddeler() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-stone-800/50 text-xs sm:text-sm">
-                            {items.map(mat => {
+                            {items.map((mat) => {
                               const isCritical =
                                 mat.critical_stock_level != null &&
                                 mat.critical_stock_level > 0 &&
@@ -952,11 +869,7 @@ export default function Hammaddeler() {
                                   <tr
                                     key={mat.id}
                                     className={`transition-colors ${
-                                      isSelected
-                                        ? 'bg-rose-950/40'
-                                        : isChanged
-                                        ? 'bg-amber-500/10'
-                                        : ''
+                                      isSelected ? 'bg-rose-950/40' : isChanged ? 'bg-amber-500/10' : ''
                                     }`}
                                   >
                                     <td className="px-4 py-2.5 text-center">
@@ -970,7 +883,7 @@ export default function Hammaddeler() {
                                     <td className="px-2 py-2">
                                       <input
                                         value={row.name}
-                                        onChange={e => updateEditRow(mat.id, 'name', e.target.value)}
+                                        onChange={(e) => updateEditRow(mat.id, 'name', e.target.value)}
                                         className={inputCls}
                                         disabled={isSelected}
                                       />
@@ -978,11 +891,11 @@ export default function Hammaddeler() {
                                     <td className="px-2 py-2">
                                       <select
                                         value={row.unit}
-                                        onChange={e => updateEditRow(mat.id, 'unit', e.target.value)}
+                                        onChange={(e) => updateEditRow(mat.id, 'unit', e.target.value)}
                                         className={inputCls}
                                         disabled={isSelected}
                                       >
-                                        {units.map(u => (
+                                        {units.map((u) => (
                                           <option key={u} value={u}>
                                             {u}
                                           </option>
@@ -993,7 +906,7 @@ export default function Hammaddeler() {
                                       <input
                                         type="number"
                                         value={row.price_per_unit}
-                                        onChange={e => updateEditRow(mat.id, 'price_per_unit', e.target.value)}
+                                        onChange={(e) => updateEditRow(mat.id, 'price_per_unit', e.target.value)}
                                         className={inputCls + ' text-right font-bold text-amber-400'}
                                         disabled={isSelected}
                                       />
@@ -1002,7 +915,7 @@ export default function Hammaddeler() {
                                       <input
                                         type="number"
                                         value={row.stock_quantity}
-                                        onChange={e => updateEditRow(mat.id, 'stock_quantity', e.target.value)}
+                                        onChange={(e) => updateEditRow(mat.id, 'stock_quantity', e.target.value)}
                                         className={inputCls + ' text-right font-semibold'}
                                         disabled={isSelected}
                                       />
@@ -1011,7 +924,7 @@ export default function Hammaddeler() {
                                       <input
                                         type="number"
                                         value={row.critical_stock_level}
-                                        onChange={e => updateEditRow(mat.id, 'critical_stock_level', e.target.value)}
+                                        onChange={(e) => updateEditRow(mat.id, 'critical_stock_level', e.target.value)}
                                         className={inputCls + ' text-right text-amber-400'}
                                         disabled={isSelected}
                                       />
@@ -1106,7 +1019,7 @@ export default function Hammaddeler() {
 
                       {/* Mobile Cards View */}
                       <div className="md:hidden divide-y divide-stone-800/60">
-                        {items.map(mat => {
+                        {items.map((mat) => {
                           const isCritical =
                             mat.critical_stock_level != null &&
                             mat.critical_stock_level > 0 &&
@@ -1146,7 +1059,7 @@ export default function Hammaddeler() {
                                     <input
                                       type="number"
                                       value={row.price_per_unit}
-                                      onChange={e => updateEditRow(mat.id, 'price_per_unit', e.target.value)}
+                                      onChange={(e) => updateEditRow(mat.id, 'price_per_unit', e.target.value)}
                                       className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1.5 text-amber-400 font-bold text-sm"
                                       disabled={isSelected}
                                     />
@@ -1156,7 +1069,7 @@ export default function Hammaddeler() {
                                     <input
                                       type="number"
                                       value={row.stock_quantity}
-                                      onChange={e => updateEditRow(mat.id, 'stock_quantity', e.target.value)}
+                                      onChange={(e) => updateEditRow(mat.id, 'stock_quantity', e.target.value)}
                                       className="w-full bg-stone-950 border border-stone-700 rounded-lg px-2.5 py-1.5 text-white text-sm"
                                       disabled={isSelected}
                                     />
@@ -1249,7 +1162,7 @@ export default function Hammaddeler() {
         >
           <div
             className="bg-stone-900 border border-stone-800 rounded-3xl w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden relative my-auto"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="px-6 py-4 bg-stone-950 border-b border-stone-800 flex items-center justify-between">
@@ -1281,7 +1194,7 @@ export default function Hammaddeler() {
                   <label className="text-stone-300 text-xs font-semibold mb-1 block">Hammadde Adı *</label>
                   <input
                     value={form.name}
-                    onChange={e => setForm({ ...form, name: e.target.value })}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50"
                     placeholder="örn: Espresso Çekirdeği"
                   />
@@ -1291,10 +1204,10 @@ export default function Hammaddeler() {
                   <label className="text-stone-300 text-xs font-semibold mb-1 block">Kategori</label>
                   <select
                     value={form.category}
-                    onChange={e => setForm({ ...form, category: e.target.value })}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50"
                   >
-                    {categories.map(c => (
+                    {categories.map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
@@ -1306,10 +1219,10 @@ export default function Hammaddeler() {
                   <label className="text-stone-300 text-xs font-semibold mb-1 block">Ölçü Birimi *</label>
                   <select
                     value={form.unit}
-                    onChange={e => setForm({ ...form, unit: e.target.value })}
+                    onChange={(e) => setForm({ ...form, unit: e.target.value })}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50"
                   >
-                    {units.map(u => (
+                    {units.map((u) => (
                       <option key={u} value={u}>
                         {u}
                       </option>
@@ -1322,7 +1235,7 @@ export default function Hammaddeler() {
                   <input
                     type="number"
                     value={form.price_per_unit}
-                    onChange={e => setForm({ ...form, price_per_unit: e.target.value })}
+                    onChange={(e) => setForm({ ...form, price_per_unit: e.target.value })}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-amber-400 font-bold text-sm focus:outline-none focus:border-amber-500/50"
                     placeholder="0.00"
                   />
@@ -1333,7 +1246,7 @@ export default function Hammaddeler() {
                   <input
                     type="number"
                     value={form.stock_quantity}
-                    onChange={e => setForm({ ...form, stock_quantity: e.target.value })}
+                    onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })}
                     className="w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white font-bold text-sm focus:outline-none focus:border-amber-500/50"
                     placeholder="0"
                   />
@@ -1344,7 +1257,7 @@ export default function Hammaddeler() {
                   <input
                     type="number"
                     value={form.critical_stock_level}
-                    onChange={e => setForm({ ...form, critical_stock_level: e.target.value })}
+                    onChange={(e) => setForm({ ...form, critical_stock_level: e.target.value })}
                     className="w-full bg-stone-950 border border-rose-500/30 rounded-xl px-3 py-2 text-rose-400 font-bold text-sm focus:outline-none focus:border-rose-500/50"
                     placeholder="0"
                   />
@@ -1372,7 +1285,7 @@ export default function Hammaddeler() {
                           ...form,
                           unit: u === 'kg' || u === 'kilogram' ? 'Gram' : 'Ml',
                           stock_quantity: (currentQty * 1000).toString(),
-                          price_per_unit: (currentPrice / 1000).toFixed(4)
+                          price_per_unit: (currentPrice / 1000).toFixed(4),
                         })
                       }}
                       className="bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/30 text-indigo-300 font-semibold px-3 py-1.5 rounded-xl text-xs transition-all active:scale-95"
@@ -1391,7 +1304,7 @@ export default function Hammaddeler() {
                       <input
                         type="number"
                         value={pkgMultiplier}
-                        onChange={e => setPkgMultiplier(parseInt(e.target.value) || 1)}
+                        onChange={(e) => setPkgMultiplier(parseInt(e.target.value) || 1)}
                         className="w-12 bg-stone-950 border border-stone-700 rounded-lg text-white font-bold text-center py-0.5 text-xs"
                       />
                       <button
@@ -1403,7 +1316,7 @@ export default function Hammaddeler() {
                               ...form,
                               unit: 'Adet',
                               stock_quantity: (currentQty * pkgMultiplier).toString(),
-                              price_per_unit: (currentPrice / pkgMultiplier).toFixed(4)
+                              price_per_unit: (currentPrice / pkgMultiplier).toFixed(4),
                             })
                           }
                         }}
@@ -1449,7 +1362,7 @@ export default function Hammaddeler() {
         isOpen={autoCatModalOpen}
         onClose={() => setAutoCatModalOpen(false)}
         suggestions={autoCatSuggestions}
-        onRemoveSuggestion={index => setAutoCatSuggestions(prev => prev.filter((_, idx) => idx !== index))}
+        onRemoveSuggestion={(index) => setAutoCatSuggestions((prev) => prev.filter((_, idx) => idx !== index))}
         onApply={handleApplyAutoCat}
         isSaving={autoCatSaving}
       />

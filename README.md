@@ -32,6 +32,7 @@ Sistemin temel modülleri `src/app/dashboard/` altında yer almaktadır:
 Projeyi kendi bilgisayarınızda çalıştırmak için aşağıdaki adımları izleyin.
 
 ### 1. Gereksinimler
+
 - Node.js (v18.17 veya üzeri)
 - Supabase Hesabı (Veritabanı ve Auth için)
 - Google Gemini API Anahtarı (Yapay Zeka modülleri için)
@@ -87,7 +88,7 @@ Eğer veritabanı veya yetkilendirme (RLS) hatalarını doğrudan terminalden h�
 
 Bu bir SaaS projesi olduğu için Supabase tarafında **Row Level Security (RLS)** kullanılarak Tenant bazlı izolasyon sağlanmaktadır. Ek güvenlik kararları ve mimari tasarımlar için [SEC-101 — Tenant Modeli ve Veri Sahipliği](docs/security/SEC-101-tenant-model.md) dokümanını okuyabilirsiniz.
 
-*(Not: Tüm veritabanı "insert, update, delete" işlemleri Next.js sunucusunda veya Supabase rpc (fonksiyon) üzerinden `logActivity` çağrılarak loglanmaktadır.)*
+_(Not: Tüm veritabanı "insert, update, delete" işlemleri Next.js sunucusunda veya Supabase rpc (fonksiyon) üzerinden `logActivity` çağrılarak loglanmaktadır.)_
 
 ---
 

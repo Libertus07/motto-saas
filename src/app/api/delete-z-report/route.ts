@@ -34,11 +34,11 @@ export async function POST(req: Request) {
 
     // 1. Z-Raporunu Atomik Olarak Sil (RPC veya Resilient Fallback)
     let rpcSuccess = false
-    
+
     // A. 2-Param RPC Dene
     const { error: rpcErr1 } = await supabase.rpc('delete_z_report_transaction', {
       p_batch_id: batch_id,
-      p_organization_id: targetOrgId
+      p_organization_id: targetOrgId,
     })
     if (!rpcErr1) {
       rpcSuccess = true
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
       // B. (p_batch_id, p_user_id) RPC Dene
       const { error: rpcErr2 } = await supabase.rpc('delete_z_report_transaction', {
         p_batch_id: batch_id,
-        p_user_id: user.id
+        p_user_id: user.id,
       })
       if (!rpcErr2) {
         rpcSuccess = true
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         devError('RPC (p_user_id) warning:', rpcErr2)
         // C. 1-Param RPC Dene
         const { error: rpcErr3 } = await supabase.rpc('delete_z_report_transaction', {
-          p_batch_id: batch_id
+          p_batch_id: batch_id,
         })
         if (!rpcErr3) {
           rpcSuccess = true
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     // C. Graceful Fallback: RPC schema cache'de yoksa doğrudan DB sorguları ile rollback yap
     if (!rpcSuccess) {
       devLog('RPC not found in schema cache. Executing resilient fallback DB cleanup...')
-      
+
       // i. Stokları geri yükle
       const { data: stockMovs } = await supabase
         .from('stock_movements')
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
               .select('stock_quantity')
               .eq('id', mov.material_id)
               .single()
-            
+
             const currentQty = Number(mat?.stock_quantity) || 0
             await supabase
               .from('materials')
@@ -108,31 +108,18 @@ export async function POST(req: Request) {
       if (accMovs && accMovs.length > 0) {
         for (const accMov of accMovs) {
           if (accMov.account_id && accMov.amount) {
-            const { data: acc } = await supabase
-              .from('accounts')
-              .select('balance')
-              .eq('id', accMov.account_id)
-              .single()
+            const { data: acc } = await supabase.from('accounts').select('balance').eq('id', accMov.account_id).single()
 
             const currentBalance = Number(acc?.balance) || 0
             const change = Number(accMov.amount)
-            const newBalance = accMov.movement_type === 'giris'
-              ? currentBalance - change
-              : currentBalance + change
+            const newBalance = accMov.movement_type === 'giris' ? currentBalance - change : currentBalance + change
 
-            await supabase
-              .from('accounts')
-              .update({ balance: newBalance })
-              .eq('id', accMov.account_id)
+            await supabase.from('accounts').update({ balance: newBalance }).eq('id', accMov.account_id)
           }
         }
       }
 
-      await supabase
-        .from('account_movements')
-        .delete()
-        .eq('source_type', 'z_report')
-        .eq('source_id', String(batch_id))
+      await supabase.from('account_movements').delete().eq('source_type', 'z_report').eq('source_id', String(batch_id))
     }
 
     // 2. Audit Log Ekle
@@ -147,8 +134,8 @@ export async function POST(req: Request) {
       organization_id: targetOrgId,
       details: {
         batch_id,
-        _meta: { ip: ipAddress, userAgent }
-      }
+        _meta: { ip: ipAddress, userAgent },
+      },
     })
 
     return NextResponse.json({ success: true })

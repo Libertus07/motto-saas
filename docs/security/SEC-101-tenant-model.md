@@ -121,29 +121,29 @@ updated_at timestamptz not null default now()
 
 Aşağıdaki tablolarda `organization_id uuid not null` doğrudan bulunmalıdır. İlişki tablolarında tenant ebeveynden türetilebilse bile doğrudan kolon kullanılması RLS sadeliği, sorgu performansı ve savunma katmanı nedeniyle tercih edilmiştir.
 
-| Tablo | Sahiplik | Aktör alanı | Not |
-|---|---|---|---|
-| `settings` | Doğrudan `organization_id` | `updated_by` | PK/unique `(organization_id, key)` olmalı |
-| `materials` | Doğrudan `organization_id` | `created_by`, `updated_by` | İsim eşleştirmeleri tenant içinde yapılmalı |
-| `products` | Doğrudan `organization_id` | `created_by`, `updated_by` | Ürün kataloğu tenant'a aittir |
-| `sub_recipes` | Doğrudan `organization_id` | `created_by`, `updated_by` | Yarı mamul/reçete tenant'a aittir |
-| `sub_recipe_ingredients` | Doğrudan `organization_id` | Yok | Parent ilişkileri aynı tenant'ta olmalı |
-| `product_ingredients` | Doğrudan `organization_id` | Yok | Product/material/sub-recipe tenant'ları eşleşmeli |
-| `suppliers` | Doğrudan `organization_id` | `created_by`, `updated_by` | Finansal ve iletişim verisi içerir |
-| `supplier_transactions` | Doğrudan `organization_id` | `performed_by` | Supplier ile aynı tenant zorunlu |
-| `expenses` | Doğrudan `organization_id` | `created_by`, `updated_by` | Finansal kayıt |
-| `sales` | Doğrudan `organization_id` | `created_by` | Batch işlemleri tenant ile sınırlandırılmalı |
-| `accounts` | Doğrudan `organization_id` | `created_by`, `updated_by` | Finans hareketlerinin sahiplik kökü |
-| `account_movements` | Doğrudan `organization_id` | `performed_by` | Account ile aynı tenant zorunlu |
-| `stock_movements` | Doğrudan `organization_id` | `performed_by` | Manuel ve çok kaynaklı hareketler nedeniyle zorunlu |
-| `material_price_history` | Doğrudan `organization_id` | `created_by` | Material ile aynı tenant zorunlu |
-| `investments` | Doğrudan `organization_id` | `created_by`, `updated_by` | `asset_type` aramaları tenant içinde yapılmalı |
-| `investment_transactions` | Doğrudan `organization_id` | `performed_by` | Investment/account aynı tenant'ta olmalı |
-| `cash_reconciliations` | Doğrudan `organization_id` | `performed_by` | Unique `(organization_id, date)` olmalı |
-| `activity_logs` | Doğrudan `organization_id` | `user_id`/`performed_by` | Audit kayıtları tenant dışına sızmamalı |
-| `ingredients` | Doğrudan `organization_id` | Belirlenecek | Legacy/kullanım durumu migration öncesi doğrulanmalı |
-| `recipes` | Doğrudan `organization_id` | Belirlenecek | Legacy/kullanım durumu migration öncesi doğrulanmalı |
-| `price_calculations` | Doğrudan `organization_id` | Belirlenecek | Legacy/kullanım durumu migration öncesi doğrulanmalı |
+| Tablo                     | Sahiplik                   | Aktör alanı                | Not                                                  |
+| ------------------------- | -------------------------- | -------------------------- | ---------------------------------------------------- |
+| `settings`                | Doğrudan `organization_id` | `updated_by`               | PK/unique `(organization_id, key)` olmalı            |
+| `materials`               | Doğrudan `organization_id` | `created_by`, `updated_by` | İsim eşleştirmeleri tenant içinde yapılmalı          |
+| `products`                | Doğrudan `organization_id` | `created_by`, `updated_by` | Ürün kataloğu tenant'a aittir                        |
+| `sub_recipes`             | Doğrudan `organization_id` | `created_by`, `updated_by` | Yarı mamul/reçete tenant'a aittir                    |
+| `sub_recipe_ingredients`  | Doğrudan `organization_id` | Yok                        | Parent ilişkileri aynı tenant'ta olmalı              |
+| `product_ingredients`     | Doğrudan `organization_id` | Yok                        | Product/material/sub-recipe tenant'ları eşleşmeli    |
+| `suppliers`               | Doğrudan `organization_id` | `created_by`, `updated_by` | Finansal ve iletişim verisi içerir                   |
+| `supplier_transactions`   | Doğrudan `organization_id` | `performed_by`             | Supplier ile aynı tenant zorunlu                     |
+| `expenses`                | Doğrudan `organization_id` | `created_by`, `updated_by` | Finansal kayıt                                       |
+| `sales`                   | Doğrudan `organization_id` | `created_by`               | Batch işlemleri tenant ile sınırlandırılmalı         |
+| `accounts`                | Doğrudan `organization_id` | `created_by`, `updated_by` | Finans hareketlerinin sahiplik kökü                  |
+| `account_movements`       | Doğrudan `organization_id` | `performed_by`             | Account ile aynı tenant zorunlu                      |
+| `stock_movements`         | Doğrudan `organization_id` | `performed_by`             | Manuel ve çok kaynaklı hareketler nedeniyle zorunlu  |
+| `material_price_history`  | Doğrudan `organization_id` | `created_by`               | Material ile aynı tenant zorunlu                     |
+| `investments`             | Doğrudan `organization_id` | `created_by`, `updated_by` | `asset_type` aramaları tenant içinde yapılmalı       |
+| `investment_transactions` | Doğrudan `organization_id` | `performed_by`             | Investment/account aynı tenant'ta olmalı             |
+| `cash_reconciliations`    | Doğrudan `organization_id` | `performed_by`             | Unique `(organization_id, date)` olmalı              |
+| `activity_logs`           | Doğrudan `organization_id` | `user_id`/`performed_by`   | Audit kayıtları tenant dışına sızmamalı              |
+| `ingredients`             | Doğrudan `organization_id` | Belirlenecek               | Legacy/kullanım durumu migration öncesi doğrulanmalı |
+| `recipes`                 | Doğrudan `organization_id` | Belirlenecek               | Legacy/kullanım durumu migration öncesi doğrulanmalı |
+| `price_calculations`      | Doğrudan `organization_id` | Belirlenecek               | Legacy/kullanım durumu migration öncesi doğrulanmalı |
 
 ### Canlı şema doğrulaması gereken tablolar
 
@@ -215,13 +215,13 @@ Insert/update için aynı kontrol `with check` içinde uygulanmalıdır.
 
 Başlangıç yetki matrisi:
 
-| Rol | Okuma | Operasyonel yazma | Finansal yazma | Üye/ayar yönetimi |
-|---|---:|---:|---:|---:|
-| `owner` | Evet | Evet | Evet | Evet |
-| `admin` | Evet | Evet | Evet | Evet, owner hariç |
-| `manager` | Evet | Evet | Sınırlı | Hayır |
-| `staff` | Evet | Sınırlı | Hayır | Hayır |
-| `accountant` | Evet | Hayır | Evet | Hayır |
+| Rol          | Okuma | Operasyonel yazma | Finansal yazma | Üye/ayar yönetimi |
+| ------------ | ----: | ----------------: | -------------: | ----------------: |
+| `owner`      |  Evet |              Evet |           Evet |              Evet |
+| `admin`      |  Evet |              Evet |           Evet | Evet, owner hariç |
+| `manager`    |  Evet |              Evet |        Sınırlı |             Hayır |
+| `staff`      |  Evet |           Sınırlı |          Hayır |             Hayır |
+| `accountant` |  Evet |             Hayır |           Evet |             Hayır |
 
 Detaylı tablo/işlem matrisi SEC-102 içinde kesinleştirilecektir.
 
@@ -304,18 +304,18 @@ Mevcut veri tek bir legacy organizasyona bağlanacaktır.
 
 SEC-102 tamamlanma testlerinde en az iki organization ve iki kullanıcı kullanılmalıdır.
 
-| Senaryo | Beklenen sonuç |
-|---|---|
-| A kullanıcısı A organizasyonunun verisini okur | Başarılı |
-| A kullanıcısı B organizasyonunun UUID'siyle select yapar | 0 satır |
-| A kullanıcısı B organizasyonuna insert yapar | RLS hatası |
-| A kullanıcısı B organizasyonundaki kaydı update/delete eder | RLS hatası veya 0 satır |
-| A kullanıcısı B tenant'ına ait parent ID ile child kayıt oluşturur | FK/RLS hatası |
-| Üyeliği suspended kullanıcı tenant verisini okur | 0 satır |
-| RPC'ye başka kullanıcıya ait `user_id` gönderilir | Değer yok sayılır; aktör `auth.uid()` olur |
-| Storage path'inde başka organization ID kullanılır | RLS hatası |
-| Aynı ayar anahtarı iki organization'da oluşturulur | Başarılı, birbirinden bağımsız |
-| Aynı gün iki organization için kasa mutabakatı oluşturulur | Başarılı, birbirinden bağımsız |
+| Senaryo                                                            | Beklenen sonuç                             |
+| ------------------------------------------------------------------ | ------------------------------------------ |
+| A kullanıcısı A organizasyonunun verisini okur                     | Başarılı                                   |
+| A kullanıcısı B organizasyonunun UUID'siyle select yapar           | 0 satır                                    |
+| A kullanıcısı B organizasyonuna insert yapar                       | RLS hatası                                 |
+| A kullanıcısı B organizasyonundaki kaydı update/delete eder        | RLS hatası veya 0 satır                    |
+| A kullanıcısı B tenant'ına ait parent ID ile child kayıt oluşturur | FK/RLS hatası                              |
+| Üyeliği suspended kullanıcı tenant verisini okur                   | 0 satır                                    |
+| RPC'ye başka kullanıcıya ait `user_id` gönderilir                  | Değer yok sayılır; aktör `auth.uid()` olur |
+| Storage path'inde başka organization ID kullanılır                 | RLS hatası                                 |
+| Aynı ayar anahtarı iki organization'da oluşturulur                 | Başarılı, birbirinden bağımsız             |
+| Aynı gün iki organization için kasa mutabakatı oluşturulur         | Başarılı, birbirinden bağımsız             |
 
 ## 12. Bilinen mevcut riskler
 

@@ -31,11 +31,7 @@ export function calculateFoodCostRatio(cost: number, salePrice: number): number 
  * Başa Baş Noktası (Break-even Point) Satış Adedi:
  * Toplam Sabit Giderler / (Ortalama Satış Fiyatı - Ortalama Birim Maliyet)
  */
-export function calculateBreakEvenQuantity(
-  totalFixedExpenses: number,
-  avgSalePrice: number,
-  avgCost: number
-): number {
+export function calculateBreakEvenQuantity(totalFixedExpenses: number, avgSalePrice: number, avgCost: number): number {
   if (!totalFixedExpenses || totalFixedExpenses <= 0) return 0
   const unitContributionMargin = avgSalePrice - avgCost
   if (unitContributionMargin <= 0) return Infinity
@@ -49,7 +45,7 @@ export function calculateBreakEvenQuantity(
 export function calculateRevenueWeightedExpenseShare(
   productRevenue: number,
   totalRevenue: number,
-  totalMonthlyExpenses: number
+  totalMonthlyExpenses: number,
 ): number {
   if (!totalRevenue || totalRevenue <= 0 || !productRevenue || productRevenue <= 0) return 0
   return (productRevenue / totalRevenue) * (totalMonthlyExpenses || 0)
@@ -66,7 +62,7 @@ export function calculateBcgCategory(
   quantitySold: number,
   avgQuantitySold: number,
   profitMargin: number,
-  targetMargin: number
+  targetMargin: number,
 ): BcgCategory {
   const isHighPopularity = quantitySold >= avgQuantitySold
   const isHighProfitability = profitMargin >= targetMargin

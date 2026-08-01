@@ -1,35 +1,35 @@
 export type Material = {
-    id: string
-    name: string
-    unit: string
-    price_per_unit: number
-    stock_quantity: number
-    critical_stock_level: number
+  id: string
+  name: string
+  unit: string
+  price_per_unit: number
+  stock_quantity: number
+  critical_stock_level: number
 }
 
 export type Movement = {
-    id: string
-    material_id: string
-    movement_type: string
-    quantity: number
-    unit_price: number
-    note: string
-    created_at: string
-    materials?: { name: string; unit: string }
+  id: string
+  material_id: string
+  movement_type: string
+  quantity: number
+  unit_price: number
+  note: string
+  created_at: string
+  materials?: { name: string; unit: string }
 }
 
 export type MovementFormState = {
-    material_id: string
-    movement_type: string
-    quantity: string
-    unit_price: string
-    note: string
+  material_id: string
+  movement_type: string
+  quantity: string
+  unit_price: string
+  note: string
 }
 
 export type InlineFormState = {
-    quantity: string
-    unit_price: string
-    note: string
+  quantity: string
+  unit_price: string
+  note: string
 }
 
 export type InventoryTab = 'stok' | 'hareket' | 'sayim' | 'zayi'

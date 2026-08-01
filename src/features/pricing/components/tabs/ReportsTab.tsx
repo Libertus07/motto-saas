@@ -13,7 +13,7 @@ import {
   Cell,
   ScatterChart,
   Scatter,
-  ZAxis
+  ZAxis,
 } from 'recharts'
 import { Calculation, ProductSales, PricingSettings } from '../../types'
 import { formatCurrency } from '@/lib/format'
@@ -29,11 +29,11 @@ type ReportsTabProps = {
 export function ReportsTab({ calculations, productSales, totalDailyProfit, dailyExpenses, settings }: ReportsTabProps) {
   // Chart data
   const chartData = calculations
-    .map(c => ({
+    .map((c) => ({
       name: c.product.name,
       sales: productSales[c.product.id]?.dailySales || 0,
       dailyProfit: Number(c.dailyProfit.toFixed(0)),
-      currentMargin: Number(c.currentMargin.toFixed(1))
+      currentMargin: Number(c.currentMargin.toFixed(1)),
     }))
     .sort((a, b) => b.dailyProfit - a.dailyProfit)
 
@@ -45,8 +45,8 @@ export function ReportsTab({ calculations, productSales, totalDailyProfit, daily
   const pieData = [
     { name: 'Hammadde (COGS)', value: Number(totalRawCost.toFixed(0)), color: '#f59e0b' },
     { name: 'Genel Giderler', value: Number(dailyExpenses.toFixed(0)), color: '#ef4444' },
-    { name: 'Net Kâr', value: totalDailyProfit > 0 ? Number(totalDailyProfit.toFixed(0)) : 0, color: '#10b981' }
-  ].filter(d => d.value > 0)
+    { name: 'Net Kâr', value: totalDailyProfit > 0 ? Number(totalDailyProfit.toFixed(0)) : 0, color: '#10b981' },
+  ].filter((d) => d.value > 0)
 
   return (
     <div className="space-y-6">
@@ -170,7 +170,7 @@ export function ReportsTab({ calculations, productSales, totalDailyProfit, daily
                   contentStyle={{ backgroundColor: '#1c1917', borderColor: '#292524', color: '#fff' }}
                   formatter={(value: unknown, name: unknown) => [
                     name === 'Satış Adedi' ? `${String(value)} adet` : `%${String(value)}`,
-                    String(name)
+                    String(name),
                   ]}
                   labelFormatter={() => ''}
                 />

@@ -5,7 +5,7 @@ export function EntegrasyonlarTab() {
     { name: 'Paraşüt', description: 'Muhasebe yazılımı entegrasyonu', icon: '📑', tag: 'Yakında' },
     { name: 'Logo', description: 'ERP entegrasyonu', icon: '🔗', tag: 'Yakında' },
     { name: 'İyzico / PayTR', description: 'Online ödeme entegrasyonu', icon: '💳', tag: 'Yakında' },
-    { name: 'Getir / Yemeksepeti', description: 'Paket sipariş platformları', icon: '🛵', tag: 'Yakında' }
+    { name: 'Getir / Yemeksepeti', description: 'Paket sipariş platformları', icon: '🛵', tag: 'Yakında' },
   ]
 
   return (
@@ -24,7 +24,7 @@ export function EntegrasyonlarTab() {
 
       <SectionCard title="Diğer Entegrasyonlar" description="İşletme yazılımlarınızla Motto'yu birbirine bağlayın.">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {integrations.map(int => (
+          {integrations.map((int) => (
             <div
               key={int.name}
               className="flex items-center justify-between bg-stone-950 border border-stone-800 rounded-xl px-4 py-3"
