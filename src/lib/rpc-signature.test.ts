@@ -30,4 +30,18 @@ describe('RPC Fonksiyon İletişim ve İmza Doğrulama Testleri', () => {
     const tedarikcilerContent = fs.readFileSync(tedarikcilerPage, 'utf8')
     expect(tedarikcilerContent).toContain('p_transaction_id: trx.id')
   })
+
+  it('kira tahsilatı tenant-scoped RPC imzasını kullanmalıdır', () => {
+    const migrationPath = path.join(
+      process.cwd(),
+      'supabase/migrations/20260801211530_fix_rpc_lint_and_rent_signature.sql',
+    )
+    const investmentHookPath = path.join(process.cwd(), 'src/features/investments/hooks/useInvestmentsData.ts')
+    const migration = fs.readFileSync(migrationPath, 'utf8')
+    const investmentHook = fs.readFileSync(investmentHookPath, 'utf8')
+
+    expect(migration).toContain('p_organization_id uuid')
+    expect(migration).toContain('DROP FUNCTION IF EXISTS public.process_investment_rent(uuid, uuid, numeric);')
+    expect(investmentHook).toContain('p_organization_id: activeOrg?.id')
+  })
 })
