@@ -1,0 +1,15 @@
+# Keep repository text files deterministic across Windows, macOS, and Linux.
+* text=auto eol=lf
+
+# Preserve binary files without line-ending conversion.
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.webp binary
+*.gif binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.zst binary
