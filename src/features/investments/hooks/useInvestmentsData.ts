@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
-import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devError } from '@/lib/debug'
 import { Investment, InvestmentTransaction } from '@/types/database'
 import { Account, Rates, BuyFormState, EditFormState, RentFormState, ValueFormState } from '../types'
-import { deleteInvestmentTransactionWithRefund } from '@/lib/investment-transactions'
 import { useOrganization } from '@/context/OrganizationContext'
 
 const getErrorMessage = (error: unknown) =>
@@ -84,40 +82,15 @@ export function useInvestmentsData() {
 
     setLoading(true)
     try {
-      const buyTransactions = transactions.filter((tx) => tx.investment_id === id && tx.transaction_type === 'buy')
-
-      if (buyTransactions.length === 0) {
-        throw new Error('Bu yatırıma bağlı alım işlemi bulunamadı.')
-      }
-
-      let totalRefunded = 0
-      for (const transaction of buyTransactions) {
-        const result = await deleteInvestmentTransactionWithRefund(supabase, transaction.id)
-        totalRefunded += result.refundedAmount
-      }
-
-      const invToDelete = investments.find((i) => i.id === id)
-      const { data: remainingInvestment, error: remainingInvestmentError } = await supabase
-        .from('investments')
-        .select('id')
-        .eq('id', id)
-        .maybeSingle()
-
-      if (remainingInvestmentError) throw remainingInvestmentError
-
-      if (remainingInvestment) {
-        const { error: deleteInvestmentError } = await supabase.from('investments').delete().eq('id', id)
-        if (deleteInvestmentError) throw deleteInvestmentError
-      }
-
-      if (invToDelete) {
-        await logActivity('Yatırımlar', 'SILME', `Yatırım Silindi (Bakiye İade Edildi): ${invToDelete.name}`, {
-          detay: `Silinen Varlık Tipi (${invToDelete.asset_type}) | Miktar (${invToDelete.quantity}) | Kasaya İade Edilen Toplam Tutar: ₺${totalRefunded.toFixed(2)}`,
-        })
-      }
+      if (!activeOrg?.id) throw new Error('Aktif organizasyon bulunamadı.')
+      const { error } = await supabase.rpc('delete_investment_with_refund', {
+        p_investment_id: id,
+        p_organization_id: activeOrg.id,
+      })
+      if (error) throw error
 
       await showAlert('Yatırım başarıyla silindi ve ilişkili ödemeler kasalarınıza iade edildi.', 'success')
-      fetchData()
+      await fetchData()
       return true
     } catch (error: unknown) {
       await showAlert('Hata: ' + getErrorMessage(error), 'error')
@@ -130,7 +103,6 @@ export function useInvestmentsData() {
     const isRE = form.asset_type === 'real_estate'
     const qty = isRE ? 1 : parseFloat(form.quantity)
     const price = parseFloat(form.price_per_unit)
-    const totalAmount = isRE ? price : qty * price
 
     if (!qty || !price || !form.account_id) return false
     setSaving(true)
@@ -159,15 +131,6 @@ export function useInvestmentsData() {
 
       if (rpcError) throw rpcError
 
-      await logActivity(
-        'Yatırımlar',
-        'EKLEME',
-        `Yeni Yatırım Alımı: ${isRE ? 'Gayrimenkul' : `${qty} birim ${form.asset_type.toUpperCase()}`}`,
-        {
-          detay: `Tutar (₺${totalAmount}) | Fiyat (₺${price}) | Not (${form.notes || '-'})`,
-        },
-      )
-
       await showAlert('Yatırım başarıyla eklendi!', 'success')
       fetchData()
       return true
@@ -179,40 +142,27 @@ export function useInvestmentsData() {
     }
   }
 
-  const editInvestment = async (investmentId: string, form: EditFormState, originalInvestment: Investment) => {
+  const editInvestment = async (investmentId: string, form: EditFormState) => {
     setSaving(true)
     try {
       const qty = parseFloat(form.quantity)
       const cost = parseFloat(form.average_cost)
 
-      const { error: updateError } = await supabase
-        .from('investments')
-        .update({
-          name: form.name,
-          quantity: qty,
-          average_cost: cost,
-          notes: form.notes,
-          purchase_date: form.purchase_date,
-          document_url: form.document_url,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', investmentId)
+      if (!activeOrg?.id) throw new Error('Aktif organizasyon bulunamadı.')
+      const { error: updateError } = await supabase.rpc('update_investment', {
+        p_investment_id: investmentId,
+        p_organization_id: activeOrg.id,
+        p_name: form.name,
+        p_quantity: qty,
+        p_average_cost: cost,
+        p_notes: form.notes || null,
+        p_purchase_date: form.purchase_date || null,
+        p_document_url: form.document_url || null,
+      })
       if (updateError) throw updateError
 
-      const changes = []
-      if (originalInvestment.name !== form.name) changes.push(`İsim: ${originalInvestment.name} -> ${form.name}`)
-      if (originalInvestment.quantity !== qty) changes.push(`Miktar: ${originalInvestment.quantity} -> ${qty}`)
-      if (originalInvestment.average_cost !== cost)
-        changes.push(`Maliyet: ₺${originalInvestment.average_cost} -> ₺${cost}`)
-
-      const details = changes.length > 0 ? changes.join(' | ') : 'Sadece diğer bilgiler güncellendi'
-
-      await logActivity('Yatırımlar', 'GUNCELLEME', `Yatırım Düzenleme: ${form.name}`, {
-        detay: details,
-      })
-
       await showAlert('Yatırım başarıyla güncellendi!', 'success')
-      fetchData()
+      await fetchData()
       return true
     } catch (error: unknown) {
       await showAlert('Hata: ' + getErrorMessage(error), 'error')
@@ -222,12 +172,11 @@ export function useInvestmentsData() {
     }
   }
 
-  const collectRent = async (investmentId: string, investmentName: string, form: RentFormState) => {
+  const collectRent = async (investmentId: string, form: RentFormState) => {
     setSaving(true)
     try {
       const amount = parseFloat(form.amount)
-      const selectedAcc = accounts.find((a) => a.id === form.account_id)
-      if (!selectedAcc) throw new Error('Hesap bulunamadı.')
+      if (!accounts.some((account) => account.id === form.account_id)) throw new Error('Hesap bulunamadı.')
 
       const { error } = await supabase.rpc('process_investment_rent', {
         p_investment_id: investmentId,
@@ -238,12 +187,8 @@ export function useInvestmentsData() {
 
       if (error) throw new Error(error.message)
 
-      await logActivity('Yatırımlar', 'EKLEME', `Kira Tahsilatı: ${investmentName}`, {
-        detay: `Kira Bedeli (₺${amount}) | Tahsil Edilen Hesap (${selectedAcc.name})`,
-      })
-
       await showAlert('Kira başarıyla tahsil edildi!', 'success')
-      fetchData()
+      await fetchData()
       return true
     } catch (error: unknown) {
       await showAlert('Hata: ' + getErrorMessage(error), 'error')
@@ -253,30 +198,20 @@ export function useInvestmentsData() {
     }
   }
 
-  const updateValue = async (
-    investmentId: string,
-    investmentName: string,
-    form: ValueFormState,
-    oldManualValue: number,
-  ) => {
+  const updateValue = async (investmentId: string, form: ValueFormState) => {
     setSaving(true)
     try {
       const newVal = parseFloat(form.current_value)
-      const { error: updateError } = await supabase
-        .from('investments')
-        .update({
-          current_manual_value: newVal,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', investmentId)
+      if (!activeOrg?.id) throw new Error('Aktif organizasyon bulunamadı.')
+      const { error: updateError } = await supabase.rpc('update_investment_value', {
+        p_investment_id: investmentId,
+        p_organization_id: activeOrg.id,
+        p_current_value: newVal,
+      })
       if (updateError) throw updateError
 
-      await logActivity('Yatırımlar', 'GUNCELLEME', `Değer Güncellemesi: ${investmentName}`, {
-        detay: `Yeni Değer (₺${newVal}) | Eski Değer (₺${oldManualValue})`,
-      })
-
       await showAlert('Gayrimenkul değeri başarıyla güncellendi!', 'success')
-      fetchData()
+      await fetchData()
       return true
     } catch (error: unknown) {
       await showAlert('Hata: ' + getErrorMessage(error), 'error')

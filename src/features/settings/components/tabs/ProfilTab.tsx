@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { Input } from '@/components/ui/input'
@@ -23,7 +23,7 @@ export function ProfilTab() {
   const [emailMsg, setEmailMsg] = useState({ text: '', type: '' })
   const [pwdMsg, setPwdMsg] = useState({ text: '', type: '' })
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -31,8 +31,7 @@ export function ProfilTab() {
         setCurrentEmail(user.email || '')
       }
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [supabase])
 
   const handleUpdateEmail = async () => {
     if (email === currentEmail) return

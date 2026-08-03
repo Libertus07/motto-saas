@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase'
-import { logActivity } from '@/lib/logger'
 import { Input } from '@/components/ui/input'
 import { SectionCard } from '../ui/SectionCard'
 import { FormRow } from '../ui/FormRow'
@@ -18,34 +16,19 @@ type FinansalTabProps = {
 
 export function FinansalTab({ s, set, onSave, saving, categories, setCategories }: FinansalTabProps) {
   const [newCat, setNewCat] = useState('')
-  const supabase = createClient()
 
-  const handleAddCat = async () => {
+  const handleAddCat = () => {
     if (!newCat.trim() || categories.includes(newCat.trim())) return
     const updated = [...categories, newCat.trim()]
     setCategories(updated)
     set('material_categories', updated)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    await supabase
-      .from('settings')
-      .upsert({ key: 'material_categories', value: updated, user_id: user?.id }, { onConflict: 'key' })
-    await logActivity('Ayarlar', 'EKLEME', `Yeni hammadde kategorisi eklendi`, { detay: newCat.trim() })
     setNewCat('')
   }
 
-  const handleRemoveCat = async (cat: string) => {
+  const handleRemoveCat = (cat: string) => {
     const updated = categories.filter((c) => c !== cat)
     setCategories(updated)
     set('material_categories', updated)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    await supabase
-      .from('settings')
-      .upsert({ key: 'material_categories', value: updated, user_id: user?.id }, { onConflict: 'key' })
-    await logActivity('Ayarlar', 'SILME', `Hammadde kategorisi silindi`, { detay: cat })
   }
 
   return (

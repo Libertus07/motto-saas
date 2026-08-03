@@ -1,105 +1,132 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Product, Expense, RealSalesMeta, PricingSettings } from '../types'
 import { useOrganization } from '@/context/OrganizationContext'
+import { buildPricingProducts } from '../services/pricing-service'
+
+const DEFAULT_PRICING_SETTINGS: PricingSettings = {
+  targetMargin: 60,
+  taxRate: 10,
+}
 
 export function usePricingData() {
   const [products, setProducts] = useState<Product[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [realSalesMeta, setRealSalesMeta] = useState<RealSalesMeta | null>(null)
-  const [settings, setSettings] = useState<PricingSettings>({
-    targetMargin: 60,
-    taxRate: 10,
-  })
+  const [settings, setSettings] = useState<PricingSettings>(DEFAULT_PRICING_SETTINGS)
 
   const { activeOrg } = useOrganization()
-  const supabase = createClient()
+  const organizationId = activeOrg?.id
+  const supabase = useMemo(() => createClient(), [])
+  const requestIdRef = useRef(0)
 
-  const fetchData = async () => {
-    if (!activeOrg) return
+  const fetchData = useCallback(async () => {
+    const requestId = ++requestIdRef.current
+    if (!organizationId) {
+      setProducts([])
+      setExpenses([])
+      setRealSalesMeta(null)
+      setSettings(DEFAULT_PRICING_SETTINGS)
+      setError(null)
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
-    const [{ data: prods }, { data: exps }, { data: salesData }, { data: settingsData }] = await Promise.all([
-      supabase.from('products').select('*').eq('organization_id', activeOrg.id).order('name'),
-      supabase.from('expenses').select('amount, period, category, expense_date').eq('organization_id', activeOrg.id),
-      supabase.from('sales').select('product_id, quantity, sale_date').eq('organization_id', activeOrg.id),
-      supabase.from('settings').select('*').eq('organization_id', activeOrg.id),
+    setError(null)
+
+    const results = await Promise.all([
+      supabase
+        .from('products')
+        .select('id, name, category, sale_price, estimated_monthly_sales')
+        .eq('organization_id', organizationId)
+        .order('name'),
+      supabase.from('expenses').select('amount, period, category, expense_date').eq('organization_id', organizationId),
+      supabase.from('sales').select('product_id, quantity, sale_date').eq('organization_id', organizationId),
+      supabase.from('settings').select('key, value').eq('organization_id', organizationId),
+      supabase.from('materials').select('id, price_per_unit').eq('organization_id', organizationId),
+      supabase.from('sub_recipes').select('id, yield_quantity, wastage_percent').eq('organization_id', organizationId),
+      supabase
+        .from('sub_recipe_ingredients')
+        .select('sub_recipe_id, material_id, quantity')
+        .eq('organization_id', organizationId),
+      supabase
+        .from('product_ingredients')
+        .select('product_id, material_id, sub_recipe_id, quantity')
+        .eq('organization_id', organizationId),
     ])
 
-    if (settingsData) {
-      const marginSetting = settingsData.find((s) => s.key === 'target_margin')?.value
-      if (marginSetting) {
-        setSettings((prev) => ({ ...prev, targetMargin: Number(marginSetting) }))
-      }
+    if (requestId !== requestIdRef.current) return
+
+    const queryError = results.find((result) => result.error)?.error
+    if (queryError) {
+      setError(`Fiyat motoru verileri yüklenemedi: ${queryError.message}`)
+      setLoading(false)
+      return
     }
 
-    if (salesData) {
-      const uniqueDays = new Set(salesData.map((s) => s.sale_date)).size
-      const activeDays = uniqueDays > 0 ? uniqueDays : 1
-      const salesByProduct: Record<string, number> = {}
-      salesData.forEach((s) => {
-        if (!salesByProduct[s.product_id]) salesByProduct[s.product_id] = 0
-        salesByProduct[s.product_id] += s.quantity
-      })
-      setRealSalesMeta({ activeDays, salesByProduct })
-    }
+    const [
+      productsResult,
+      expensesResult,
+      salesResult,
+      settingsResult,
+      materialsResult,
+      recipesResult,
+      recipeIngredientsResult,
+      productIngredientsResult,
+    ] = results
+    const productRows = productsResult.data ?? []
+    const expenseRows = expensesResult.data ?? []
+    const salesRows = salesResult.data ?? []
+    const settingsRows = settingsResult.data ?? []
+    const materialRows = materialsResult.data ?? []
+    const recipeRows = recipesResult.data ?? []
+    const recipeIngredientRows = recipeIngredientsResult.data ?? []
+    const productIngredientRows = productIngredientsResult.data ?? []
 
-    const { data: mats } = await supabase.from('materials').select('*').eq('organization_id', activeOrg.id)
-    const { data: s_recipes } = await supabase.from('sub_recipes').select('*').eq('organization_id', activeOrg.id)
-    const { data: s_recipe_ings } = await supabase
-      .from('sub_recipe_ingredients')
-      .select('*')
-      .eq('organization_id', activeOrg.id)
-    const { data: prod_ings } = await supabase
-      .from('product_ingredients')
-      .select('*')
-      .eq('organization_id', activeOrg.id)
-
-    const processedSubRecipes = (s_recipes || []).map((r) => {
-      const myIngs = (s_recipe_ings || []).filter((i) => i.sub_recipe_id === r.id)
-      let totalCost = 0
-      myIngs.forEach((ing) => {
-        const mat = (mats || []).find((m) => m.id === ing.material_id)
-        if (mat) totalCost += mat.price_per_unit * ing.quantity
-      })
-      const finalCostWithWastage = totalCost * (1 + r.wastage_percent / 100)
-      const costPerYield = r.yield_quantity > 0 ? finalCostWithWastage / r.yield_quantity : 0
-      return { ...r, cost_per_yield: costPerYield }
+    const targetMargin = Number(settingsRows.find((row) => row.key === 'target_margin')?.value)
+    const taxRate = Number(settingsRows.find((row) => row.key === 'default_vat')?.value)
+    setSettings({
+      targetMargin: Number.isFinite(targetMargin) ? targetMargin : DEFAULT_PRICING_SETTINGS.targetMargin,
+      taxRate: Number.isFinite(taxRate) ? taxRate : DEFAULT_PRICING_SETTINGS.taxRate,
     })
 
-    const productsWithCost = (prods || []).map((p) => {
-      const myIngs = (prod_ings || []).filter((i) => i.product_id === p.id)
-      let cost = 0
-      myIngs.forEach((ing) => {
-        if (ing.material_id) {
-          const mat = (mats || []).find((m) => m.id === ing.material_id)
-          if (mat) cost += mat.price_per_unit * ing.quantity
-        } else if (ing.sub_recipe_id) {
-          const sr = processedSubRecipes.find((s) => s.id === ing.sub_recipe_id)
-          if (sr && sr.cost_per_yield) cost += sr.cost_per_yield * ing.quantity
-        }
-      })
-      return { ...p, calculated_cost: cost }
+    const uniqueDays = new Set(salesRows.map((sale) => sale.sale_date)).size
+    const salesByProduct: Record<string, number> = {}
+    for (const sale of salesRows) {
+      salesByProduct[sale.product_id] = (salesByProduct[sale.product_id] ?? 0) + Number(sale.quantity)
+    }
+    setRealSalesMeta({ activeDays: Math.max(1, uniqueDays), salesByProduct })
+
+    const productsWithCost = buildPricingProducts({
+      products: productRows,
+      materials: materialRows,
+      recipes: recipeRows,
+      recipeIngredients: recipeIngredientRows,
+      productIngredients: productIngredientRows,
     })
 
     setProducts(productsWithCost)
-    setExpenses(exps || [])
+    setExpenses(expenseRows)
     setLoading(false)
-  }
+  }, [organizationId, supabase])
 
   useEffect(() => {
-    const id = window.setTimeout(() => {
-      fetchData()
-    }, 0)
-    return () => clearTimeout(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeOrg?.id])
+    const timeoutId = window.setTimeout(() => void fetchData(), 0)
+    return () => {
+      window.clearTimeout(timeoutId)
+      requestIdRef.current += 1
+    }
+  }, [fetchData])
 
   return {
     products,
     setProducts,
     expenses,
     loading,
+    error,
     realSalesMeta,
     settings,
     setSettings,

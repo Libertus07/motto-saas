@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
-import { logActivity } from '@/lib/logger'
 import { Material, Movement, MovementFormState, InlineFormState } from '../types'
 import { useOrganization } from '@/context/OrganizationContext'
+import { applyStockCount, recordStockMovement } from '../services/inventory-service'
 
 export function useInventoryData(
   showAlert: (msg: string, type: 'success' | 'error' | 'warning' | 'info', title?: string) => Promise<void>,
@@ -58,6 +58,7 @@ export function useInventoryData(
   }, [fetchData])
 
   const handleMovement = async (form: MovementFormState, onSuccess: () => void) => {
+    if (!activeOrg) return
     if (!form.material_id || !form.quantity) return
 
     const material = materials.find((i) => i.id === form.material_id)
@@ -82,30 +83,20 @@ export function useInventoryData(
     }
 
     const unitPrice = form.unit_price ? parseFloat(form.unit_price) : material.price_per_unit
-    const { data: movementResult, error: movementError } = await supabase.rpc('record_stock_movement', {
-      p_material_id: form.material_id,
-      p_movement_type: form.movement_type,
-      p_quantity: quantity,
-      p_unit_price: unitPrice,
-      p_note: form.note || null,
-      p_organization_id: activeOrg?.id,
-    })
-
-    if (movementError) {
-      await showAlert(movementError.message || 'Stok hareketi kaydedilirken hata oluştu.', 'error')
+    try {
+      await recordStockMovement(supabase, activeOrg.id, {
+        materialId: form.material_id,
+        movementType: form.movement_type,
+        quantity,
+        unitPrice,
+        note: form.note || null,
+      })
+    } catch (error) {
+      await showAlert(error instanceof Error ? error.message : 'Stok hareketi kaydedilirken hata oluştu.', 'error')
       return
     }
 
-    const newQuantity = Number(movementResult?.new_stock ?? currentStock)
     await fetchData()
-
-    const details = `Stok: ${currentStock} -> ${newQuantity} ${material.unit}`
-    await logActivity(
-      'Stok',
-      'EKLEME',
-      `${material.name} ürününe ${quantity} ${material.unit} manuel ${form.movement_type} işlemi yapıldı.`,
-      { detay: details },
-    )
     await showAlert(`${material.name} için stok hareketi başarıyla kaydedildi.`, 'success')
     onSuccess()
   }
@@ -116,6 +107,7 @@ export function useInventoryData(
     inlineForm: InlineFormState,
     onSuccess: () => void,
   ) => {
+    if (!activeOrg) return
     if (!inlineMovementMatId || !inlineForm.quantity) return
 
     const material = materials.find((i) => i.id === inlineMovementMatId)
@@ -139,35 +131,29 @@ export function useInventoryData(
     }
 
     const unitPrice = inlineForm.unit_price ? parseFloat(inlineForm.unit_price) : material.price_per_unit
-    const { data: movementResult, error: movementError } = await supabase.rpc('record_stock_movement', {
-      p_material_id: inlineMovementMatId,
-      p_movement_type: inlineMovementType,
-      p_quantity: quantity,
-      p_unit_price: unitPrice,
-      p_note: inlineForm.note || (inlineMovementType === 'giris' ? 'Hızlı Giriş' : 'Hızlı Çıkış'),
-      p_organization_id: activeOrg?.id,
-    })
-
-    if (movementError) {
-      await showAlert(movementError.message || 'Hızlı stok hareketi kaydedilirken hata oluştu.', 'error')
+    try {
+      await recordStockMovement(supabase, activeOrg.id, {
+        materialId: inlineMovementMatId,
+        movementType: inlineMovementType,
+        quantity,
+        unitPrice,
+        note: inlineForm.note || (inlineMovementType === 'giris' ? 'Hızlı Giriş' : 'Hızlı Çıkış'),
+      })
+    } catch (error) {
+      await showAlert(
+        error instanceof Error ? error.message : 'Hızlı stok hareketi kaydedilirken hata oluştu.',
+        'error',
+      )
       return
     }
 
-    const newQuantity = Number(movementResult?.new_stock ?? currentStock)
     await fetchData()
-
-    const details = `Stok: ${currentStock} -> ${newQuantity} ${material.unit}`
-    await logActivity(
-      'Stok',
-      'EKLEME',
-      `${material.name} ürününe ${quantity} ${material.unit} hızlı ${inlineMovementType} işlemi yapıldı.`,
-      { detay: details },
-    )
     await showAlert(`${material.name} için hızlı stok işlemi kaydedildi.`, 'success')
     onSuccess()
   }
 
   const handleSayim = async (sayimData: { [key: string]: string }, onSuccess: () => void) => {
+    if (!activeOrg) return
     const pendingAdjustments = Object.entries(sayimData)
       .map(([materialId, quantity]) => {
         const material = materials.find((i) => i.id === materialId)
@@ -211,38 +197,23 @@ export function useInventoryData(
     )
     if (!confirmed) return
 
-    const sayimDetails = pendingAdjustments.map(
-      (item) => `${item.material.name} (${item.currentStock} -> ${item.sayimQty})`,
-    )
-    const { data: countResult, error: countError } = await supabase.rpc('apply_stock_count', {
-      p_items: pendingAdjustments.map((item) => ({
-        material_id: item.materialId,
-        counted_quantity: item.sayimQty,
-      })),
-      p_organization_id: activeOrg?.id,
-    })
-
-    if (countError) {
-      await showAlert(countError.message || 'Sayım işlemi uygulanırken hata oluştu.', 'error')
+    let updatedCount: number
+    try {
+      updatedCount = await applyStockCount(
+        supabase,
+        activeOrg.id,
+        pendingAdjustments.map((item) => ({
+          material_id: item.materialId,
+          counted_quantity: item.sayimQty,
+        })),
+      )
+    } catch (error) {
+      await showAlert(error instanceof Error ? error.message : 'Sayım işlemi uygulanırken hata oluştu.', 'error')
       return
     }
 
-    await logActivity('Stok', 'GUNCELLEME', 'Son stok sayım tarihi güncellendi.', {
-      detay: `Sayım tarihi: ${countResult?.counted_at || new Date().toISOString()}`,
-    })
-
     await fetchData()
-
-    await logActivity(
-      'Stok',
-      'GUNCELLEME',
-      `Stok sayım düzeltmesi yapıldı. Farklar ayrı sayım hareketi olarak kaydedildi.`,
-      sayimDetails.length > 0 ? { detay: sayimDetails.join(', ') } : undefined,
-    )
-    await showAlert(
-      `Sayım tamamlandı! ${countResult?.updated_count || pendingAdjustments.length} ürün için sayım düzeltmesi kaydedildi.`,
-      'success',
-    )
+    await showAlert(`Sayım tamamlandı! ${updatedCount} ürün için sayım düzeltmesi kaydedildi.`, 'success')
     onSuccess()
   }
 

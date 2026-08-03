@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSettings } from '@/features/settings/hooks/useSettings'
 import { Tab } from '@/features/settings/types'
 import { GenelTab } from '@/features/settings/components/tabs/GenelTab'
@@ -14,8 +14,7 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   useEffect(() => {
     const t = setTimeout(onDone, 2500)
     return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [onDone])
   return (
     <div className="fixed bottom-6 right-6 bg-stone-900 border border-stone-800 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 z-50 animate-fadeIn backdrop-blur-md">
       <span className="text-emerald-400 text-lg">✓</span>
@@ -39,6 +38,7 @@ export default function Ayarlar() {
     handleSave,
     activeNotificationCount,
   } = useSettings()
+  const clearToast = useCallback(() => setToast(''), [setToast])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -186,7 +186,7 @@ export default function Ayarlar() {
       </main>
 
       {/* Toast Alert */}
-      {toast && <Toast message={toast} onDone={() => setToast('')} />}
+      {toast && <Toast message={toast} onDone={clearToast} />}
     </div>
   )
 }

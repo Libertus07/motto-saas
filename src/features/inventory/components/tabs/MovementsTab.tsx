@@ -20,7 +20,7 @@ type MovementsTabProps = {
   onClearFilters: () => void
   onToggleDate: (dateKey: string) => void
   onExpandAll: () => void
-  onCollapseAll: () => void
+  onCollapseAll: (dateKeys: string[]) => void
 }
 
 const movementDaysPerPage = 7
@@ -281,7 +281,7 @@ export function MovementsTab({
               Genişlet
             </button>
             <button
-              onClick={onCollapseAll}
+              onClick={() => onCollapseAll(groupedMovementRows.map((group) => group.dateKey))}
               className="flex-1 bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs py-1.5 rounded transition-colors"
               title="Tüm tarihleri daralt"
             >

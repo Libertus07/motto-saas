@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { devError } from '@/lib/debug'
 import { formatCurrency, formatDate } from '@/lib/format'
@@ -139,12 +138,8 @@ export default function YatirimGecmisi() {
     if (!confirmed) return
 
     try {
-      const result = await deleteInvestmentTransactionWithRefund(supabase, id)
-
-      // Log activity for delete
-      await logActivity('Yatırım Fişi', 'SILME', `Yatırım İşlemi Silindi: ${name}`, {
-        detay: `Silinen İşlem ID (${id}) | İade Edilen Tutar (₺${Math.abs(result.refundedAmount || amount)})`,
-      })
+      if (!activeOrg?.id) throw new Error('Aktif organizasyon bulunamadı.')
+      await deleteInvestmentTransactionWithRefund(supabase, activeOrg.id, id)
 
       await showAlert('Yatırım işlemi başarıyla silindi ve iade gerçekleştirildi.', 'success')
       fetchInvestments()
