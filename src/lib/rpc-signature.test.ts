@@ -2,6 +2,14 @@ import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 
+function collectFiles(directory: string, extensions: ReadonlySet<string>): string[] {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(directory, entry.name)
+    if (entry.isDirectory()) return collectFiles(fullPath, extensions)
+    return extensions.has(path.extname(entry.name)) ? [fullPath] : []
+  })
+}
+
 describe('RPC Fonksiyon İletişim ve İmza Doğrulama Testleri', () => {
   it('20260728000004_tenant_rpc_functions_sec102.sql içerisinde eski overload DROP komutları bulunmalıdır', () => {
     const migrationFilePath = path.join(
@@ -43,5 +51,29 @@ describe('RPC Fonksiyon İletişim ve İmza Doğrulama Testleri', () => {
     expect(migration).toContain('p_organization_id uuid')
     expect(migration).toContain('DROP FUNCTION IF EXISTS public.process_investment_rent(uuid, uuid, numeric);')
     expect(investmentHook).toContain('p_organization_id: activeOrg?.id')
+  })
+
+  it('kaynak kodda çağrılan her RPC yerel göçlerde tanımlı olmalıdır', () => {
+    const sourceFiles = collectFiles(path.join(process.cwd(), 'src'), new Set(['.ts', '.tsx']))
+    const migrationFiles = collectFiles(path.join(process.cwd(), 'supabase/migrations'), new Set(['.sql']))
+    const calledRpcNames = new Set<string>()
+    const definedRpcNames = new Set<string>()
+
+    for (const sourceFile of sourceFiles) {
+      const source = fs.readFileSync(sourceFile, 'utf8')
+      for (const match of source.matchAll(/\.rpc\(\s*['"]([a-zA-Z0-9_]+)['"]/g)) calledRpcNames.add(match[1])
+    }
+
+    for (const migrationFile of migrationFiles) {
+      const sql = fs.readFileSync(migrationFile, 'utf8')
+      for (const match of sql.matchAll(
+        /CREATE(?:\s+OR\s+REPLACE)?\s+FUNCTION\s+(?:"public"\.|public\.)(?:"([a-zA-Z0-9_]+)"|([a-zA-Z0-9_]+))/gi,
+      )) {
+        definedRpcNames.add(match[1] || match[2])
+      }
+    }
+
+    const missingDefinitions = [...calledRpcNames].filter((rpcName) => !definedRpcNames.has(rpcName)).sort()
+    expect(missingDefinitions).toEqual([])
   })
 })

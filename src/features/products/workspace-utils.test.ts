@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Product } from './types'
+import { AiRecipeRequestSchema } from './ai-recipe-contract'
 import {
   createAutoCategorySuggestions,
+  createAiRecipeRequest,
   createBulkUpdatePlan,
   createProductBulkRows,
   createProductFormPayload,
@@ -66,6 +68,18 @@ describe('product workspace rules', () => {
         estimated_monthly_sales: '2.5',
       }),
     ).toBeNull()
+  })
+
+  it('creates an AI recipe request that matches the server contract', () => {
+    const request = createAiRecipeRequest(
+      'Magnolia',
+      [{ id: 'milk', name: 'Süt', unit: 'Litre', price_per_unit: 40 }],
+      [{ id: 'cream', name: 'Krema', yield_quantity: 1, yield_unit: 'Kg', wastage_percent: 0, cost_per_yield: 50 }],
+    )
+
+    expect(AiRecipeRequestSchema.safeParse(request).success).toBe(true)
+    expect(request.materials).toEqual([{ id: 'milk', name: 'Süt', unit: 'Litre' }])
+    expect(request.subRecipes).toEqual([{ id: 'cream', name: 'Krema', unit: 'Kg' }])
   })
 
   it('creates validated bulk updates and audit details', () => {

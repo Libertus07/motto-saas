@@ -4,8 +4,11 @@ import type {
   ProductBulkUpdate,
   ProductCategorySuggestion,
   ProductFormValues,
+  ProductMaterial,
   ProductSort,
+  SubRecipe,
 } from './types'
+import type { AiRecipeRequest } from './ai-recipe-contract'
 import { calculateMargin } from './utils'
 
 export const PRODUCT_CATEGORY_ALL = 'Tümü'
@@ -31,6 +34,60 @@ export type ProductFormPayload = {
   category: string
   salePrice: number
   estimatedMonthlySales: number
+}
+
+const MAX_AI_MATERIAL_CANDIDATES = 120
+const MAX_AI_SUB_RECIPE_CANDIDATES = 60
+
+function normalizeSearchValue(value: string) {
+  return value
+    .toLocaleLowerCase('tr-TR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function rankAiRecipeCandidates<T extends { id: string; name: string; unit: string }>(
+  productName: string,
+  candidates: T[],
+  limit: number,
+) {
+  const productTokens = new Set(
+    normalizeSearchValue(productName)
+      .split(/\s+/)
+      .filter((token) => token.length > 2),
+  )
+  const uniqueCandidates = [...new Map(candidates.map((candidate) => [candidate.id, candidate])).values()]
+
+  return uniqueCandidates
+    .map((candidate) => ({
+      candidate,
+      relevance: normalizeSearchValue(candidate.name)
+        .split(/\s+/)
+        .filter((token) => productTokens.has(token)).length,
+    }))
+    .sort(
+      (left, right) =>
+        right.relevance - left.relevance || left.candidate.name.localeCompare(right.candidate.name, 'tr'),
+    )
+    .slice(0, limit)
+    .map(({ candidate }) => ({ id: candidate.id, name: candidate.name, unit: candidate.unit }))
+}
+
+export function createAiRecipeRequest(
+  productName: string,
+  materials: ProductMaterial[],
+  subRecipes: SubRecipe[],
+): AiRecipeRequest {
+  return {
+    productName: productName.trim(),
+    materials: rankAiRecipeCandidates(productName, materials, MAX_AI_MATERIAL_CANDIDATES),
+    subRecipes: rankAiRecipeCandidates(
+      productName,
+      subRecipes.map((recipe) => ({ id: recipe.id, name: recipe.name, unit: recipe.yield_unit })),
+      MAX_AI_SUB_RECIPE_CANDIDATES,
+    ),
+    option: 1,
+  }
 }
 
 export function getProductCategories(products: Product[]) {
