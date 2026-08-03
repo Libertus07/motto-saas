@@ -11,6 +11,7 @@ import type {
 } from '@/features/products/types'
 import { calculateMargin, calculateRecipeCost } from '@/features/products/utils'
 import {
+  createAiRecipeRequest,
   createProductFormPayload,
   describeProductChanges,
   EMPTY_PRODUCT_FORM,
@@ -161,12 +162,7 @@ export function useProductFormWorkspace({
       const response = await fetch('/api/ai-recipe-builder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productName: form.name,
-          materials: materials.map((material) => ({ id: material.id, name: material.name, unit: material.unit })),
-          subRecipes: subRecipes.map((recipe) => ({ id: recipe.id, name: recipe.name, yield_unit: recipe.yield_unit })),
-          option: 1,
-        }),
+        body: JSON.stringify(createAiRecipeRequest(form.name, materials, subRecipes)),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Yapay zeka reçetesi oluşturulamadı.')

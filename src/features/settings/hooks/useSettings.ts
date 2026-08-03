@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { Settings, DEFAULT_SETTINGS, SETTINGS_LABELS } from '../types'
 import { useOrganization } from '@/context/OrganizationContext'
+import { buildSettingsRows, getChangedSettings } from '../settings-utils'
 
 export function useSettings() {
   const [loading, setLoading] = useState(true)
@@ -13,81 +14,105 @@ export function useSettings() {
   const [toast, setToast] = useState('')
 
   const { activeOrg } = useOrganization()
-  const supabase = createClient()
+  const organizationId = activeOrg?.id
+  const supabase = useMemo(() => createClient(), [])
+  const requestIdRef = useRef(0)
 
   const fetchSettings = useCallback(async () => {
-    if (!activeOrg) return
-    setLoading(true)
-    const { data } = await supabase.from('settings').select('*').eq('organization_id', activeOrg.id)
-    if (data) {
-      const merged = { ...DEFAULT_SETTINGS }
-      data.forEach((row) => {
-        const key = row.key as keyof Settings
-        if (key === 'material_categories') {
-          const cats = Array.isArray(row.value) ? row.value : JSON.parse(row.value || '[]')
-          ;(merged as Record<string, unknown>)[key] = cats
-          setCategories(cats)
-        } else if (
-          key === 'notify_critical_stock' ||
-          key === 'notify_low_margin' ||
-          key === 'notify_daily_revenue' ||
-          key === 'notify_supplier_price'
-        ) {
-          ;(merged as Record<string, unknown>)[key] = row.value === true || row.value === 'true'
-        } else {
-          ;(merged as Record<string, unknown>)[key] = row.value
-        }
-      })
-      setSettings(merged)
-      setInitialSettings(merged)
+    const requestId = ++requestIdRef.current
+    if (!organizationId) {
+      setSettings(DEFAULT_SETTINGS)
+      setInitialSettings(DEFAULT_SETTINGS)
+      setCategories(DEFAULT_SETTINGS.material_categories)
+      setLoading(false)
+      return
     }
+
+    setLoading(true)
+    const { data, error } = await supabase.from('settings').select('*').eq('organization_id', organizationId)
+
+    if (requestId !== requestIdRef.current) return
+    if (error) {
+      setToast('Ayarlar yüklenemedi. Lütfen tekrar deneyin.')
+      setLoading(false)
+      return
+    }
+
+    const merged = { ...DEFAULT_SETTINGS }
+    data?.forEach((row) => {
+      const key = row.key as keyof Settings
+      if (key === 'material_categories') {
+        const cats = Array.isArray(row.value) ? row.value : JSON.parse(row.value || '[]')
+        ;(merged as Record<string, unknown>)[key] = cats
+      } else if (
+        key === 'notify_critical_stock' ||
+        key === 'notify_low_margin' ||
+        key === 'notify_daily_revenue' ||
+        key === 'notify_supplier_price'
+      ) {
+        ;(merged as Record<string, unknown>)[key] = row.value === true || row.value === 'true'
+      } else {
+        ;(merged as Record<string, unknown>)[key] = row.value
+      }
+    })
+
+    setSettings(merged)
+    setInitialSettings(merged)
+    setCategories(merged.material_categories)
     setLoading(false)
-  }, [activeOrg, supabase])
+  }, [organizationId, supabase])
 
   useEffect(() => {
     const id = window.setTimeout(() => {
       fetchSettings()
     }, 0)
     return () => clearTimeout(id)
-  }, [fetchSettings, activeOrg?.id])
+  }, [fetchSettings])
 
   const setSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }))
   }, [])
 
   const handleSave = async () => {
-    setSaving(true)
-    const entries = Object.entries(settings).filter(([k]) => k !== 'material_categories')
-
-    const changes: string[] = []
-    for (const [key, value] of entries) {
-      const initialVal = (initialSettings as Record<string, unknown>)[key]
-      if (value !== initialVal) {
-        const label = SETTINGS_LABELS[key] || key
-        const formatVal = (v: unknown) => (v === true ? 'Açık' : v === false ? 'Kapalı' : v)
-        changes.push(`${label} (${formatVal(initialVal)} -> ${formatVal(value)})`)
-      }
+    if (!organizationId) {
+      setToast('Ayarları kaydetmek için aktif bir organizasyon gerekli.')
+      return
     }
 
-    if (changes.length > 0) {
+    setSaving(true)
+    try {
+      const changedEntries = getChangedSettings(settings, initialSettings)
+
+      if (changedEntries.length === 0) {
+        setToast('Kaydedilecek bir ayar değişikliği bulunamadı.')
+        return
+      }
+
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser()
-      for (const [key, value] of entries) {
-        await supabase
-          .from('settings')
-          .upsert(
-            { key, value, user_id: user?.id, organization_id: activeOrg?.id },
-            { onConflict: 'organization_id, key' },
-          )
-      }
-      const changeText = changes.join(' | ')
-      await logActivity('Ayarlar', 'GUNCELLEME', `Sistem genel ayarları güncellendi.`, { detay: changeText })
-      setInitialSettings(settings)
-    }
+      if (userError || !user) throw userError || new Error('Oturum bilgisi bulunamadı.')
 
-    setToast('Ayarlar başarıyla kaydedildi.')
-    setSaving(false)
+      const rows = buildSettingsRows(changedEntries, user.id, organizationId)
+      const { error: saveError } = await supabase.from('settings').upsert(rows, { onConflict: 'organization_id,key' })
+      if (saveError) throw saveError
+
+      const formatValue = (value: unknown) =>
+        value === true ? 'Açık' : value === false ? 'Kapalı' : Array.isArray(value) ? value.join(', ') : value
+      const changes = changedEntries.map(([key, value]) => {
+        const initialValue = (initialSettings as Record<string, unknown>)[key]
+        return `${SETTINGS_LABELS[key] || key} (${formatValue(initialValue)} -> ${formatValue(value)})`
+      })
+      const changeText = changes.join(' | ')
+      await logActivity('Ayarlar', 'GUNCELLEME', 'Sistem genel ayarları güncellendi.', { detay: changeText })
+      setInitialSettings(settings)
+      setToast('Ayarlar başarıyla kaydedildi.')
+    } catch (error) {
+      setToast(error instanceof Error ? `Ayarlar kaydedilemedi: ${error.message}` : 'Ayarlar kaydedilemedi.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const activeNotificationCount = useMemo(() => {

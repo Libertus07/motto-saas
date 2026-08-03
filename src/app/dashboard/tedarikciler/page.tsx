@@ -231,10 +231,6 @@ export default function Tedarikciler() {
       fetchSuppliers()
       viewTransactions({ ...selectedSupplier, total_debt: newDebt })
 
-      logActivity('Tedarikçi', 'EKLEME', `${selectedSupplier.name} firmasına ${amount} TL ödeme eklendi.`, {
-        amount,
-        note: paymentNote,
-      })
       await showAlert('Ödeme başarıyla kaydedildi!', 'success')
     } catch (error: unknown) {
       console.error('Ödeme ekleme hatası:', error)

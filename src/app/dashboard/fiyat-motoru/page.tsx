@@ -12,6 +12,8 @@ import { SalesInputTab } from '@/features/pricing/components/tabs/SalesInputTab'
 import { AnalysisTab } from '@/features/pricing/components/tabs/AnalysisTab'
 import { ReportsTab } from '@/features/pricing/components/tabs/ReportsTab'
 import { useAppTour } from '@/hooks/useAppTour'
+import { useOrganization } from '@/context/OrganizationContext'
+import { savePricingCalculations } from '@/features/pricing/services/pricing-service'
 
 export default function FiyatMotoruPage() {
   const [activeTab, setActiveTab] = useState<'sales' | 'results' | 'reports'>('sales')
@@ -40,8 +42,10 @@ export default function FiyatMotoruPage() {
   ])
   const [saving, setSaving] = useState(false)
   const { showAlert } = useNotification()
+  const { activeOrg } = useOrganization()
 
-  const { products, setProducts, expenses, loading, realSalesMeta, settings, setSettings } = usePricingData()
+  const { products, setProducts, expenses, loading, error, realSalesMeta, settings, setSettings, refetch } =
+    usePricingData()
 
   const { productSales, calculations, updateSales, adjustSalesByDelta } = usePricingCalculator(
     products,
@@ -51,33 +55,37 @@ export default function FiyatMotoruPage() {
   )
 
   const handleSaveCosts = async () => {
+    if (!activeOrg?.id) {
+      await showAlert('Fiyatları kaydetmek için aktif bir organizasyon gereklidir.', 'warning')
+      return
+    }
+
+    if (calculations.length === 0) {
+      await showAlert('Kaydedilecek ürün maliyeti bulunamadı.', 'warning')
+      return
+    }
+
     setSaving(true)
     const supabase = createClient()
     try {
-      for (const calc of calculations) {
-        const { error } = await supabase
-          .from('products')
-          .update({ calculated_cost: calc.totalCost })
-          .eq('id', calc.product.id)
-        if (error) throw error
-      }
+      const updates = calculations.map((calculation) => ({
+        id: calculation.product.id,
+        total_cost: calculation.totalCost,
+      }))
+      await savePricingCalculations(supabase, activeOrg.id, updates, settings.targetMargin)
 
-      const { error: marginErr } = await supabase
-        .from('settings')
-        .upsert({ key: 'target_margin', value: settings.targetMargin.toString() })
-      if (marginErr) throw marginErr
-
+      const costsByProductId = new Map(updates.map((update) => [update.id, update.total_cost]))
       setProducts((prev) =>
-        prev.map((p) => {
-          const c = calculations.find((x) => x.product.id === p.id)
-          return c ? { ...p, calculated_cost: c.totalCost } : p
+        prev.map((product) => {
+          const calculatedCost = costsByProductId.get(product.id)
+          return calculatedCost === undefined ? product : { ...product, calculated_cost: calculatedCost }
         }),
       )
 
-      showAlert('Birim maliyetler ürün kartlarına kaydedildi.', 'success')
+      await showAlert('Birim maliyetler ürün kartlarına güvenli biçimde kaydedildi.', 'success')
     } catch (err: unknown) {
-      console.error('Kaydetme hatası:', err)
-      showAlert('Kaydetme işlemi başarısız oldu.', 'error')
+      console.error('Fiyat motoru kaydetme hatası:', err)
+      await showAlert('Kaydetme işlemi başarısız oldu. Mevcut veriler değiştirilmedi.', 'error')
     } finally {
       setSaving(false)
     }
@@ -89,6 +97,27 @@ export default function FiyatMotoruPage() {
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
           <p className="text-stone-400 font-medium">Algoritma Hazırlanıyor...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-stone-950 px-4 py-12 text-stone-100">
+        <div className="mx-auto flex max-w-lg flex-col items-center rounded-2xl border border-red-900/60 bg-red-950/30 p-6 text-center shadow-xl">
+          <div className="mb-3 text-3xl" aria-hidden="true">
+            ⚠️
+          </div>
+          <h1 className="text-lg font-bold text-red-200">Fiyat motoru yüklenemedi</h1>
+          <p className="mt-2 text-sm leading-6 text-stone-300">{error}</p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="mt-5 min-h-11 rounded-xl bg-amber-500 px-5 py-2.5 font-bold text-stone-950 transition-colors hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+          >
+            Tekrar Dene
+          </button>
         </div>
       </div>
     )

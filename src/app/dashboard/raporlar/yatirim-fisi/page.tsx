@@ -186,6 +186,7 @@ export default function YatirimFisiYukle() {
         // Kullanıcı onayladı, eski Yatırımı sil (Rollback)
         const { error: delError } = await supabase.rpc('delete_investment_transaction', {
           p_transaction_id: dupData[0].id,
+          p_organization_id: activeOrg.id,
         })
         if (delError) {
           await showAlert('Eski Yatırım fişi silinirken hata oluştu: ' + delError.message, 'error')

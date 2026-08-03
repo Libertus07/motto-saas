@@ -285,7 +285,7 @@ export default function InventoryPage() {
                 onClearFilters={ui.clearMovementFilters}
                 onToggleDate={ui.toggleMovementDate}
                 onExpandAll={() => ui.setMovementCollapsedDates(new Set())}
-                onCollapseAll={() => {}}
+                onCollapseAll={(dateKeys) => ui.setMovementCollapsedDates(new Set(dateKeys))}
               />
             )}
 

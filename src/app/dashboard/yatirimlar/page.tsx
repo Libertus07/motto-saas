@@ -249,7 +249,7 @@ export default function YatirimlarPage() {
   const handleRentSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!ui.selectedInvestment) return
-    const success = await collectRent(ui.selectedInvestment.id, ui.selectedInvestment.name, ui.rentForm)
+    const success = await collectRent(ui.selectedInvestment.id, ui.rentForm)
     if (success) {
       ui.setIsRentModalOpen(false)
       ui.resetForms()
@@ -259,12 +259,7 @@ export default function YatirimlarPage() {
   const handleValueUpdateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!ui.selectedInvestment) return
-    const success = await updateValue(
-      ui.selectedInvestment.id,
-      ui.selectedInvestment.name,
-      ui.valueForm,
-      Number(ui.selectedInvestment.current_manual_value || 0),
-    )
+    const success = await updateValue(ui.selectedInvestment.id, ui.valueForm)
     if (success) {
       ui.setIsValueModalOpen(false)
       ui.resetForms()
@@ -274,7 +269,7 @@ export default function YatirimlarPage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!ui.selectedInvestment) return
-    const success = await editInvestment(ui.selectedInvestment.id, ui.editForm, ui.selectedInvestment)
+    const success = await editInvestment(ui.selectedInvestment.id, ui.editForm)
     if (success) {
       ui.setIsEditModalOpen(false)
     }
