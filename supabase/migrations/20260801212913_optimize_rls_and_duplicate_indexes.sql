@@ -22,6 +22,12 @@ WITH CHECK ((SELECT auth.uid()) = id);
 DROP POLICY IF EXISTS "View own organization members" ON public.organization_members;
 DROP POLICY IF EXISTS "Owners and admins can manage organization members"
 ON public.organization_members;
+DROP POLICY IF EXISTS "Owners and admins can insert organization members"
+ON public.organization_members;
+DROP POLICY IF EXISTS "Owners and admins can update organization members"
+ON public.organization_members;
+DROP POLICY IF EXISTS "Owners and admins can delete organization members"
+ON public.organization_members;
 
 CREATE POLICY "View own organization members"
 ON public.organization_members

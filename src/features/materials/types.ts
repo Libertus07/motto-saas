@@ -37,3 +37,38 @@ export type AutoCategoryResponse = {
   error?: string
   suggestions?: Array<{ id: string; suggested_category: string }>
 }
+
+export type MaterialFormValues = {
+  name: string
+  category: string
+  unit: string
+  price_per_unit: string
+  stock_quantity: string
+  critical_stock_level: string
+}
+
+export type MaterialMutationInput = {
+  id?: string | null
+  name: string
+  category: string
+  unit: string
+  pricePerUnit: number
+  stockQuantity: number
+  criticalStockLevel: number
+  auditDetails?: Record<string, unknown>
+}
+
+export type MaterialBulkUpdate = {
+  id: string
+  name: string
+  unit: string
+  category: string
+  price_per_unit: number
+  stock_quantity: number
+  critical_stock_level: number
+}
+
+export type MaterialCategoryGroup = {
+  category: string
+  items: Material[]
+}

@@ -8,37 +8,45 @@ BEGIN
     SELECT pg_get_functiondef('public.apply_stock_count(jsonb)'::regprocedure)
     INTO v_definition;
 
-    v_updated_definition := replace(
-        v_definition,
-        'v_details text[] := ''{}'';',
-        'v_details text[] := ARRAY[]::text[];'
-    );
-
-    IF v_updated_definition = v_definition THEN
-        RAISE EXCEPTION 'apply_stock_count array initializer was not found';
+    IF strpos(v_definition, 'v_details text[] := ''{}'';') > 0 THEN
+        v_updated_definition := replace(
+            v_definition,
+            'v_details text[] := ''{}'';',
+            'v_details text[] := ARRAY[]::text[];'
+        );
+        EXECUTE v_updated_definition;
+    ELSIF strpos(v_definition, 'v_details text[] := ARRAY[]::text[];') = 0 THEN
+        RAISE EXCEPTION 'apply_stock_count array initializer could not be verified';
     END IF;
-
-    EXECUTE v_updated_definition;
 
     SELECT pg_get_functiondef('public.process_receipt_upload(json)'::regprocedure)
     INTO v_definition;
 
-    v_updated_definition := replace(
-        v_definition,
-        'v_audit_details text[] := ''{}'';',
-        'v_audit_details text[] := ARRAY[]::text[];'
-    );
-    v_updated_definition := replace(
-        v_updated_definition,
-        'v_user_id := (payload->>''user_id'')::uuid;',
-        E'v_user_id := auth.uid();\n\n    IF v_user_id IS NULL THEN\n        RAISE EXCEPTION ''Oturum açmış bir kullanıcı gereklidir.'' USING ERRCODE = ''42501'';\n    END IF;'
-    );
+    v_updated_definition := v_definition;
 
-    IF v_updated_definition = v_definition THEN
-        RAISE EXCEPTION 'process_receipt_upload hardening targets were not found';
+    IF strpos(v_updated_definition, 'v_audit_details text[] := ''{}'';') > 0 THEN
+        v_updated_definition := replace(
+            v_updated_definition,
+            'v_audit_details text[] := ''{}'';',
+            'v_audit_details text[] := ARRAY[]::text[];'
+        );
+    ELSIF strpos(v_updated_definition, 'v_audit_details text[] := ARRAY[]::text[];') = 0 THEN
+        RAISE EXCEPTION 'process_receipt_upload array initializer could not be verified';
     END IF;
 
-    EXECUTE v_updated_definition;
+    IF strpos(v_updated_definition, 'v_user_id := (payload->>''user_id'')::uuid;') > 0 THEN
+        v_updated_definition := replace(
+            v_updated_definition,
+            'v_user_id := (payload->>''user_id'')::uuid;',
+            E'v_user_id := auth.uid();\n\n    IF v_user_id IS NULL THEN\n        RAISE EXCEPTION ''Oturum açmış bir kullanıcı gereklidir.'' USING ERRCODE = ''42501'';\n    END IF;'
+        );
+    ELSIF strpos(v_updated_definition, 'v_user_id := auth.uid();') = 0 THEN
+        RAISE EXCEPTION 'process_receipt_upload authentication could not be verified';
+    END IF;
+
+    IF v_updated_definition <> v_definition THEN
+        EXECUTE v_updated_definition;
+    END IF;
 END;
 $migration$;
 
@@ -46,7 +54,7 @@ $migration$;
 -- overload with an explicitly tenant-scoped signature and least-privilege ACL.
 DROP FUNCTION IF EXISTS public.process_investment_rent(uuid, uuid, numeric);
 
-CREATE FUNCTION public.process_investment_rent(
+CREATE OR REPLACE FUNCTION public.process_investment_rent(
     p_investment_id uuid,
     p_account_id uuid,
     p_amount numeric,
