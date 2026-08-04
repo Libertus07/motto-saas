@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Product, Expense, Calculation, ProductSales, PricingSettings, RealSalesMeta } from '../types'
+import { calculateDailyExpenses } from '../pricing-metrics'
 
 export function usePricingCalculator(
   products: Product[],
@@ -41,28 +42,7 @@ export function usePricingCalculator(
   const calculate = useCallback(() => {
     if (products.length === 0) return
 
-    const fixedMonthlyExpenses = expenses.reduce((t, e) => {
-      if (e.period === 'daily' || e.period === 'one_time') return t
-      return t + (e.period === 'yearly' ? e.amount / 12 : e.amount)
-    }, 0)
-
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    const recentDailyExpensesTotal = expenses.reduce((t, e) => {
-      if (e.period === 'daily' || e.period === 'one_time') {
-        const expDate = e.expense_date ? new Date(e.expense_date) : null
-        if (!expDate || expDate >= thirtyDaysAgo) {
-          return t + Number(e.amount)
-        }
-      }
-      return t
-    }, 0)
-
-    const dailyFixed = fixedMonthlyExpenses / 30
-    const activeExpenseDays = realSalesMeta && realSalesMeta.activeDays > 0 ? realSalesMeta.activeDays : 30
-    const dailyVariable = recentDailyExpensesTotal / activeExpenseDays
-
-    const dailyExpenses = dailyFixed + dailyVariable
+    const dailyExpenses = calculateDailyExpenses(expenses, realSalesMeta)
 
     const totalDailyRevenue = products.reduce((t, p) => {
       const sales = productSales[p.id]?.dailySales || 0
