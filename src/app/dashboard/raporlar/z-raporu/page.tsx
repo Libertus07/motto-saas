@@ -20,16 +20,16 @@ export default function ZRaporuYukle() {
         >
           ← Geri
         </button>
-        <span className="text-stone-600" aria-hidden="true">|</span>
-        <span className="text-2xl" aria-hidden="true">📸</span>
+        <span className="text-stone-600" aria-hidden="true">
+          |
+        </span>
+        <span className="text-2xl" aria-hidden="true">
+          📸
+        </span>
         <h1 className="font-bold text-blue-400">Gün Sonu Z Raporu</h1>
       </header>
       <main className="mx-auto max-w-5xl p-4 sm:p-6">
-        {workspace.parsedData ? (
-          <ZReportEditor workspace={workspace} />
-        ) : (
-          <ZReportUploadPanel workspace={workspace} />
-        )}
+        {workspace.parsedData ? <ZReportEditor workspace={workspace} /> : <ZReportUploadPanel workspace={workspace} />}
       </main>
       <ZReportModals workspace={workspace} />
     </div>

@@ -15,7 +15,10 @@ describe('Z report utilities', () => {
 
   it('adds discounts as a non-cash expense row for atomic persistence', () => {
     const result = prepareZReportForSave({
-      date: '2026-08-03', total_revenue: 100, items: [], expenses: [],
+      date: '2026-08-03',
+      total_revenue: 100,
+      items: [],
+      expenses: [],
       discounts: { total_amount: 20 },
     })
     expect(result.expenses).toEqual([

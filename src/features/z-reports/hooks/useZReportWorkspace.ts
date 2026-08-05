@@ -145,18 +145,25 @@ export function useZReportWorkspace() {
     setSavingProduct(true)
     try {
       const productId = await saveProductWithRecipe(supabase, activeOrg.id, {
-        name: newProductModal.name.trim(), category: newProductModal.category.trim(),
-        salePrice: newProductModal.price, estimatedMonthlySales: 0, ingredients: [],
+        name: newProductModal.name.trim(),
+        category: newProductModal.category.trim(),
+        salePrice: newProductModal.price,
+        estimatedMonthlySales: 0,
+        ingredients: [],
         auditDetails: { source: 'z_report_workspace' },
       })
       const product = { id: productId, name: newProductModal.name.trim(), category: newProductModal.category.trim() }
       setProducts((current) => [...current, product].sort((a, b) => a.name.localeCompare(b.name, 'tr-TR')))
-      setParsedData((current) => current ? {
-        ...current,
-        items: current.items.map((item, index) => index === newProductModal.itemIndex
-          ? { ...item, matchedProductId: productId }
-          : item),
-      } : current)
+      setParsedData((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((item, index) =>
+                index === newProductModal.itemIndex ? { ...item, matchedProductId: productId } : item,
+              ),
+            }
+          : current,
+      )
       setNewProductModal(null)
     } catch (error: unknown) {
       await showAlert(`Ürün eklenirken hata oluştu: ${getErrorMessage(error)}`, 'error')
@@ -165,19 +172,34 @@ export function useZReportWorkspace() {
     }
   }
 
-  const startManualMode = () => setParsedData({
-    date: new Date().toISOString().split('T')[0], total_revenue: 0,
-    payment_methods: { cash: 0, credit_card: 0, other: 0 },
-    items: [{ product_name: '', quantity: 1, total_price: 0 }], expenses: [],
-  })
+  const startManualMode = () =>
+    setParsedData({
+      date: new Date().toISOString().split('T')[0],
+      total_revenue: 0,
+      payment_methods: { cash: 0, credit_card: 0, other: 0 },
+      items: [{ product_name: '', quantity: 1, total_price: 0 }],
+      expenses: [],
+    })
 
-  const addManualExpense = () => setParsedData((current) => current ? {
-    ...current, expenses: [...current.expenses, { expense_name: '', amount: 0, category: 'Genel' }],
-  } : current)
+  const addManualExpense = () =>
+    setParsedData((current) =>
+      current
+        ? {
+            ...current,
+            expenses: [...current.expenses, { expense_name: '', amount: 0, category: 'Genel' }],
+          }
+        : current,
+    )
 
-  const addManualSale = () => setParsedData((current) => current ? {
-    ...current, items: [...current.items, { product_name: '', quantity: 1, total_price: 0 }],
-  } : current)
+  const addManualSale = () =>
+    setParsedData((current) =>
+      current
+        ? {
+            ...current,
+            items: [...current.items, { product_name: '', quantity: 1, total_price: 0 }],
+          }
+        : current,
+    )
 
   const approve = async () => {
     if (!parsedData || !activeOrg?.id) return
@@ -186,7 +208,10 @@ export function useZReportWorkspace() {
       const reportDate = parsedData.date || new Date().toISOString().split('T')[0]
       const existingBatchId = await findExistingZReportBatch(supabase, activeOrg.id, reportDate)
       const replaceExisting = existingBatchId
-        ? await showConfirm(`Bu tarihe (${reportDate}) ait bir Z-Raporu zaten var. Önceki kaydı yenisiyle değiştirmek istiyor musunuz?`, 'warning')
+        ? await showConfirm(
+            `Bu tarihe (${reportDate}) ait bir Z-Raporu zaten var. Önceki kaydı yenisiyle değiştirmek istiyor musunuz?`,
+            'warning',
+          )
         : false
       if (existingBatchId && !replaceExisting) return
 
@@ -214,22 +239,50 @@ export function useZReportWorkspace() {
   }
 
   const reset = () => {
-    setParsedData(null); setImageUrl(null); setFileText(null); setFileType(null); setSelectedFile(null)
+    setParsedData(null)
+    setImageUrl(null)
+    setFileText(null)
+    setFileType(null)
+    setSelectedFile(null)
   }
-  const closePreprocess = () => { setIsPreprocessOpen(false); setPreprocessFiles(null) }
+  const closePreprocess = () => {
+    setIsPreprocessOpen(false)
+    setPreprocessFiles(null)
+  }
   const confirmPreprocess = (results: { dataUrl: string }[]) => {
     closePreprocess()
     if (!results.length) return
-    setFileText(null); setImageUrl(results[0].dataUrl); setFileType('image')
+    setFileText(null)
+    setImageUrl(results[0].dataUrl)
+    setFileType('image')
     setSelectedFile(dataUrlToFile(results[0].dataUrl, `processed-zreport-${Date.now()}.jpg`))
   }
 
   return {
-    imageUrl, fileText, fileType, loading, analyzing, parsedData, setParsedData, products,
-    newProductModal, setNewProductModal, savingProduct, allCategories,
-    isPreprocessOpen, preprocessFiles, handleFileUpload, analyze, createProduct,
-    startManualMode, addManualExpense, addManualSale, approve, reset,
-    closePreprocess, confirmPreprocess,
+    imageUrl,
+    fileText,
+    fileType,
+    loading,
+    analyzing,
+    parsedData,
+    setParsedData,
+    products,
+    newProductModal,
+    setNewProductModal,
+    savingProduct,
+    allCategories,
+    isPreprocessOpen,
+    preprocessFiles,
+    handleFileUpload,
+    analyze,
+    createProduct,
+    startManualMode,
+    addManualExpense,
+    addManualSale,
+    approve,
+    reset,
+    closePreprocess,
+    confirmPreprocess,
   }
 }
 

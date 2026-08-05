@@ -6,7 +6,9 @@ export function ZReportUploadPanel({ workspace }: { workspace: ZReportWorkspace 
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-dashed border-stone-800 bg-stone-900 p-5 text-center sm:p-8">
-        <div className="mb-4 text-6xl" aria-hidden="true">🧾</div>
+        <div className="mb-4 text-6xl" aria-hidden="true">
+          🧾
+        </div>
         <h2 className="mb-2 text-xl font-bold">Belge Yükleyin</h2>
         <p className="mx-auto mb-6 max-w-md text-sm leading-6 text-stone-400 sm:text-base">
           Görsel, PDF, XML, JSON veya Excel raporunu yükleyin; sistem satışları okuyup eşleşmeleri hazırlasın.
@@ -44,11 +46,21 @@ export function ZReportUploadPanel({ workspace }: { workspace: ZReportWorkspace 
           <h3 className="mb-4 font-bold">Önizleme</h3>
           <div className="mb-6 flex min-h-40 items-center justify-center">
             {workspace.imageUrl && workspace.fileType === 'image' ? (
-              <Image src={workspace.imageUrl} alt="Yüklenen Z Raporu" width={400} height={384} className="mx-auto max-h-96 rounded-lg object-contain" />
+              <Image
+                src={workspace.imageUrl}
+                alt="Yüklenen Z Raporu"
+                width={400}
+                height={384}
+                className="mx-auto max-h-96 rounded-lg object-contain"
+              />
             ) : (
               <div className="py-8 text-center">
-                <div className="mb-3 text-6xl" aria-hidden="true">{workspace.fileType === 'pdf' ? '📄' : workspace.fileType === 'xml' ? '📰' : '🤖'}</div>
-                <p className="font-bold text-stone-300">{workspace.fileType === 'pdf' ? 'PDF' : workspace.fileType === 'xml' ? 'XML' : 'JSON / Excel'} seçildi</p>
+                <div className="mb-3 text-6xl" aria-hidden="true">
+                  {workspace.fileType === 'pdf' ? '📄' : workspace.fileType === 'xml' ? '📰' : '🤖'}
+                </div>
+                <p className="font-bold text-stone-300">
+                  {workspace.fileType === 'pdf' ? 'PDF' : workspace.fileType === 'xml' ? 'XML' : 'JSON / Excel'} seçildi
+                </p>
               </div>
             )}
           </div>

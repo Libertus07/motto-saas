@@ -2,11 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ParsedZReport } from '../types'
 import { prepareZReportForSave } from '../z-report-utils'
 
-export async function findExistingZReportBatch(
-  supabase: SupabaseClient,
-  organizationId: string,
-  reportDate: string,
-) {
+export async function findExistingZReportBatch(supabase: SupabaseClient, organizationId: string, reportDate: string) {
   const { data, error } = await supabase
     .from('sales')
     .select('batch_id')

@@ -65,7 +65,13 @@ export function prepareZReportForSave(report: ParsedZReport) {
   const expenses: ParsedExpenseItem[] = [
     ...(report.expenses ?? []),
     ...((report.discounts?.total_amount ?? 0) > 0
-      ? [{ expense_name: 'Z-Raporu İndirim ve İkramlar', category: 'indirim-ikram', amount: report.discounts?.total_amount ?? 0 }]
+      ? [
+          {
+            expense_name: 'Z-Raporu İndirim ve İkramlar',
+            category: 'indirim-ikram',
+            amount: report.discounts?.total_amount ?? 0,
+          },
+        ]
       : []),
   ]
 
