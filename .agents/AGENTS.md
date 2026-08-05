@@ -1,11 +1,12 @@
-# Agent System Architecture
+# Agent Skill Authoring Rules
 
-This project uses the Agent Skills standard for maintaining agent instructions.
-Monolithic rules have been deprecated and extracted into modular skills.
+These instructions apply only while changing files under `.agents/`. Read
+`README.md` before adding or modifying a project skill.
 
-## Custom Skills
-All project-specific rules, guidelines, and instructions are now stored in the `.agents/skills/` directory. Each skill follows the standardized `SKILL.md` format.
-
-When working on tasks, the agent should automatically discover and adhere to these skills.
-
-If you need to add a new project rule, create a new folder under `.agents/skills/` with a corresponding `SKILL.md` file rather than adding it here.
+- Keep durable repository and subtree constraints in the nearest applicable
+  `AGENTS.md`; do not duplicate them in skills.
+- Create a skill only for a specialized, reusable workflow with a clear trigger.
+- Keep skill frontmatter, paths, examples, verification, and failure behavior
+  current with the repository.
+- Do not include credentials, tenant data, machine-specific paths, or rules that
+  contradict the root engineering contract.
