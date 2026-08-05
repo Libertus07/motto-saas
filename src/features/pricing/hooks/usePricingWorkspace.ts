@@ -25,13 +25,7 @@ export function usePricingWorkspace() {
         expenses: data.expenses,
         realSalesMeta: data.realSalesMeta,
       }),
-    [
-      calculator.calculations,
-      calculator.productSales,
-      data.expenses,
-      data.products,
-      data.realSalesMeta,
-    ],
+    [calculator.calculations, calculator.productSales, data.expenses, data.products, data.realSalesMeta],
   )
 
   const saveCosts = async () => {

@@ -22,9 +22,7 @@ export function PricingTabs({ activeTab, onChange }: { activeTab: PricingTab; on
           aria-selected={activeTab === tab.id}
           onClick={() => onChange(tab.id)}
           className={`whitespace-nowrap border-b-2 px-4 py-3.5 text-xs font-bold transition-colors sm:px-6 sm:py-4 sm:text-sm ${
-            activeTab === tab.id
-              ? tab.activeClass
-              : 'border-transparent text-stone-400 hover:text-stone-200'
+            activeTab === tab.id ? tab.activeClass : 'border-transparent text-stone-400 hover:text-stone-200'
           }`}
         >
           {tab.label}

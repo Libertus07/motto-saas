@@ -7,13 +7,7 @@ export const EMPTY_ACCOUNT_MESSAGE: AccountMessage = { text: '', type: '' }
 
 export const PASSWORD_STRENGTH = {
   colors: ['bg-rose-500', 'bg-orange-500', 'bg-amber-400', 'bg-emerald-400', 'bg-emerald-500'],
-  textColors: [
-    'text-rose-400',
-    'text-orange-400',
-    'text-amber-400',
-    'text-emerald-400',
-    'text-emerald-400',
-  ],
+  textColors: ['text-rose-400', 'text-orange-400', 'text-amber-400', 'text-emerald-400', 'text-emerald-400'],
   labels: ['Çok Zayıf', 'Zayıf', 'Orta', 'Güçlü', 'Çok Güçlü'],
 } as const
 

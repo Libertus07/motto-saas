@@ -1,10 +1,6 @@
 import type { Calculation, Expense, Product, ProductSales, RealSalesMeta } from './types'
 
-export function calculateDailyExpenses(
-  expenses: Expense[],
-  realSalesMeta: RealSalesMeta | null,
-  now = new Date(),
-) {
+export function calculateDailyExpenses(expenses: Expense[], realSalesMeta: RealSalesMeta | null, now = new Date()) {
   const fixedMonthlyExpenses = expenses.reduce((total, expense) => {
     if (expense.period === 'daily' || expense.period === 'one_time') return total
     return total + (expense.period === 'yearly' ? Number(expense.amount) / 12 : Number(expense.amount))
@@ -40,8 +36,7 @@ export function getPricingMetrics({
 }) {
   return {
     totalDailyRevenue: products.reduce(
-      (total, product) =>
-        total + Number(product.sale_price || 0) * (productSales[product.id]?.dailySales || 0),
+      (total, product) => total + Number(product.sale_price || 0) * (productSales[product.id]?.dailySales || 0),
       0,
     ),
     dailyExpenses: calculateDailyExpenses(expenses, realSalesMeta, now),

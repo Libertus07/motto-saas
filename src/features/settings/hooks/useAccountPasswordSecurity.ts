@@ -1,11 +1,7 @@
 import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
-import {
-  calculatePasswordStrength,
-  EMPTY_ACCOUNT_MESSAGE,
-  type AccountMessage,
-} from '../account-security'
+import { calculatePasswordStrength, EMPTY_ACCOUNT_MESSAGE, type AccountMessage } from '../account-security'
 
 export function useAccountPasswordSecurity(currentEmail: string) {
   const supabase = useMemo(() => createClient(), [])

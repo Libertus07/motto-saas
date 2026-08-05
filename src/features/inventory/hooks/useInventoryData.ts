@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { Material, Movement, MovementFormState, InlineFormState } from '../types'
 import { useOrganization } from '@/context/OrganizationContext'
-import { applyStockCount, recordStockMovement } from '../services/inventory-service'
+import { applyStockCount, fetchInventoryWorkspace, recordStockMovement } from '../services/inventory-service'
 
 export function useInventoryData(
   showAlert: (msg: string, type: 'success' | 'error' | 'warning' | 'info', title?: string) => Promise<void>,
@@ -21,31 +21,19 @@ export function useInventoryData(
 
   const fetchData = useCallback(async () => {
     if (!activeOrg) return
-    const [{ data: mats }, { data: movs }, { data: settingsData }] = await Promise.all([
-      supabase.from('materials').select('*').eq('organization_id', activeOrg.id).order('name'),
-      supabase
-        .from('stock_movements')
-        .select('*, materials(name, unit)')
-        .eq('organization_id', activeOrg.id)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('settings')
-        .select('key, value')
-        .eq('organization_id', activeOrg.id)
-        .in('key', ['inventory_count_day', 'last_inventory_count_date']),
-    ])
-    setMaterials(mats || [])
-    setMovements(movs || [])
-
-    if (settingsData) {
-      const countDay = settingsData.find((s) => s.key === 'inventory_count_day')
-      if (countDay) setInventoryCountDay(parseInt(countDay.value) || 1)
-
-      const lastDate = settingsData.find((s) => s.key === 'last_inventory_count_date')
-      if (lastDate && lastDate.value) setLastCountDate(new Date(lastDate.value))
+    setLoading(true)
+    try {
+      const workspace = await fetchInventoryWorkspace(supabase, activeOrg.id)
+      setMaterials(workspace.materials)
+      setMovements(workspace.movements)
+      setInventoryCountDay(workspace.inventoryCountDay)
+      setLastCountDate(workspace.lastCountDate)
+    } catch (error) {
+      await showAlert(error instanceof Error ? error.message : 'Stok verileri yüklenemedi.', 'error')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
-  }, [activeOrg, supabase])
+  }, [activeOrg, showAlert, supabase])
 
   useEffect(() => {
     let active = true

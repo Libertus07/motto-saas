@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, ReactNode } from 'react'
+import React, { createContext, useCallback, useContext, useMemo, useState, ReactNode } from 'react'
 import { toast } from 'sonner'
 import {
   AlertDialog,
@@ -35,28 +35,37 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     resolve: null,
   })
 
-  const showAlert = (message: string, severity: NotificationSeverity = 'info', title?: string): Promise<void> => {
-    return new Promise((resolve) => {
-      const defaultTitle =
-        severity === 'success' ? 'Başarılı' : severity === 'error' ? 'Hata' : severity === 'warning' ? 'Uyarı' : 'Bilgi'
+  const showAlert = useCallback(
+    (message: string, severity: NotificationSeverity = 'info', title?: string): Promise<void> => {
+      return new Promise((resolve) => {
+        const defaultTitle =
+          severity === 'success'
+            ? 'Başarılı'
+            : severity === 'error'
+              ? 'Hata'
+              : severity === 'warning'
+                ? 'Uyarı'
+                : 'Bilgi'
 
-      const toastTitle = title || defaultTitle
+        const toastTitle = title || defaultTitle
 
-      if (severity === 'success') {
-        toast.success(toastTitle, { description: message })
-      } else if (severity === 'error') {
-        toast.error(toastTitle, { description: message })
-      } else if (severity === 'warning') {
-        toast.warning(toastTitle, { description: message })
-      } else {
-        toast.info(toastTitle, { description: message })
-      }
+        if (severity === 'success') {
+          toast.success(toastTitle, { description: message })
+        } else if (severity === 'error') {
+          toast.error(toastTitle, { description: message })
+        } else if (severity === 'warning') {
+          toast.warning(toastTitle, { description: message })
+        } else {
+          toast.info(toastTitle, { description: message })
+        }
 
-      resolve()
-    })
-  }
+        resolve()
+      })
+    },
+    [],
+  )
 
-  const showConfirm = (message: string, title: string = 'Onay Gerekli'): Promise<boolean> => {
+  const showConfirm = useCallback((message: string, title: string = 'Onay Gerekli'): Promise<boolean> => {
     return new Promise((resolve) => {
       setConfirmState({
         isOpen: true,
@@ -65,17 +74,23 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         resolve,
       })
     })
-  }
+  }, [])
 
-  const handleClose = (value: boolean) => {
-    if (confirmState.resolve) {
-      confirmState.resolve(value)
-    }
-    setConfirmState((prev) => ({ ...prev, isOpen: false, resolve: null }))
-  }
+  const currentConfirmResolver = confirmState.resolve
+  const handleClose = useCallback(
+    (value: boolean) => {
+      if (currentConfirmResolver) {
+        currentConfirmResolver(value)
+      }
+      setConfirmState((prev) => ({ ...prev, isOpen: false, resolve: null }))
+    },
+    [currentConfirmResolver],
+  )
+
+  const contextValue = useMemo(() => ({ showAlert, showConfirm }), [showAlert, showConfirm])
 
   return (
-    <NotificationContext.Provider value={{ showAlert, showConfirm }}>
+    <NotificationContext.Provider value={contextValue}>
       {children}
 
       <AlertDialog open={confirmState.isOpen} onOpenChange={(open) => !open && handleClose(false)}>

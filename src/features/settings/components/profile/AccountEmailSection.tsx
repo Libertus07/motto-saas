@@ -36,9 +36,7 @@ export function AccountEmailSection({ onEmailLoaded }: { onEmailLoaded?: (email:
               type="button"
               onClick={() => void emailSecurity.requestChange()}
               disabled={
-                emailSecurity.saving ||
-                emailSecurity.email.trim() === currentEmail ||
-                !emailSecurity.email.trim()
+                emailSecurity.saving || emailSecurity.email.trim() === currentEmail || !emailSecurity.email.trim()
               }
               className="w-full rounded-xl border border-stone-700 bg-stone-800 px-6 py-2.5 text-xs font-extrabold text-white transition-all hover:bg-stone-700 active:scale-95 disabled:opacity-50"
             >
@@ -73,9 +71,7 @@ export function AccountEmailSection({ onEmailLoaded }: { onEmailLoaded?: (email:
               <button
                 type="button"
                 onClick={() => void emailSecurity.verifyChange()}
-                disabled={
-                  emailSecurity.saving || !emailSecurity.oldEmailOtp || !emailSecurity.newEmailOtp
-                }
+                disabled={emailSecurity.saving || !emailSecurity.oldEmailOtp || !emailSecurity.newEmailOtp}
                 className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-2.5 text-xs font-extrabold text-stone-950 shadow-lg shadow-amber-500/20 transition-all hover:from-amber-400 hover:to-amber-500 active:scale-95 disabled:opacity-50"
               >
                 {emailSecurity.saving ? 'Doğrulanıyor...' : 'Kodları Doğrula ve Güncelle'}
