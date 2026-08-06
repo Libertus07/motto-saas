@@ -56,19 +56,20 @@ export function useSettings() {
     setSettings((prev) => ({ ...prev, [key]: value }))
   }, [])
 
-  const handleSave = async () => {
+  const handleSave = async (overrides: Partial<Settings> = {}): Promise<boolean> => {
     if (!organizationId) {
       await showAlert('Ayarları kaydetmek için aktif bir organizasyon gerekli.', 'warning')
-      return
+      return false
     }
 
     setSaving(true)
     try {
-      const changedEntries = getChangedSettings(settings, initialSettings)
+      const nextSettings = { ...settings, ...overrides }
+      const changedEntries = getChangedSettings(nextSettings, initialSettings)
 
       if (changedEntries.length === 0) {
         await showAlert('Kaydedilecek bir ayar değişikliği bulunamadı.', 'info')
-        return
+        return true
       }
 
       await saveSettingsChanges(supabase, organizationId, changedEntries)
@@ -81,13 +82,16 @@ export function useSettings() {
       })
       const changeText = changes.join(' | ')
       await logActivity('Ayarlar', 'GUNCELLEME', 'Sistem genel ayarları güncellendi.', { detay: changeText })
-      setInitialSettings(settings)
+      setSettings(nextSettings)
+      setInitialSettings(nextSettings)
       await showAlert('Ayarlar başarıyla kaydedildi.', 'success')
+      return true
     } catch (error) {
       await showAlert(
         error instanceof Error ? `Ayarlar kaydedilemedi: ${error.message}` : 'Ayarlar kaydedilemedi.',
         'error',
       )
+      return false
     } finally {
       setSaving(false)
     }

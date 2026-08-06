@@ -34,9 +34,10 @@ SELECT is(
             ON namespace.oid = procedure.pronamespace
         WHERE namespace.nspname = 'public'
           AND has_function_privilege('anon', procedure.oid, 'EXECUTE')
+          AND procedure.oid <> 'public.get_public_login_branding(text)'::regprocedure
     ),
     0,
-    'anonymous users cannot execute any function in the public schema'
+    'anonymous users cannot execute public functions except the narrow login branding reader'
 );
 
 SELECT ok(
