@@ -26,6 +26,7 @@
 - [Environment variables](#environment-variables)
 - [Local Supabase](#local-supabase)
 - [Development commands](#development-commands)
+- [Spec-driven development](#spec-driven-development)
 - [Testing and quality](#testing-and-quality)
 - [Security](#security)
 - [Deployment](#deployment)
@@ -177,6 +178,21 @@ Copy the local URL and keys printed by the CLI into `.env.local`. Follow [supaba
 | `npm run check`        | Run formatting, lint, types, and tests          |
 | `npm run build`        | Produce a production Next.js build with Webpack |
 | `npm run start`        | Serve the generated production build            |
+
+## Spec-driven development
+
+Material features, cross-module changes, database contracts, and substantial
+refactors are planned with GitHub Spec Kit. The primary Codex workflow is:
+
+1. Use `$speckit-specify` to define user value, scope, and acceptance scenarios.
+2. Run `$speckit-clarify` when needed, followed by `$speckit-plan`.
+3. Generate verifiable work items with `$speckit-tasks`.
+4. Run `$speckit-analyze` for high-risk work before implementation.
+5. Implement the approved scope with `$speckit-implement`.
+
+All specifications must comply with the
+[Motto SaaS Engineering Constitution](.specify/memory/constitution.md) and the
+applicable `AGENTS.md` contracts.
 
 ## Testing and quality
 

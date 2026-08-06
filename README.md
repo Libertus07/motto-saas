@@ -26,6 +26,7 @@
 - [Ortam değişkenleri](#ortam-değişkenleri)
 - [Yerel Supabase](#yerel-supabase)
 - [Geliştirme komutları](#geliştirme-komutları)
+- [Spesifikasyon odaklı geliştirme](#spesifikasyon-odaklı-geliştirme)
 - [Test ve kalite](#test-ve-kalite)
 - [Güvenlik](#güvenlik)
 - [Deployment](#deployment)
@@ -177,6 +178,20 @@ Yerel servis çıktısındaki URL ve anahtarları `.env.local` dosyanıza aktar�
 | `npm run check`        | Format, lint, tip ve test kalite kapısını çalıştırır |
 | `npm run build`        | Webpack ile production Next.js build'i üretir        |
 | `npm run start`        | Üretilmiş production build'i çalıştırır              |
+
+## Spesifikasyon odaklı geliştirme
+
+Önemli özellikler, modüller arası değişiklikler, veritabanı sözleşmeleri ve büyük
+refactorlar GitHub Spec Kit ile planlanır. Codex içindeki temel akış:
+
+1. `$speckit-specify` ile kullanıcı değerini, kapsamı ve kabul senaryolarını yazın.
+2. Belirsizlik varsa `$speckit-clarify`, ardından `$speckit-plan` çalıştırın.
+3. `$speckit-tasks` ile doğrulanabilir görevler üretin.
+4. Yüksek riskli işlerde `$speckit-analyze` ile tutarlılığı denetleyin.
+5. Onaylanan kapsamı `$speckit-implement` ile uygulayın.
+
+Tüm spesifikasyonlar [Motto SaaS Engineering Constitution](.specify/memory/constitution.md)
+ve ilgili `AGENTS.md` sözleşmelerine uymalıdır.
 
 ## Test ve kalite
 
