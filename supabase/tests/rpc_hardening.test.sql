@@ -1,10 +1,19 @@
 BEGIN;
 
-SELECT plan(9);
+SELECT plan(12);
 
 SELECT ok(
-    NOT has_function_privilege('anon', 'public.apply_stock_count(jsonb)', 'EXECUTE'),
+    NOT has_function_privilege('anon', 'public.apply_stock_count(jsonb,uuid)', 'EXECUTE'),
     'anonymous users cannot execute stock counts'
+);
+
+SELECT ok(
+    NOT has_function_privilege(
+        'anon',
+        'public.record_stock_movement(uuid,text,numeric,numeric,text,uuid)',
+        'EXECUTE'
+    ),
+    'anonymous users cannot record stock movements'
 );
 
 SELECT ok(
@@ -15,6 +24,33 @@ SELECT ok(
 SELECT ok(
     NOT has_function_privilege('anon', 'public.process_investment_rent(uuid,uuid,numeric,uuid)', 'EXECUTE'),
     'anonymous users cannot execute rent collection'
+);
+
+SELECT is(
+    (
+        SELECT count(*)::integer
+        FROM pg_proc AS procedure
+        INNER JOIN pg_namespace AS namespace
+            ON namespace.oid = procedure.pronamespace
+        WHERE namespace.nspname = 'public'
+          AND has_function_privilege('anon', procedure.oid, 'EXECUTE')
+    ),
+    0,
+    'anonymous users cannot execute any function in the public schema'
+);
+
+SELECT ok(
+    NOT EXISTS (
+        SELECT 1
+        FROM pg_default_acl AS default_acl
+        CROSS JOIN LATERAL aclexplode(default_acl.defaclacl) AS acl
+        WHERE default_acl.defaclrole = 'postgres'::regrole
+          AND default_acl.defaclnamespace = 'public'::regnamespace
+          AND default_acl.defaclobjtype = 'f'
+          AND acl.privilege_type = 'EXECUTE'
+          AND acl.grantee IN (0, 'anon'::regrole::oid)
+    ),
+    'future public functions do not inherit anonymous execute privileges'
 );
 
 INSERT INTO auth.users (id, aud, role, email, created_at, updated_at)
@@ -93,8 +129,14 @@ SELECT is(
     (
         SELECT count(*)::integer
         FROM public.account_movements
-        WHERE source_id = '85555555-5555-5555-5555-555555555555'
+        WHERE source_type = 'investment_rent'
           AND organization_id = '82222222-2222-2222-2222-222222222222'
+          AND source_id IN (
+              SELECT id::text
+              FROM public.investment_transactions
+              WHERE investment_id = '85555555-5555-5555-5555-555555555555'
+                AND organization_id = '82222222-2222-2222-2222-222222222222'
+          )
     ),
     1,
     'rent collection writes an organization-scoped account movement'
