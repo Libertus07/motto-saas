@@ -16,7 +16,7 @@ type SettingsContentProps = {
   categories: string[]
   setCategories: Dispatch<SetStateAction<string[]>>
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void
-  onSave: () => Promise<void>
+  onSave: (overrides?: Partial<Settings>) => Promise<boolean>
 }
 
 export function SettingsContent(props: SettingsContentProps) {

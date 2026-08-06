@@ -2,15 +2,16 @@
 
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { ShieldCheck } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase'
 
 import { LoginForm } from './LoginForm'
+import { LoginBrandLogo, useLoginBranding } from './LoginBrandingProvider'
 
 export function LoginScreen() {
+  const { businessName } = useLoginBranding()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -57,10 +58,10 @@ export function LoginScreen() {
       <div className="relative z-10 w-full max-w-[480px]">
         <div className="mb-7 flex items-center justify-center gap-3 lg:hidden">
           <div className="overflow-hidden rounded-2xl border border-amber-200/15 bg-[#efe2cf] shadow-xl">
-            <Image src="/icons/logo.png" alt="Motto" width={64} height={64} unoptimized className="size-16" />
+            <LoginBrandLogo className="size-16 object-contain" />
           </div>
           <div>
-            <p className="text-lg font-black tracking-tight text-white">Motto SaaS</p>
+            <p className="max-w-[13rem] truncate text-lg font-black tracking-tight text-white">{businessName}</p>
             <p className="text-[0.7rem] font-bold tracking-[0.14em] text-amber-400/80 uppercase">Restoran zekâsı</p>
           </div>
         </div>

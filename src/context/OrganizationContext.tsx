@@ -6,13 +6,14 @@ import { createClient } from '@/lib/supabase'
 export interface OrganizationItem {
   id: string
   name: string
+  slug: string
   role: string
 }
 
 type OrganizationMember = {
   organization_id: string
   role: string | null
-  organizations: { name: string } | null
+  organizations: { name: string; slug: string } | null
 }
 
 interface OrganizationContextType {
@@ -43,7 +44,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
         const { data: members } = await supabase
           .from('organization_members')
-          .select('organization_id, role, organizations(id, name)')
+          .select('organization_id, role, organizations(id, name, slug)')
           .eq('user_id', user.id)
           .eq('status', 'active')
 
@@ -51,6 +52,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           const list: OrganizationItem[] = (members as unknown as OrganizationMember[]).map((m) => ({
             id: m.organization_id,
             name: m.organizations?.name || 'Motto Varsayılan Şube',
+            slug: m.organizations?.slug || m.organization_id,
             role: m.role || 'owner',
           }))
 
@@ -59,6 +61,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           const savedOrgId = localStorage.getItem('motto_active_org_id')
           const found = list.find((o) => o.id === savedOrgId) || list[0]
           setActiveOrgState(found)
+          localStorage.setItem('motto_login_org_slug', found.slug)
           if (!savedOrgId) {
             localStorage.setItem('motto_active_org_id', found.id)
           }
@@ -67,10 +70,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           const defaultOrg: OrganizationItem = {
             id: '00000000-0000-0000-0000-000000000001',
             name: 'Motto SaaS (Ana Şube)',
+            slug: 'motto-saas',
             role: 'owner',
           }
           setOrganizations([defaultOrg])
           setActiveOrgState(defaultOrg)
+          localStorage.setItem('motto_login_org_slug', defaultOrg.slug)
         }
       } catch (err) {
         console.error('Organization fetch error:', err)
@@ -84,6 +89,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const setActiveOrg = (org: OrganizationItem) => {
     setActiveOrgState(org)
     localStorage.setItem('motto_active_org_id', org.id)
+    localStorage.setItem('motto_login_org_slug', org.slug)
   }
 
   return (

@@ -1,5 +1,8 @@
-import Image from 'next/image'
+'use client'
+
 import { BarChart3, Boxes, ShieldCheck, Sparkles } from 'lucide-react'
+
+import { LoginBrandLogo, useLoginBranding } from './LoginBrandingProvider'
 
 const capabilities = [
   {
@@ -20,6 +23,8 @@ const capabilities = [
 ]
 
 export function LoginBrandPanel() {
+  const { businessName } = useLoginBranding()
+
   return (
     <section className="relative hidden min-h-[100svh] overflow-hidden border-r border-white/8 bg-stone-950 lg:flex lg:flex-col lg:justify-between lg:px-12 lg:py-10 xl:px-16 xl:py-12">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -30,10 +35,10 @@ export function LoginBrandPanel() {
 
       <div className="relative z-10 flex items-center gap-4">
         <div className="overflow-hidden rounded-2xl border border-amber-200/15 bg-[#efe2cf] shadow-[0_18px_50px_rgba(0,0,0,0.24)]">
-          <Image src="/icons/logo.png" alt="Motto" width={72} height={72} unoptimized className="size-[72px]" />
+          <LoginBrandLogo className="size-[72px] object-contain" />
         </div>
         <div>
-          <p className="text-lg font-black tracking-[-0.02em] text-white">Motto SaaS</p>
+          <p className="max-w-xs truncate text-lg font-black tracking-[-0.02em] text-white">{businessName}</p>
           <p className="mt-0.5 text-xs font-semibold tracking-[0.16em] text-amber-400/80 uppercase">Restoran zekâsı</p>
         </div>
       </div>

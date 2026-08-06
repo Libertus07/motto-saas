@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "aef8de04053f7bf85576cd2190052925a9764f68",
-    "indexed_at": "2026-08-06T03:49:06Z",
+    "commit": "87278de9b06ee4a0988f3a559c93afc4163f2705",
+    "indexed_at": "2026-08-06T04:25:23Z",
     "project": "W-Projeler-ilk-motto-saas",
-    "nodes": 2643,
-    "edges": 4588,
-    "original_size": 3473408,
-    "compressed_size": 376841,
-    "compression_level": 9
+    "nodes": 3143,
+    "edges": 5453,
+    "original_size": 8126464,
+    "compressed_size": 1525219,
+    "compression_level": 3
 }
