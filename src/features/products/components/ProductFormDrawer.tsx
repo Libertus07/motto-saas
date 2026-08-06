@@ -28,7 +28,7 @@ type ProductFormDrawerProps = {
 }
 
 const inputClassName =
-  'w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50'
+  'min-h-[44px] sm:min-h-0 w-full bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500/50'
 
 export function ProductFormDrawer({
   open,
@@ -96,7 +96,7 @@ export function ProductFormDrawer({
             onClick={onClose}
             disabled={saving}
             aria-label="Ürün formunu kapat"
-            className="shrink-0 min-h-10 min-w-10 text-stone-400 hover:text-white p-2 rounded-xl bg-stone-800/80 border border-stone-700/80 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            className="shrink-0 min-h-[44px] min-w-[44px] sm:min-h-10 sm:min-w-10 text-stone-400 hover:text-white p-2 rounded-xl bg-stone-800/80 border border-stone-700/80 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             ✕
           </button>
@@ -196,7 +196,7 @@ export function ProductFormDrawer({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="min-h-10 w-full sm:w-auto bg-stone-800 hover:bg-stone-700 text-stone-300 px-5 py-2 rounded-xl text-xs font-semibold border border-stone-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-[44px] sm:min-h-10 w-full sm:w-auto bg-stone-800 hover:bg-stone-700 text-stone-300 px-5 py-2 rounded-xl text-xs font-semibold border border-stone-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             İptal
           </button>
@@ -204,7 +204,7 @@ export function ProductFormDrawer({
             type="submit"
             disabled={saving}
             aria-busy={saving}
-            className="min-h-10 w-full sm:w-auto bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-extrabold px-6 py-2 rounded-xl text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition-all disabled:cursor-wait disabled:opacity-60"
+            className="min-h-[44px] sm:min-h-10 w-full sm:w-auto bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-extrabold px-6 py-2 rounded-xl text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition-all disabled:cursor-wait disabled:opacity-60"
           >
             {saving ? 'Kaydediliyor…' : editing ? 'Ürünü Güncelle' : 'Ürünü Kaydet'}
           </button>

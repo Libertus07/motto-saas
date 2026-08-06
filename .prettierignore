@@ -4,6 +4,7 @@ coverage
 graphify-out
 .codebase-memory
 .agents
+.specify
 .husky
 supabase/.temp
 package-lock.json

@@ -33,21 +33,21 @@ export function ProductRecipeEditor({
             type="button"
             onClick={onBuildAiRecipe}
             disabled={isBuildingAiRecipe}
-            className="min-h-9 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-bold disabled:opacity-50 transition-all active:scale-95"
+            className="min-h-[44px] sm:min-h-9 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-bold disabled:opacity-50 transition-all active:scale-95"
           >
             {isBuildingAiRecipe ? '⏳ Oluşturuluyor...' : '✨ Yapay Zeka Hesaplasın'}
           </button>
           <button
             type="button"
             onClick={() => onAddItem('material')}
-            className="min-h-9 bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1.5 rounded-xl text-xs font-semibold border border-stone-700 transition-colors"
+            className="min-h-[44px] sm:min-h-9 bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1.5 rounded-xl text-xs font-semibold border border-stone-700 transition-colors"
           >
             + Hammadde
           </button>
           <button
             type="button"
             onClick={() => onAddItem('sub_recipe')}
-            className="min-h-9 bg-stone-800 hover:bg-stone-700 text-amber-300 px-3 py-1.5 rounded-xl text-xs font-semibold border border-stone-700 transition-colors"
+            className="min-h-[44px] sm:min-h-9 bg-stone-800 hover:bg-stone-700 text-amber-300 px-3 py-1.5 rounded-xl text-xs font-semibold border border-stone-700 transition-colors"
           >
             + Üretim Reçetesi
           </button>
@@ -123,7 +123,7 @@ export function ProductRecipeEditor({
                   type="button"
                   onClick={() => onRemoveItem(index)}
                   aria-label={`${index + 1}. reçete kalemini kaldır`}
-                  className="min-h-9 min-w-9 text-stone-500 hover:text-red-400 p-1 rounded-lg hover:bg-stone-800 text-center transition-colors"
+                  className="min-h-[44px] min-w-[44px] sm:min-h-9 sm:min-w-9 text-stone-500 hover:text-red-400 p-1 rounded-lg hover:bg-stone-800 text-center transition-colors"
                 >
                   ✕
                 </button>

@@ -32,6 +32,7 @@ function collectFinalSqlFunctionDefinitions(migrationFiles: string[]) {
     const events: Array<
       | { index: number; type: 'drop'; name: string; parameterCount: number }
       | { index: number; type: 'create'; name: string; parameterNames: string[] }
+      | { index: number; type: 'rename'; fromName: string; toName: string; parameterCount: number }
     > = []
 
     for (const match of sql.matchAll(
@@ -52,7 +53,39 @@ function collectFinalSqlFunctionDefinitions(migrationFiles: string[]) {
       })
     }
 
+    for (const match of sql.matchAll(
+      /ALTER\s+FUNCTION\s+(?:"public"\.|public\.)"?([a-zA-Z0-9_]+)"?\s*\(([^;]*)\)\s+RENAME\s+TO\s+"?([a-zA-Z0-9_]+)"?/gi,
+    )) {
+      const parameterCount = match[2].trim() ? match[2].split(',').length : 0
+      events.push({
+        index: match.index,
+        type: 'rename',
+        fromName: match[1].toLowerCase(),
+        toName: match[3].toLowerCase(),
+        parameterCount,
+      })
+    }
+
     for (const event of events.sort((left, right) => left.index - right.index)) {
+      if (event.type === 'rename') {
+        const sourceDefinitions = definitions.get(event.fromName) ?? []
+        const renamedDefinitions = sourceDefinitions.filter(
+          (definition) => definition.parameterCount === event.parameterCount,
+        )
+        definitions.set(
+          event.fromName,
+          sourceDefinitions.filter((definition) => definition.parameterCount !== event.parameterCount),
+        )
+        if (renamedDefinitions.length > 0) {
+          const targetDefinitions = definitions.get(event.toName) ?? []
+          definitions.set(event.toName, [
+            ...targetDefinitions.filter((definition) => definition.parameterCount !== event.parameterCount),
+            ...renamedDefinitions,
+          ])
+        }
+        continue
+      }
+
       const current = definitions.get(event.name) ?? []
       const parameterCount = event.type === 'drop' ? event.parameterCount : event.parameterNames.length
       const withoutSameArity = current.filter((definition) => definition.parameterCount !== parameterCount)

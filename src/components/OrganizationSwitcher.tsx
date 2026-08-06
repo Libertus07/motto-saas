@@ -17,17 +17,17 @@ export function OrganizationSwitcher() {
   }
 
   return (
-    <div className="relative inline-block text-left">
+    <div className="relative block min-w-0 max-w-full text-left">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-label="Şube ve organizasyon seçici"
-        className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-950/80 border border-stone-800 hover:border-amber-500/40 text-xs font-bold text-stone-200 hover:text-amber-400 transition-all shadow-inner"
+        className="flex min-h-[44px] md:min-h-0 w-full min-w-0 items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-950/80 border border-stone-800 hover:border-amber-500/40 text-xs font-bold text-stone-200 hover:text-amber-400 transition-all shadow-inner"
       >
-        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
-        <span className="truncate max-w-[120px] sm:max-w-[160px]">{activeOrg?.name || 'Şube Seç'}</span>
-        <span className="text-[10px] text-stone-500" aria-hidden="true">
+        <span className="w-2 h-2 shrink-0 rounded-full bg-amber-500 animate-pulse" aria-hidden="true" />
+        <span className="min-w-0 flex-1 truncate">{activeOrg?.name || 'Şube Seç'}</span>
+        <span className="shrink-0 text-[10px] text-stone-500" aria-hidden="true">
           {isOpen ? '▲' : '▼'}
         </span>
       </button>
@@ -45,7 +45,7 @@ export function OrganizationSwitcher() {
             <button
               key={org.id}
               onClick={() => handleSelectOrg(org)}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all text-left ${
+              className={`min-h-[44px] md:min-h-0 w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all text-left ${
                 activeOrg?.id === org.id
                   ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                   : 'text-stone-300 hover:bg-stone-800/60 hover:text-white'

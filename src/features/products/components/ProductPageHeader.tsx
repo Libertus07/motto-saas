@@ -57,7 +57,7 @@ export function ProductPageHeader({
                 variant="outline"
                 size="sm"
                 onClick={onCancelBulkEdit}
-                className="w-full border-stone-700 bg-stone-800 text-stone-300 hover:bg-stone-700 hover:text-white"
+                className="min-h-[44px] sm:min-h-7 w-full border-stone-700 bg-stone-800 text-stone-300 hover:bg-stone-700 hover:text-white"
               >
                 İptal
               </Button>
@@ -65,7 +65,7 @@ export function ProductPageHeader({
                 size="sm"
                 onClick={onSaveBulkChanges}
                 disabled={bulkSaving || changedCount === 0}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold shadow-md shadow-amber-500/20"
+                className="min-h-[44px] sm:min-h-7 w-full bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold shadow-md shadow-amber-500/20"
               >
                 {bulkSaving ? (
                   <>
@@ -82,7 +82,7 @@ export function ProductPageHeader({
               <Button
                 variant="outline"
                 onClick={onEnterBulkEdit}
-                className="w-full bg-stone-900 border-stone-800 text-stone-200 hover:bg-stone-800 shadow-sm"
+                className="min-h-[44px] sm:min-h-8 w-full bg-stone-900 border-stone-800 text-stone-200 hover:bg-stone-800 shadow-sm"
               >
                 <span className="mr-2">✏️</span>
                 Hızlı Düzenle
@@ -91,7 +91,7 @@ export function ProductPageHeader({
                 variant="outline"
                 onClick={onAutoCategorize}
                 disabled={autoCategorizeLoading}
-                className="w-full bg-violet-950/60 border-violet-800/40 text-violet-300 hover:bg-violet-900/80 hover:text-violet-200 shadow-sm"
+                className="min-h-[44px] sm:min-h-8 w-full bg-violet-950/60 border-violet-800/40 text-violet-300 hover:bg-violet-900/80 hover:text-violet-200 shadow-sm"
               >
                 {autoCategorizeLoading ? (
                   <>
@@ -107,7 +107,7 @@ export function ProductPageHeader({
               </Button>
               <Button
                 onClick={onCreateProduct}
-                className="col-span-2 w-full bg-amber-500 hover:bg-amber-600 text-stone-950 font-extrabold shadow-lg shadow-amber-500/20"
+                className="min-h-[44px] sm:min-h-8 col-span-2 w-full bg-amber-500 hover:bg-amber-600 text-stone-950 font-extrabold shadow-lg shadow-amber-500/20"
               >
                 <span className="mr-2">➕</span>
                 Yeni Ürün Ekle

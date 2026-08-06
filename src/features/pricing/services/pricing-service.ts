@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import type { Product } from '../types'
+import type { Expense, PricingSettings, Product, RealSalesMeta } from '../types'
 
 type MaterialRow = { id: string; price_per_unit: number | string | null }
 type RecipeRow = { id: string; yield_quantity: number | string | null; wastage_percent: number | string | null }
@@ -11,6 +11,8 @@ type ProductIngredientRow = {
   sub_recipe_id: string | null
   quantity: number | string
 }
+type SaleRow = { product_id: string; quantity: number | string; sale_date: string }
+type PricingSettingRow = { key: string; value: unknown }
 
 export type PricingWorkspaceInput = {
   products: Omit<Product, 'calculated_cost'>[]
@@ -23,6 +25,72 @@ export type PricingWorkspaceInput = {
 export type PricingCostUpdate = {
   id: string
   total_cost: number
+}
+
+export const DEFAULT_PRICING_SETTINGS: PricingSettings = { targetMargin: 60, taxRate: 10 }
+
+export type PricingWorkspaceData = {
+  products: Product[]
+  expenses: Expense[]
+  realSalesMeta: RealSalesMeta
+  settings: PricingSettings
+}
+
+export async function fetchPricingWorkspace(
+  supabase: SupabaseClient,
+  organizationId: string,
+): Promise<PricingWorkspaceData> {
+  const results = await Promise.all([
+    supabase
+      .from('products')
+      .select('id, name, category, sale_price, estimated_monthly_sales')
+      .eq('organization_id', organizationId)
+      .order('name'),
+    supabase.from('expenses').select('amount, period, category, expense_date').eq('organization_id', organizationId),
+    supabase.from('sales').select('product_id, quantity, sale_date').eq('organization_id', organizationId),
+    supabase.from('settings').select('key, value').eq('organization_id', organizationId),
+    supabase.from('materials').select('id, price_per_unit').eq('organization_id', organizationId),
+    supabase.from('sub_recipes').select('id, yield_quantity, wastage_percent').eq('organization_id', organizationId),
+    supabase
+      .from('sub_recipe_ingredients')
+      .select('sub_recipe_id, material_id, quantity')
+      .eq('organization_id', organizationId),
+    supabase
+      .from('product_ingredients')
+      .select('product_id, material_id, sub_recipe_id, quantity')
+      .eq('organization_id', organizationId),
+  ])
+
+  const queryError = results.find((result) => result.error)?.error
+  if (queryError) throw new Error(queryError.message)
+
+  const products = (results[0].data ?? []) as Omit<Product, 'calculated_cost'>[]
+  const expenses = (results[1].data ?? []) as Expense[]
+  const sales = (results[2].data ?? []) as SaleRow[]
+  const settings = (results[3].data ?? []) as PricingSettingRow[]
+  const materials = (results[4].data ?? []) as MaterialRow[]
+  const recipes = (results[5].data ?? []) as RecipeRow[]
+  const recipeIngredients = (results[6].data ?? []) as RecipeIngredientRow[]
+  const productIngredients = (results[7].data ?? []) as ProductIngredientRow[]
+  const targetMargin = Number(settings.find((row) => row.key === 'target_margin')?.value)
+  const taxRate = Number(settings.find((row) => row.key === 'default_vat')?.value)
+  const salesByProduct: Record<string, number> = {}
+  for (const sale of sales) {
+    salesByProduct[sale.product_id] = (salesByProduct[sale.product_id] ?? 0) + Number(sale.quantity)
+  }
+
+  return {
+    products: buildPricingProducts({ products, materials, recipes, recipeIngredients, productIngredients }),
+    expenses: expenses as Expense[],
+    realSalesMeta: {
+      activeDays: Math.max(1, new Set(sales.map((sale) => sale.sale_date)).size),
+      salesByProduct,
+    },
+    settings: {
+      targetMargin: Number.isFinite(targetMargin) ? targetMargin : DEFAULT_PRICING_SETTINGS.targetMargin,
+      taxRate: Number.isFinite(taxRate) ? taxRate : DEFAULT_PRICING_SETTINGS.taxRate,
+    },
+  }
 }
 
 export function buildPricingProducts(input: PricingWorkspaceInput): Product[] {

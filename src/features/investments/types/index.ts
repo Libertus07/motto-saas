@@ -51,3 +51,12 @@ export type EnhancedInvestment = Investment & {
   profit: number
   isProfit: boolean
 }
+
+export type InvestmentListActions = {
+  onRent: (investment: EnhancedInvestment) => void
+  onUpdateValue: (investment: EnhancedInvestment) => void
+  onNote: (note: string) => void
+  onDoc: (url: string) => void
+  onEdit: (investment: EnhancedInvestment) => void
+  onDelete: (id: string) => void
+}

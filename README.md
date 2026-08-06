@@ -1,104 +1,247 @@
-# Motto SaaS - Restoran & Kafe Yönetim Sistemi
+# Motto SaaS
 
-Motto SaaS, kafeler ve restoranlar için geliştirilmiş, maliyet hesaplaması, stok yönetimi, yapay zeka destekli fatura okuma ve kasa takibini bir araya getiren modern bir bulut POS (Point of Sale) ve ERP sistemidir.
+**Restoran ve kafeler için çok kiracılı (multi-tenant), yapay zekâ destekli maliyet ve operasyon yönetim platformu.**
 
-Bu proje, veri gizliliği (tenant izolasyonu), anlık maliyet (food cost) hesaplamaları ve otomatik reçetelendirme yetenekleri ile işletmelerin "ne kadar kar ediyorum?" sorusuna anlık ve kesin yanıt vermeyi amaçlar.
+[Türkçe](README.md) · [English](README.en.md)
 
-## 🚀 Öne Çıkan Özellikler
+[![CI](https://github.com/Libertus07/motto-saas/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Libertus07/motto-saas/actions/workflows/ci.yml)
+![Next.js](https://img.shields.io/badge/Next.js-16.2-black?logo=next.js)
+![React](https://img.shields.io/badge/React-19.2-149eca?logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript)
+![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-3fcf8e?logo=supabase)
 
-- **AI Destekli Fiş/Fatura Okuma:** Google Gemini entegrasyonu sayesinde yüklenen fatura fotoğraflarından ürün, miktar, birim fiyat ve KDV bilgisi otomatik okunur. Zeki eşleştirme algoritması sayesinde mevcut stok isimleri ile eşleştirilir.
-- **Fiyat Motoru:** Ürün reçeteleri (hammadde ve alt reçeteler) üzerinden canlı food cost hesaplar. Ciro ağırlıklı genel gider dağıtımı ile **net kâr** oranını ve önerilen satış fiyatını sunar.
-- **Gelişmiş Kasa & Finans:** Z-Raporu entegrasyonu, nakit ve POS kasa ayırımı, tedarikçi cari hesapları ve masraf fişleri modülleriyle uçtan uca finans takibi sağlar.
-- **Güçlü Mimari:** Next.js 14 App Router, Supabase (Postgres, RLS), Tailwind CSS ve Recharts kullanılarak inşa edilmiştir.
+[Canlı uygulama](https://motto-saas.vercel.app) · [Güvenlik modeli](docs/security/SEC-101-tenant-model.md) · [Geliştirme kuralları](AGENTS.md)
 
----
+> [!IMPORTANT]
+> Motto SaaS aktif geliştirme aşamasındadır. `1.0.0` öncesinde uygulama sözleşmeleri ve veritabanı şeması değişebilir.
 
-## 🛠️ Modüller ve Çalışma Akışı
+## İçindekiler
 
-Sistemin temel modülleri `src/app/dashboard/` altında yer almaktadır:
+- [Ürün hakkında](#ürün-hakkında)
+- [Öne çıkan yetenekler](#öne-çıkan-yetenekler)
+- [Mimari](#mimari)
+- [Teknoloji yığını](#teknoloji-yığını)
+- [Proje yapısı](#proje-yapısı)
+- [Hızlı başlangıç](#hızlı-başlangıç)
+- [Ortam değişkenleri](#ortam-değişkenleri)
+- [Yerel Supabase](#yerel-supabase)
+- [Geliştirme komutları](#geliştirme-komutları)
+- [Spesifikasyon odaklı geliştirme](#spesifikasyon-odaklı-geliştirme)
+- [Test ve kalite](#test-ve-kalite)
+- [Güvenlik](#güvenlik)
+- [Deployment](#deployment)
+- [Katkıda bulunma](#katkıda-bulunma)
+- [Lisans](#lisans)
 
-1. **Stok & Hammadde (`/stok`, `/hammaddeler`):** En temel birimlerdir. Fiş yüklendiğinde (`/hammaddeler/fis-yukle`) otomatik olarak stok miktarı artar ve tedarikçinin cari hesabına borç yazılır.
-2. **Yarı Mamuller (`/yari-mamuller`):** Hammaddelerden üretilen, kendi içerisinde "Fire Oranı" ve "Porsiyon" maliyeti barındıran alt reçetelerdir (Örn: Pizza Hamuru).
-3. **Ürünler (`/urunler`):** Müşteriye satılan nihai ürünlerdir. Hammadde ve yarı mamuller kullanılarak reçeteleri oluşturulur, otomatik maliyet hesaplanır.
-4. **Tedarikçiler (`/tedarikciler`):** Fatura kesilen kurumlar. Cari hesap takibi ve ödeme geçmişi bu modül altından izlenir.
-5. **Kasa & Finans (`/kasa`, `/finans`, `/giderler`):** Z-Raporları üzerinden günlük satış adetleri girildiğinde kasa bakiyesi (Nakit/Kredi Kartı) güncellenir. Yapılan giderler kasadan otomatik düşülür.
-6. **Fiyat Motoru (`/fiyat-motoru`):** Ürünlerin satıldığı adetler üzerinden aylık sabit/değişken gider dağılımı yaparak, her ürün için BCG matrisi ve başa baş noktası analizi sunar.
-7. **Raporlar (`/raporlar`):** Geçmişe dönük Z-Raporları, yatırımlar ve kasa sayımları raporlanır.
+## Ürün hakkında
 
----
+Motto SaaS; restoran ve kafe ekiplerinin stok, reçete, ürün maliyeti, fiyatlandırma, tedarikçi, kasa, yatırım ve raporlama süreçlerini tek bir çalışma alanında yönetmesine yardımcı olur.
 
-## ⚙️ Kurulum Adımları
+Platformun temel amacı, dağınık operasyon verilerini tutarlı maliyet ve kârlılık içgörülerine dönüştürmektir. Her organizasyonun verisi Supabase Row Level Security (RLS), tenant kontrollü RPC fonksiyonları ve çapraz tenant bütünlük kurallarıyla ayrıştırılır.
 
-Projeyi kendi bilgisayarınızda çalıştırmak için aşağıdaki adımları izleyin.
+## Öne çıkan yetenekler
 
-### 1. Gereksinimler
+| Alan           | Yetenekler                                                                                    |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| Yapay zekâ     | Fiş/fatura analizi, Z-Raporu okuma, reçete önerisi, menü analizi ve otomatik kategorilendirme |
+| Stok           | Hammadde takibi, stok hareketleri, kritik stok görünümü ve zayi/kayıp analizi                 |
+| Reçete ve ürün | Hammadde, yarı mamul ve nihai ürün reçeteleri; otomatik food-cost hesaplama                   |
+| Fiyatlandırma  | Genel gider dağıtımı, katkı payı, önerilen satış fiyatı, başa baş ve ürün portföyü analizi    |
+| Finans         | Kasa sayımı, gider, tedarikçi cari hareketleri, yatırım fişleri ve finansal raporlar          |
+| Operasyon      | Türkçe kullanıcı deneyimi, mobil uyumlu çalışma alanları, eğitim turu ve işlem geçmişi        |
+| Güvenlik       | Organizasyon bazlı veri izolasyonu, RLS, atomik RPC işlemleri ve audit-log sözleşmesi         |
 
-- Node.js (v18.17 veya üzeri)
-- Supabase Hesabı (Veritabanı ve Auth için)
-- Google Gemini API Anahtarı (Yapay Zeka modülleri için)
+## Mimari
 
-### 2. Bağımlılıkları Yükleyin
-
-Proje dizinine terminalden gidin ve paketleri yükleyin:
-
-```bash
-npm install
-# veya
-yarn install
+```mermaid
+flowchart LR
+    U["Restoran ekibi"] --> A["Next.js 16 App Router"]
+    A --> F["Feature çalışma alanları"]
+    F --> H["Hook ve saf iş kuralları"]
+    H --> S["Tipli servis katmanı"]
+    S --> P["Supabase Auth + PostgREST"]
+    P --> D[("Postgres + RLS")]
+    A --> R["Sunucu API rotaları"]
+    R --> G["Google Gemini"]
 ```
 
-### 3. Ortam Değişkenlerini (Env) Ayarlayın
+- `src/app/` yalnızca rota, layout, sunucu sınırı ve feature bileşimi için kullanılır.
+- Alan davranışı `src/features/<feature>/` altında bileşen, hook, servis, tip ve saf yardımcı fonksiyonlara ayrılır.
+- Çok tablolı kritik işlemler, tarayıcıdan ardışık istekler yerine migration ile tanımlanan atomik RPC fonksiyonlarında yürütülür.
+- Supabase migration dosyaları `supabase/migrations/` altında ileri yönlü ve tekrar üretilebilir şema geçmişini oluşturur.
 
-Projenin kök dizininde `.env.local` adında bir dosya oluşturun ve aşağıdaki şablonu kendi bilgilerinizle doldurun:
+Ayrıntılı mühendislik sınırları için [AGENTS.md](AGENTS.md), [src/AGENTS.md](src/AGENTS.md) ve [supabase/AGENTS.md](supabase/AGENTS.md) dosyalarına bakın.
 
-```env
-# --- SUPABASE BAĞLANTILARI ---
-# Supabase Dashboard -> Settings -> API kısmından alınır.
-NEXT_PUBLIC_SUPABASE_URL=https://[YOUR_PROJECT_ID].supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=[YOUR_ANON_KEY]
+## Teknoloji yığını
 
-# Service Role Key, API rotalarındaki (server-side) admin yetkili işlemler için gereklidir.
-SUPABASE_SERVICE_ROLE_KEY=[YOUR_SERVICE_ROLE_KEY]
+| Katman         | Teknoloji                                                             |
+| -------------- | --------------------------------------------------------------------- |
+| Web uygulaması | Next.js 16.2, React 19.2, TypeScript 5                                |
+| Stil ve UI     | Tailwind CSS 4, shadcn/ui yaklaşımı, Lucide Icons                     |
+| Veri ve kimlik | Supabase, PostgreSQL, Auth, RLS ve RPC                                |
+| Yapay zekâ     | Google Gemini                                                         |
+| Grafikler      | Recharts                                                              |
+| PWA            | `@ducanh2912/next-pwa`                                                |
+| Test           | Vitest, SQL sözleşme ve RLS testleri                                  |
+| Kalite         | ESLint, Prettier, TypeScript strict kontrolleri, Husky ve lint-staged |
+| CI/CD          | GitHub Actions ve Vercel                                              |
 
-# Doğrudan veritabanı bağlantısı için (Prisma, migration vb. işlemlerde gerekebilir)
-DATABASE_URL=postgresql://postgres:[YOUR_PASSWORD]@db.[YOUR_PROJECT_ID].supabase.co:5432/postgres
+Sürüm numaraları için tek doğruluk kaynağı [package.json](package.json) ve [package-lock.json](package-lock.json) dosyalarıdır.
 
-# --- GOOGLE GEMINI AI ---
-# Google AI Studio üzerinden alınır. Fatura okuma ve AI Kategori işlemleri için zorunludur.
-GEMINI_API_KEY=[YOUR_GEMINI_KEY]
+## Proje yapısı
+
+```text
+motto-saas/
+├── .github/workflows/       # CI kalite kapıları
+├── docs/security/           # Güvenlik kararları ve tenant modeli
+├── public/                  # Statik ve PWA varlıkları
+├── src/
+│   ├── app/                 # App Router sayfaları ve API rotaları
+│   ├── components/          # Uygulama genelinde paylaşılan UI
+│   ├── context/             # Global provider'lar
+│   ├── features/            # Alan odaklı feature modülleri
+│   ├── hooks/               # Uygulama genelinde paylaşılan hook'lar
+│   └── lib/                 # Ortak altyapı ve yardımcılar
+├── supabase/
+│   ├── migrations/          # İleri yönlü veritabanı değişiklikleri
+│   └── tests/               # SQL güvenlik ve RPC sözleşme testleri
+├── tests/                   # Uygulama seviyesi entegrasyon testleri
+├── AGENTS.md                # Repo genelindeki mühendislik sözleşmesi
+└── package.json             # Komutlar ve bağımlılıklar
 ```
 
-### 4. Geliştirme Sunucusunu Başlatın
+## Hızlı başlangıç
+
+### Gereksinimler
+
+- Node.js `22.x`
+- npm `10+`
+- Bir Supabase projesi veya yerel geliştirme için Docker Desktop
+- Yapay zekâ özellikleri için Google Gemini API anahtarı
+
+### Kurulum
 
 ```bash
+git clone https://github.com/Libertus07/motto-saas.git
+cd motto-saas
+npm ci
+cp .env.example .env.local
 npm run dev
-# veya
-yarn dev
 ```
 
-Tarayıcınızda [http://localhost:3000](http://localhost:3000) adresine giderek uygulamayı görebilirsiniz.
+Windows PowerShell kullanıyorsanız kopyalama adımı:
 
-### 5. Hata Ayıklama (Debug) Scriptleri
+```powershell
+Copy-Item .env.example .env.local
+```
 
-Eğer veritabanı veya yetkilendirme (RLS) hatalarını doğrudan terminalden hızlıca test etmek isterseniz, `scripts/debug/` klasörü altındaki `.mjs` uzantılı tek seferlik test dosyalarını kullanabilirsiniz (Örn: `node scripts/debug/check_auth.mjs`).
+Uygulama varsayılan olarak [http://localhost:3000](http://localhost:3000) adresinde açılır.
 
----
+## Ortam değişkenleri
 
-## 🔒 Güvenlik (RLS ve Tenant İzolasyonu)
+Başlangıç noktası olarak [.env.example](.env.example) dosyasını kullanın.
 
-Bu bir SaaS projesi olduğu için Supabase tarafında **Row Level Security (RLS)** kullanılarak Tenant bazlı izolasyon sağlanmaktadır. Ek güvenlik kararları ve mimari tasarımlar için [SEC-101 — Tenant Modeli ve Veri Sahipliği](docs/security/SEC-101-tenant-model.md) dokümanını okuyabilirsiniz.
+| Değişken                           | Gerekli                                             | Kapsam           | Açıklama                                     |
+| ---------------------------------- | --------------------------------------------------- | ---------------- | -------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`         | Evet                                                | İstemci + sunucu | Supabase proje URL'si                        |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`    | Evet                                                | İstemci + sunucu | RLS ile sınırlandırılmış public/anon anahtar |
+| `GEMINI_API_KEY`                   | AI özellikleri için                                 | Yalnızca sunucu  | Gemini API rotalarında kullanılır            |
+| `SUPABASE_SERVICE_ROLE_KEY`        | Entegrasyon testleri ve yetkili bakım araçları için | Yalnızca sunucu  | RLS'i aşabilen ayrıcalıklı anahtar           |
+| `DATABASE_URL` veya `POSTGRES_URL` | Bazı debug/migration araçları için                  | Yalnızca sunucu  | Doğrudan PostgreSQL bağlantısı               |
 
-_(Not: Tüm veritabanı "insert, update, delete" işlemleri Next.js sunucusunda veya Supabase rpc (fonksiyon) üzerinden `logActivity` çağrılarak loglanmaktadır.)_
+> [!CAUTION]
+> `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `POSTGRES_URL` ve `GEMINI_API_KEY` değerlerini hiçbir zaman `NEXT_PUBLIC_` ön ekiyle tanımlamayın, istemci koduna aktarmayın veya Git'e kaydetmeyin.
 
----
+## Yerel Supabase
 
-## 🚀 Build ve Deploy (Vercel)
+Docker çalışırken yerel Supabase servislerini başlatabilirsiniz:
 
-Projeyi canlıya almak (Production) için Vercel platformu önerilir.
+```bash
+npx supabase@2.111.0 start
+npx supabase@2.111.0 migration list --local
+```
 
-1. GitHub deponuzu Vercel'e bağlayın.
-2. Vercel proje ayarlarından **Environment Variables** bölümüne gidin.
-3. `.env.local` dosyanızdaki tüm değerleri Vercel üzerine ekleyin.
-4. **Deploy** butonuna tıklayın. Vercel otomatik olarak `npm run build` ve `npm start` komutlarını çalıştıracaktır.
+Yerel servis çıktısındaki URL ve anahtarları `.env.local` dosyanıza aktarın. Migration değişikliklerinde [supabase/AGENTS.md](supabase/AGENTS.md) kurallarını izleyin; uygulanmış migration dosyalarını geriye dönük değiştirmeyin.
 
-> **Uyarı:** `SUPABASE_SERVICE_ROLE_KEY` değerinin asla `NEXT_PUBLIC_` ön eki ile başlamadığından emin olun, aksi halde admin yetkileriniz istemci tarafında sızabilir!
+`supabase/config.toml` seed dosyasına izin verir ancak repoda örnek tenant verisi dağıtılmaz. Geliştirme verilerini gerçek müşteri veya üretim verilerinden oluşturmayın.
+
+## Geliştirme komutları
+
+| Komut                  | Açıklama                                             |
+| ---------------------- | ---------------------------------------------------- |
+| `npm run dev`          | Geliştirme sunucusunu başlatır                       |
+| `npm run format`       | Desteklenen dosyaları Prettier ile biçimlendirir     |
+| `npm run format:check` | Biçim farklarını dosya değiştirmeden kontrol eder    |
+| `npm run lint`         | ESLint denetimini çalıştırır                         |
+| `npm run typecheck`    | TypeScript tip kontrolünü çalıştırır                 |
+| `npm run test`         | Vitest test paketini bir kez çalıştırır              |
+| `npm run check`        | Format, lint, tip ve test kalite kapısını çalıştırır |
+| `npm run build`        | Webpack ile production Next.js build'i üretir        |
+| `npm run start`        | Üretilmiş production build'i çalıştırır              |
+
+## Spesifikasyon odaklı geliştirme
+
+Önemli özellikler, modüller arası değişiklikler, veritabanı sözleşmeleri ve büyük
+refactorlar GitHub Spec Kit ile planlanır. Codex içindeki temel akış:
+
+1. `$speckit-specify` ile kullanıcı değerini, kapsamı ve kabul senaryolarını yazın.
+2. Belirsizlik varsa `$speckit-clarify`, ardından `$speckit-plan` çalıştırın.
+3. `$speckit-tasks` ile doğrulanabilir görevler üretin.
+4. Yüksek riskli işlerde `$speckit-analyze` ile tutarlılığı denetleyin.
+5. Onaylanan kapsamı `$speckit-implement` ile uygulayın.
+
+Tüm spesifikasyonlar [Motto SaaS Engineering Constitution](.specify/memory/constitution.md)
+ve ilgili `AGENTS.md` sözleşmelerine uymalıdır.
+
+## Test ve kalite
+
+Önemli bir değişikliği tamamlamadan önce:
+
+```bash
+npm run check
+npm run build
+```
+
+Test paketi saf iş kuralları, feature servisleri, RPC imzaları ve tenant/RLS sözleşmelerini kapsar. `tests/rls.integration.test.ts`, gerekli Supabase ortam değişkenleri bulunmadığında güvenli şekilde atlanır; tam güvenlik doğrulaması için yerel veya izole bir test projesine bağlanmalıdır.
+
+GitHub Actions her `master`/`main` push ve pull request'inde bağımlılıkları `npm ci` ile kurar, kalite kapılarını çalıştırır ve ayrı bir production build üretir.
+
+## Güvenlik
+
+- Tenant verileri organizasyon kimliği ve doğrulanmış üyelik üzerinden sınırlandırılır.
+- Exposed şemalardaki tenant tabloları RLS politikalarıyla korunur.
+- Çok tablolı finansal ve stok işlemleri atomik RPC fonksiyonlarıyla yürütülür.
+- Ayrıcalıklı anahtarlar yalnızca güvenilir sunucu/test sınırlarında kullanılır.
+- Başarılı veri mutasyonları audit-log sözleşmesine tabidir.
+- Canlı müşteri verileri debug, seed veya otomatik test verisi olarak kullanılmaz.
+
+Tehdit modeli, veri sahipliği ve test senaryoları için [SEC-101 — Tenant Modeli ve Veri Sahipliği](docs/security/SEC-101-tenant-model.md) belgesini okuyun.
+
+Bir güvenlik açığı bildirirken kimlik bilgisi, tenant verisi veya hassas logları public issue içerisinde paylaşmayın. GitHub Private Vulnerability Reporting etkinse onu, değilse depo sahibinin özel iletişim kanalını kullanın.
+
+## Deployment
+
+Uygulama Vercel üzerinde Next.js olarak dağıtılabilir:
+
+1. GitHub deposunu Vercel projesine bağlayın.
+2. Ortam değişkenlerini Preview ve Production ortamları için ayrı tanımlayın.
+3. Build komutu olarak `npm run build` kullanın.
+4. Deployment öncesinde Supabase migration geçmişinin hedef ortamla uyumlu olduğunu doğrulayın.
+5. Preview deployment üzerinde kimlik doğrulama, tenant izolasyonu ve kritik mobil akışları test edin.
+
+Build işlemi canlı Supabase kimlik bilgilerine ihtiyaç duymamalıdır; GitHub CI bu sözleşmeyi placeholder değerlerle doğrular.
+
+## Katkıda bulunma
+
+1. Değişikliğin kapsamını açıklayan bir issue veya çalışma notu oluşturun.
+2. Kısa ömürlü bir feature dalı açın.
+3. Kök ve ilgili alt klasördeki `AGENTS.md` kurallarını uygulayın.
+4. Davranış değişikliklerine uygun testleri ekleyin.
+5. `npm run check` ve `npm run build` komutlarını çalıştırın.
+6. Küçük, açıklayıcı commit'lerle pull request açın.
+
+Refactorlar gözlemlenebilir davranışı korumalı; güvenlik, RPC veya veritabanı sözleşmesi değişiklikleri migration ve denial-path testleriyle birlikte gelmelidir.
+
+## Lisans
+
+Bu depoda henüz açık kaynak lisansı tanımlanmamıştır. Bir lisans eklenene kadar tüm haklar depo sahibine aittir.
