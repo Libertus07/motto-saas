@@ -50,14 +50,14 @@ export function ProductFilters({
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Ürün adı ile hızlı ara..."
           aria-label="Ürün ara"
-          className="pl-9 pr-8"
+          className="min-h-[44px] sm:min-h-8 pl-9 pr-[44px] sm:pr-8"
         />
         {search.length > 0 ? (
           <button
             type="button"
             onClick={() => onSearchChange('')}
             aria-label="Aramayı temizle"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300 text-xs"
+            className="absolute right-0 sm:right-1 top-1/2 -translate-y-1/2 inline-flex min-h-[44px] min-w-[44px] sm:min-h-8 sm:min-w-8 items-center justify-center text-stone-500 hover:text-stone-300 text-xs"
           >
             ✕
           </button>
@@ -69,7 +69,7 @@ export function ProductFilters({
           value={categoryFilter}
           onChange={(event) => onCategoryFilterChange(event.target.value)}
           aria-label="Ürün kategorisi"
-          className="w-full sm:w-auto bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-300 text-xs focus:outline-none focus:border-amber-500/50 cursor-pointer"
+          className="min-h-[44px] sm:min-h-0 w-full sm:w-auto bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-300 text-xs focus:outline-none focus:border-amber-500/50 cursor-pointer"
         >
           <option value="Tümü">Tüm Kategoriler ({products.length})</option>
           {categories.map((category) => (
@@ -83,7 +83,7 @@ export function ProductFilters({
           value={sortBy}
           onChange={(event) => onSortChange(event.target.value as ProductSort)}
           aria-label="Ürün sıralaması"
-          className="w-full sm:w-auto bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-300 text-xs focus:outline-none focus:border-amber-500/50 cursor-pointer"
+          className="min-h-[44px] sm:min-h-0 w-full sm:w-auto bg-stone-950 border border-stone-800 rounded-xl px-3 py-2 text-stone-300 text-xs focus:outline-none focus:border-amber-500/50 cursor-pointer"
         >
           <option value="name">İsme Göre (A-Z)</option>
           <option value="price_desc">Fiyat (En Yüksek)</option>
@@ -95,7 +95,7 @@ export function ProductFilters({
         <button
           type="button"
           onClick={onToggleAll}
-          className="w-full sm:w-auto bg-stone-950 hover:bg-stone-800 text-stone-300 hover:text-white text-xs font-semibold px-3 py-2 border border-stone-800 rounded-xl whitespace-nowrap transition-colors"
+          className="min-h-[44px] sm:min-h-0 w-full sm:w-auto bg-stone-950 hover:bg-stone-800 text-stone-300 hover:text-white text-xs font-semibold px-3 py-2 border border-stone-800 rounded-xl whitespace-nowrap transition-colors"
         >
           {allCategoriesOpen ? '▲ Tümünü Kapat' : '▼ Tümünü Aç'}
         </button>

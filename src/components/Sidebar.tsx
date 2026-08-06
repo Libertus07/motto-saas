@@ -96,8 +96,8 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
   return (
     <aside className="w-64 bg-stone-900/95 border-r border-stone-800/80 backdrop-blur-2xl flex flex-col h-full shadow-2xl md:shadow-none select-none">
       {/* ──────────────── BRAND HEADER ──────────────── */}
-      <div className="p-5 border-b border-stone-800/80 bg-stone-950/60 flex items-center justify-between">
-        <div className="flex items-center gap-3 w-full min-w-0">
+      <div className="p-5 border-b border-stone-800/80 bg-stone-950/60 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           {loadingSettings ? (
             <div className="w-10 h-10 rounded-2xl bg-stone-800 animate-pulse shrink-0 border border-stone-700/50" />
           ) : businessLogo ? (
@@ -141,7 +141,7 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
           <button
             onClick={onCloseMobile}
             aria-label="Menüyü kapat"
-            className="md:hidden text-stone-400 hover:text-white p-1.5 rounded-xl hover:bg-stone-800/80 border border-stone-700/50 transition-colors ml-2"
+            className="md:hidden min-h-[44px] min-w-[44px] shrink-0 text-stone-400 hover:text-white p-1.5 rounded-xl hover:bg-stone-800/80 border border-stone-700/50 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

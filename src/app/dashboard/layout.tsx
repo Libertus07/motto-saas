@@ -76,7 +76,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="p-2 text-stone-400 hover:text-white rounded-lg hover:bg-stone-800 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              className="min-h-[44px] min-w-[44px] p-2 text-stone-400 hover:text-white rounded-lg hover:bg-stone-800 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500/50"
               aria-label="Menüyü Aç"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
