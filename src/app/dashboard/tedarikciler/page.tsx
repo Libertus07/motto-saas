@@ -148,7 +148,7 @@ export default function Tedarikciler() {
       supabase
         .from('stock_movements')
         .select(
-          'id, created_at, quantity, unit_price, batch_id, materials!stock_movements_material_id_fkey(name, unit)',
+          'id, created_at, quantity, unit_price, batch_id, materials!stock_movements_material_tenant_fk(name, unit)',
         )
         .eq('supplier_id', supplier.id)
         .eq('organization_id', activeOrg?.id)

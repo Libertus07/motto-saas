@@ -1,9 +1,38 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { describe, expect, it, vi } from 'vitest'
 
-import { applyStockCount, recordStockMovement } from './inventory-service'
+import { applyStockCount, fetchInventoryWorkspace, recordStockMovement } from './inventory-service'
 
 describe('inventory mutation service', () => {
+  it('uses the tenant-safe material relationship when fetching stock movements', async () => {
+    const materialsQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }
+    const movementsQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }
+    const settingsQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }
+    const from = vi.fn((table: string) => {
+      if (table === 'materials') return materialsQuery
+      if (table === 'stock_movements') return movementsQuery
+      return settingsQuery
+    })
+    const supabase = { from } as unknown as SupabaseClient
+
+    await fetchInventoryWorkspace(supabase, 'org-1')
+
+    expect(movementsQuery.select).toHaveBeenCalledWith('*, materials!stock_movements_material_tenant_fk(name, unit)')
+    expect(movementsQuery.eq).toHaveBeenCalledWith('organization_id', 'org-1')
+  })
+
   it('records a movement with the active tenant in one RPC call', async () => {
     const rpc = vi.fn().mockResolvedValue({ data: null, error: null })
     const supabase = { rpc } as unknown as SupabaseClient

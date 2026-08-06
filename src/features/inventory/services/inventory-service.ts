@@ -25,7 +25,7 @@ export async function fetchInventoryWorkspace(
     supabase.from('materials').select('*').eq('organization_id', organizationId).order('name'),
     supabase
       .from('stock_movements')
-      .select('*, materials(name, unit)')
+      .select('*, materials!stock_movements_material_tenant_fk(name, unit)')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false }),
     supabase
