@@ -46,7 +46,7 @@ AS $$
                     ''
                 )
             WHEN p_reference ~ (
-                '^https://[a-z0-9]{20}[.]supabase[.]co/storage/v1/object/public/'
+                '^https://zahdmrvhxsmqpeesrfkt[.]supabase[.]co/storage/v1/object/public/'
                 || p_bucket_id
                 || '/[^?#]+([?#].*)?$'
             ) THEN

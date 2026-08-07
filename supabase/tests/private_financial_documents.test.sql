@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(48);
+SELECT plan(49);
 
 SELECT has_table(
     'private',
@@ -184,7 +184,7 @@ SELECT is(
 SELECT is(
     private.storage_object_name_from_reference(
         'receipts',
-        'https://abcdefghijklmnopqrst.supabase.co/storage/v1/object/public/receipts/legacy/z-report.xlsx?download=1'
+        'https://zahdmrvhxsmqpeesrfkt.supabase.co/storage/v1/object/public/receipts/legacy/z-report.xlsx?download=1'
     ),
     'legacy/z-report.xlsx',
     'the internal parser extracts legacy public Storage URLs without query parameters'
@@ -215,6 +215,15 @@ SELECT is(
     ),
     NULL,
     'the legacy parser rejects public-object URLs from untrusted origins'
+);
+
+SELECT is(
+    private.storage_object_name_from_reference(
+        'motto_assets',
+        'https://abcdefghijklmnopqrst.supabase.co/storage/v1/object/public/motto_assets/victim.pdf'
+    ),
+    NULL,
+    'the legacy parser rejects a different valid Supabase project origin'
 );
 
 SELECT is(
