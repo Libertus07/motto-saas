@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-07
 
-**Status:** Approved in collaborative design review; awaiting written-spec review
+**Status:** Approved
 
 **Scope:** Customer tenancy, branches, authorization, onboarding, branding, platform administration, integrations, subscriptions, trials, and referrals
 
