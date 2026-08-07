@@ -1,7 +1,7 @@
 {
     "schema_version": 2,
-    "commit": "5b37edab38b8c2c7261abeaa467279392d05d964",
-    "indexed_at": "2026-08-07T20:35:43Z",
+    "commit": "a474f55485e2c839b5b7a1da9bbcb1efd846ef68",
+    "indexed_at": "2026-08-07T20:42:47Z",
     "project": "private-financial-documents",
     "nodes": 2714,
     "edges": 4889,

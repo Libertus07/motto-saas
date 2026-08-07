@@ -91,9 +91,18 @@ export async function removeOrganizationDocument(supabase: SupabaseClient, store
     return
   }
 
-  const { error } = await supabase.storage.from(reference.bucket).remove([reference.path])
-  if (error) {
-    throw error
+  let removalError: Error | null = null
+
+  try {
+    ;({ error: removalError } = await supabase.storage.from(reference.bucket).remove([reference.path]))
+  } catch (error) {
+    devError('Belge depolamadan silinemedi.', error)
+    throw new Error('Belge silinemedi. Lütfen tekrar deneyin.')
+  }
+
+  if (removalError) {
+    devError('Belge depolamadan silinemedi.', removalError)
+    throw new Error('Belge silinemedi. Lütfen tekrar deneyin.')
   }
 }
 

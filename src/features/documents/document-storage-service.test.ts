@@ -171,6 +171,30 @@ describe('private document storage service', () => {
     expect(remove).toHaveBeenCalledWith([scopedPath])
   })
 
+  it('hides result-shaped Storage removal failures while reporting provider detail to the logger', async () => {
+    const providerError = { message: 'delete policy denied', statusCode: '403' }
+    const remove = vi.fn().mockResolvedValue({ data: [], error: providerError })
+    const from = vi.fn(() => ({ remove }))
+    const supabase = { storage: { from } } as unknown as SupabaseClient
+
+    await expect(removeOrganizationDocument(supabase, `storage://motto_assets/${scopedPath}`)).rejects.toThrow(
+      'Belge silinemedi. Lütfen tekrar deneyin.',
+    )
+    expect(mocks.devError).toHaveBeenCalledWith('Belge depolamadan silinemedi.', providerError)
+  })
+
+  it('hides rejected Storage removal failures while reporting provider detail to the logger', async () => {
+    const providerError = new Error('network interrupted')
+    const remove = vi.fn().mockRejectedValue(providerError)
+    const from = vi.fn(() => ({ remove }))
+    const supabase = { storage: { from } } as unknown as SupabaseClient
+
+    await expect(removeOrganizationDocument(supabase, `storage://motto_assets/${scopedPath}`)).rejects.toThrow(
+      'Belge silinemedi. Lütfen tekrar deneyin.',
+    )
+    expect(mocks.devError).toHaveBeenCalledWith('Belge depolamadan silinemedi.', providerError)
+  })
+
   it('removes a newly uploaded object when the business write fails', async () => {
     const upload = vi.fn().mockResolvedValue({ data: { path: scopedPath }, error: null })
     const remove = vi.fn().mockResolvedValue({ data: [], error: null })
@@ -211,6 +235,6 @@ describe('private document storage service', () => {
     await expect(persistWithOrganizationDocument(supabase, createUploadInput(), null, persist)).rejects.toThrow(
       'RPC failed',
     )
-    expect(mocks.devError).toHaveBeenCalledWith('Yeni yüklenen belge temizlenemedi.', cleanupError)
+    expect(mocks.devError).toHaveBeenCalledWith('Belge depolamadan silinemedi.', cleanupError)
   })
 })
