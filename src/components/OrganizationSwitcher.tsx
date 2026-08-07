@@ -2,14 +2,26 @@
 
 import { useState } from 'react'
 import { useOrganization, OrganizationItem } from '@/context/OrganizationContext'
+import { useNotification } from '@/components/NotificationProvider'
 
 export function OrganizationSwitcher() {
   const { activeOrg, organizations, loading, setActiveOrg } = useOrganization()
+  const { showAlert } = useNotification()
   const [isOpen, setIsOpen] = useState(false)
+  const [switchingOrganizationId, setSwitchingOrganizationId] = useState<string | null>(null)
 
-  const handleSelectOrg = (org: OrganizationItem) => {
-    setActiveOrg(org)
-    setIsOpen(false)
+  const handleSelectOrg = async (org: OrganizationItem) => {
+    if (org.id === activeOrg?.id || switchingOrganizationId) return
+
+    setSwitchingOrganizationId(org.id)
+    try {
+      await setActiveOrg(org)
+      setIsOpen(false)
+    } catch {
+      await showAlert('Şube değiştirilemedi. Lütfen tekrar deneyin.', 'error')
+    } finally {
+      setSwitchingOrganizationId(null)
+    }
   }
 
   if (loading) {
@@ -44,7 +56,10 @@ export function OrganizationSwitcher() {
           {organizations.map((org) => (
             <button
               key={org.id}
+              type="button"
               onClick={() => handleSelectOrg(org)}
+              disabled={switchingOrganizationId !== null}
+              aria-busy={switchingOrganizationId === org.id}
               className={`min-h-[44px] md:min-h-0 w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all text-left ${
                 activeOrg?.id === org.id
                   ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
@@ -53,7 +68,7 @@ export function OrganizationSwitcher() {
             >
               <span className="truncate">{org.name}</span>
               <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-stone-800 text-stone-400">
-                {org.role}
+                {switchingOrganizationId === org.id ? 'Değiştiriliyor…' : org.role}
               </span>
             </button>
           ))}

@@ -18,19 +18,16 @@ export async function logActivity(
       data: { user },
     } = await supabase.auth.getUser()
 
-    let organizationId: string | null = null
-    if (user) {
-      const { data: member } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .limit(1)
-        .single()
+    if (!user) {
+      devError('İşlem geçmişi kaydı için oturum bilgisi bulunamadı.')
+      return
+    }
 
-      if (member) {
-        organizationId = member.organization_id
-      }
+    const { data: organizationId, error: organizationError } = await supabase.rpc('current_organization_id')
+
+    if (organizationError || !organizationId) {
+      devError('İşlem geçmişi kaydı için aktif organizasyon çözümlenemedi.', organizationError)
+      return
     }
 
     const headersList = await headers()
@@ -57,12 +54,9 @@ export async function logActivity(
       module: moduleName,
       action_type: actionType,
       description,
-      user_id: user?.id || 'Bilinmeyen Kullanıcı',
+      user_id: user.id,
+      organization_id: organizationId,
       details: enrichedDetails,
-    }
-
-    if (organizationId) {
-      logPayload.organization_id = organizationId
     }
 
     const { error } = await supabase.from('activity_logs').insert(logPayload)
