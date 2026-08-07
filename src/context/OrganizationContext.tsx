@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react'
+import React, { createContext, useCallback, useContext, useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 
 export interface OrganizationItem {
@@ -20,7 +20,7 @@ interface OrganizationContextType {
   activeOrg: OrganizationItem | null
   organizations: OrganizationItem[]
   loading: boolean
-  setActiveOrg: (org: OrganizationItem) => void
+  setActiveOrg: (org: OrganizationItem) => Promise<void>
 }
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined)
@@ -42,11 +42,17 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           return
         }
 
-        const { data: members } = await supabase
-          .from('organization_members')
-          .select('organization_id, role, organizations(id, name, slug)')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
+        const [{ data: members, error: membersError }, { data: profile, error: profileError }] = await Promise.all([
+          supabase
+            .from('organization_members')
+            .select('organization_id, role, organizations(id, name, slug)')
+            .eq('user_id', user.id)
+            .eq('status', 'active'),
+          supabase.from('profiles').select('active_organization_id').eq('id', user.id).maybeSingle(),
+        ])
+
+        if (membersError) throw membersError
+        if (profileError) throw profileError
 
         if (members && members.length > 0) {
           const list: OrganizationItem[] = (members as unknown as OrganizationMember[]).map((m) => ({
@@ -59,23 +65,24 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
           setOrganizations(list)
 
           const savedOrgId = localStorage.getItem('motto_active_org_id')
-          const found = list.find((o) => o.id === savedOrgId) || list[0]
+          const found =
+            list.find((organization) => organization.id === profile?.active_organization_id) ||
+            list.find((organization) => organization.id === savedOrgId) ||
+            list[0]
+
+          if (profile?.active_organization_id !== found.id) {
+            const { error: selectionError } = await supabase.rpc('set_active_organization', {
+              p_organization_id: found.id,
+            })
+            if (selectionError) throw selectionError
+          }
+
           setActiveOrgState(found)
+          localStorage.setItem('motto_active_org_id', found.id)
           localStorage.setItem('motto_login_org_slug', found.slug)
-          if (!savedOrgId) {
-            localStorage.setItem('motto_active_org_id', found.id)
-          }
         } else {
-          // Legacy fallback
-          const defaultOrg: OrganizationItem = {
-            id: '00000000-0000-0000-0000-000000000001',
-            name: 'Motto SaaS (Ana Şube)',
-            slug: 'motto-saas',
-            role: 'owner',
-          }
-          setOrganizations([defaultOrg])
-          setActiveOrgState(defaultOrg)
-          localStorage.setItem('motto_login_org_slug', defaultOrg.slug)
+          setOrganizations([])
+          setActiveOrgState(null)
         }
       } catch (err) {
         console.error('Organization fetch error:', err)
@@ -86,11 +93,24 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     loadOrganizations()
   }, [supabase])
 
-  const setActiveOrg = (org: OrganizationItem) => {
-    setActiveOrgState(org)
-    localStorage.setItem('motto_active_org_id', org.id)
-    localStorage.setItem('motto_login_org_slug', org.slug)
-  }
+  const setActiveOrg = useCallback(
+    async (org: OrganizationItem) => {
+      const isSelectable = organizations.some((organization) => organization.id === org.id)
+      if (!isSelectable) {
+        throw new Error('Bu organizasyonu seçme yetkiniz yok.')
+      }
+
+      const { error } = await supabase.rpc('set_active_organization', {
+        p_organization_id: org.id,
+      })
+      if (error) throw error
+
+      setActiveOrgState(org)
+      localStorage.setItem('motto_active_org_id', org.id)
+      localStorage.setItem('motto_login_org_slug', org.slug)
+    },
+    [organizations, supabase],
+  )
 
   return (
     <OrganizationContext.Provider value={{ activeOrg, organizations, loading, setActiveOrg }}>
