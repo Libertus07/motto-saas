@@ -37,6 +37,10 @@ describe('private document references', () => {
     expect(parseStorageDocumentReference('blob:https://example.com/receipt')).toBeNull()
     expect(parseStorageDocumentReference('storage://unknown/file.pdf')).toBeNull()
     expect(parseStorageDocumentReference('storage://motto_assets/../file.pdf')).toBeNull()
+    expect(parseStorageDocumentReference('storage://motto_assets/reports%2F..%2Fsecret.pdf')).toBeNull()
+    expect(parseStorageDocumentReference('storage://motto_assets/reports%5C..%5Csecret.pdf')).toBeNull()
+    expect(parseStorageDocumentReference('storage://motto_assets/reports%252F..%252Fsecret.pdf')).toBeNull()
+    expect(parseStorageDocumentReference('storage://motto_assets/report%3Fdownload%3D1.pdf')).toBeNull()
     expect(parseStorageDocumentReference('storage://motto_assets/')).toBeNull()
   })
 
@@ -54,23 +58,49 @@ describe('private document references', () => {
     expect(
       parseLegacyPublicStorageUrl('https://project.supabase.co/storage/v1/object/public/receipts/reports/../a.pdf'),
     ).toBeNull()
+    expect(
+      parseLegacyPublicStorageUrl(
+        'https://project.supabase.co/storage/v1/object/public/receipts/reports%2F..%2Fsecret.pdf',
+      ),
+    ).toBeNull()
+    expect(
+      parseLegacyPublicStorageUrl(
+        'https://project.supabase.co/storage/v1/object/public/receipts/reports%252F..%252Fsecret.pdf',
+      ),
+    ).toBeNull()
+    expect(
+      parseLegacyPublicStorageUrl('https://example.com/unrelated/storage/v1/object/public/receipts/a.pdf'),
+    ).toBeNull()
+    expect(
+      parseLegacyPublicStorageUrl('https://project.supabase.co/storage//v1/object/public/receipts/a.pdf'),
+    ).toBeNull()
     expect(parseLegacyPublicStorageUrl('data:application/pdf;base64,cGRm')).toBeNull()
   })
 
-  it('builds an organization-scoped path with a MIME-derived extension', () => {
+  it.each([
+    ['supplier-receipt', 'motto_assets', 'image/jpeg', 'jpg', threeMiB],
+    ['investment-receipt', 'motto_assets', 'image/png', 'png', 1],
+    ['investment-document', 'motto_assets', 'image/webp', 'webp', 1],
+    ['supplier-receipt', 'motto_assets', 'application/pdf', 'pdf', 1],
+    ['z-report', 'receipts', 'application/xml', 'xml', 1],
+    ['z-report', 'receipts', 'text/xml', 'xml', 1],
+    ['z-report', 'receipts', 'application/json', 'json', tenMiB],
+    ['z-report', 'receipts', 'application/vnd.ms-excel', 'xls', 1],
+    ['z-report', 'receipts', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx', 1],
+  ] as const)('accepts %s in %s with a MIME-derived extension', (kind, bucket, mimeType, extension, size) => {
+    const file = createFile(mimeType, size)
+    const input = { organizationId, bucket, kind, file }
+
+    expect(validateOrganizationDocument(input)).toBeNull()
+
     vi.stubGlobal('crypto', { randomUUID: () => '22222222-2222-4222-8222-222222222222' })
-    const file = new File(['pdf'], 'unsafe.name.exe', { type: 'application/pdf' })
-
-    expect(
-      buildOrganizationDocumentPath({
-        organizationId,
-        bucket: 'motto_assets',
-        kind: 'supplier-receipt',
-        file,
-      }),
-    ).toBe(`${organizationId}/supplier-receipt/22222222-2222-4222-8222-222222222222.pdf`)
-
-    vi.unstubAllGlobals()
+    try {
+      expect(buildOrganizationDocumentPath(input)).toBe(
+        `${organizationId}/${kind}/22222222-2222-4222-8222-222222222222.${extension}`,
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('requires a UUID organization and rejects unsupported active content', () => {

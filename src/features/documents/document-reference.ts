@@ -50,30 +50,31 @@ function isPrivateDocumentBucket(value: string): value is PrivateDocumentBucket 
   return value === 'motto_assets' || value === 'receipts'
 }
 
-function hasSafeObjectPath(path: string): boolean {
-  if (!path || path.startsWith('/') || path.includes('\\') || path.includes('?') || path.includes('#')) {
+function hasSafePathSegment(segment: string): boolean {
+  if (!segment) {
     return false
   }
 
   try {
-    return path.split('/').every((segment) => {
-      const decodedSegment = decodeURIComponent(segment)
-      return decodedSegment !== '' && decodedSegment !== '.' && decodedSegment !== '..'
-    })
+    const decodedSegment = decodeURIComponent(segment)
+    return (
+      decodedSegment !== '' &&
+      decodedSegment !== '.' &&
+      decodedSegment !== '..' &&
+      !/[\\/?#]/.test(decodedSegment) &&
+      !/%[0-9a-f]{2}/i.test(decodedSegment)
+    )
   } catch {
     return false
   }
 }
 
-function hasTraversalSegment(path: string): boolean {
-  try {
-    return path.split('/').some((segment) => {
-      const decodedSegment = decodeURIComponent(segment)
-      return decodedSegment === '.' || decodedSegment === '..'
-    })
-  } catch {
-    return true
-  }
+function hasSafeObjectPath(path: string): boolean {
+  return !path.startsWith('/') && path.split('/').every(hasSafePathSegment)
+}
+
+function hasUnsafePathSegment(path: string): boolean {
+  return path.split('/').some((segment) => segment !== '' && !hasSafePathSegment(segment))
 }
 
 function getMimeType(file: File): keyof typeof extensionByMimeType | null {
@@ -123,25 +124,23 @@ export function parseLegacyPublicStorageUrl(value: string): StorageDocumentRefer
 
   const pathStartIndex = value.indexOf('/', value.indexOf('://') + 3)
   const rawPath = pathStartIndex === -1 ? '' : value.slice(pathStartIndex).split(/[?#]/, 1)[0]
-  if (hasTraversalSegment(rawPath)) {
+  if (hasUnsafePathSegment(rawPath)) {
     return null
   }
 
-  const segments = url.pathname.split('/').filter(Boolean)
-  const publicObjectIndex = segments.findIndex(
-    (segment, index) =>
-      segment === 'storage' &&
-      segments[index + 1] === 'v1' &&
-      segments[index + 2] === 'object' &&
-      segments[index + 3] === 'public',
-  )
-
-  if (publicObjectIndex === -1) {
+  const segments = url.pathname.split('/')
+  if (
+    segments[0] !== '' ||
+    segments[1] !== 'storage' ||
+    segments[2] !== 'v1' ||
+    segments[3] !== 'object' ||
+    segments[4] !== 'public'
+  ) {
     return null
   }
 
-  const bucket = segments[publicObjectIndex + 4]
-  const path = segments.slice(publicObjectIndex + 5).join('/')
+  const bucket = segments[5]
+  const path = segments.slice(6).join('/')
 
   if (!bucket || !isPrivateDocumentBucket(bucket) || !hasSafeObjectPath(path)) {
     return null
