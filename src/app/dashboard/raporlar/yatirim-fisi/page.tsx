@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
+import { persistWithOrganizationDocument } from '@/features/documents'
+import { devError } from '@/lib/debug'
 import { formatCurrency } from '@/lib/format'
 
 type Account = {
@@ -165,6 +167,7 @@ export default function YatirimFisiYukle() {
       const investmentName = parsedData.name || `${parsedData.quantity} Birim ${parsedData.asset_type.toUpperCase()}`
 
       // --- ÇİFT KAYIT KONTROLÜ BAŞLANGIÇ ---
+      let duplicateTransactionId: string | null = null
       const { data: dupData } = await supabase
         .from('investment_transactions')
         .select('id')
@@ -182,48 +185,44 @@ export default function YatirimFisiYukle() {
           setLoading(false)
           return // İptal edildi
         }
-
-        // Kullanıcı onayladı, eski Yatırımı sil (Rollback)
-        const { error: delError } = await supabase.rpc('delete_investment_transaction', {
-          p_transaction_id: dupData[0].id,
-          p_organization_id: activeOrg.id,
-        })
-        if (delError) {
-          await showAlert('Eski Yatırım fişi silinirken hata oluştu: ' + delError.message, 'error')
-          setLoading(false)
-          return
-        }
+        duplicateTransactionId = dupData[0].id
       }
       // --- ÇİFT KAYIT KONTROLÜ BİTİŞ ---
 
-      let uploadedUrl = null
-      if (selectedFile) {
-        const fileExt = selectedFile.name.split('.').pop()
-        const fileName = `investment-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('motto_assets')
-          .upload(fileName, selectedFile)
-        if (!uploadError && uploadData) {
-          const { data: urlData } = supabase.storage.from('motto_assets').getPublicUrl(fileName)
-          uploadedUrl = urlData.publicUrl
-        } else if (uploadError) {
-          console.error('Storage upload error:', uploadError)
-        }
-      }
+      await persistWithOrganizationDocument(
+        supabase,
+        selectedFile
+          ? {
+              organizationId: activeOrg.id,
+              bucket: 'motto_assets',
+              kind: 'investment-receipt',
+              file: selectedFile,
+            }
+          : null,
+        null,
+        async (uploadedUrl) => {
+          if (duplicateTransactionId) {
+            const { error: delError } = await supabase.rpc('delete_investment_transaction', {
+              p_transaction_id: duplicateTransactionId,
+              p_organization_id: activeOrg.id,
+            })
+            if (delError) throw delError
+          }
 
-      const { error: rpcError } = await supabase.rpc('buy_investment_transaction', {
-        p_asset_type: parsedData.asset_type,
-        p_name: investmentName,
-        p_quantity: parsedData.quantity,
-        p_price: parsedData.price_per_unit,
-        p_account_id: selectedAccount,
-        p_notes: parsedData.notes || null,
-        p_purchase_date: parsedData.purchase_date,
-        p_document_url: uploadedUrl,
-        p_organization_id: activeOrg.id,
-      })
-
-      if (rpcError) throw rpcError
+          const { error: rpcError } = await supabase.rpc('buy_investment_transaction', {
+            p_asset_type: parsedData.asset_type,
+            p_name: investmentName,
+            p_quantity: parsedData.quantity,
+            p_price: parsedData.price_per_unit,
+            p_account_id: selectedAccount,
+            p_notes: parsedData.notes || null,
+            p_purchase_date: parsedData.purchase_date,
+            p_document_url: uploadedUrl,
+            p_organization_id: activeOrg.id,
+          })
+          if (rpcError) throw rpcError
+        },
+      )
 
       // 4. Log
       await logActivity('Yatırım Fişi', 'EKLEME', `Yatırım eklendi: ${investmentName}`, {
@@ -233,7 +232,8 @@ export default function YatirimFisiYukle() {
       await showAlert('Yatırım fişi başarıyla kaydedildi!', 'success')
       router.push('/dashboard/raporlar/yatirim-gecmisi')
     } catch (err: unknown) {
-      await showAlert('Kayıt sırasında hata oluştu: ' + getErrorMessage(err), 'error')
+      devError('Yatırım fişi kaydedilemedi.', err)
+      await showAlert('Yatırım fişi kaydedilemedi. Lütfen tekrar deneyin.', 'error')
     } finally {
       setLoading(false)
     }

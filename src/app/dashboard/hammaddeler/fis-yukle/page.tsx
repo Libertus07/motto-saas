@@ -9,8 +9,10 @@ import { logActivity } from '@/lib/logger'
 import { devError } from '@/lib/debug'
 import { formatCurrency } from '@/lib/format'
 import { useNotification } from '@/components/NotificationProvider'
+import { useOrganization } from '@/context/OrganizationContext'
 import dynamic from 'next/dynamic'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
+import { persistWithOrganizationDocument } from '@/features/documents'
 
 const ImagePreprocessModal = dynamic(
   () => import('@/components/ui/ImagePreprocessModal').then((mod) => mod.ImagePreprocessModal),
@@ -65,6 +67,7 @@ export default function FisYukle() {
   const [isPreprocessOpen, setIsPreprocessOpen] = useState(false)
   const [preprocessFiles, setPreprocessFiles] = useState<File[] | File | null>(null)
   const { showAlert, showConfirm } = useNotification()
+  const { activeOrg } = useOrganization()
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
 
@@ -282,7 +285,14 @@ export default function FisYukle() {
   const applyChanges = async () => {
     setLoading(true)
 
+    if (selectedFile && !activeOrg?.id) {
+      setError('Belge yüklenemedi. Organizasyon bilgisi bulunamadı.')
+      setLoading(false)
+      return
+    }
+
     // --- ÇİFT KAYIT KONTROLÜ BAŞLANGIÇ ---
+    let duplicateBatchId: string | null = null
     if (parsedSupplier && parsedSupplier.id && parsedSupplier.date && parsedSupplier.totalAmount) {
       const { data: dupData } = await supabase
         .from('supplier_transactions')
@@ -302,16 +312,7 @@ export default function FisYukle() {
           setLoading(false)
           return // İptal edildi
         }
-
-        // Kullanıcı onayladı, eski fişi sil (Rollback)
-        const { error: delError } = await supabase.rpc('delete_receipt_transaction', {
-          p_batch_id: dupData[0].batch_id,
-        })
-        if (delError) {
-          setError('Eski fiş silinirken hata oluştu: ' + delError.message)
-          setLoading(false)
-          return
-        }
+        duplicateBatchId = dupData[0].batch_id
       }
     }
     // --- ÇİFT KAYIT KONTROLÜ BİTİŞ ---
@@ -322,61 +323,66 @@ export default function FisYukle() {
     const selectedItems = parsedItems.filter((i) => i.selected)
     const batchId = crypto.randomUUID()
 
-    let uploadedUrl = null
-    if (selectedFile) {
-      const fileExt = selectedFile.name.split('.').pop()
-      const fileName = `receipt-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('motto_assets')
-        .upload(fileName, selectedFile)
-      if (!uploadError && uploadData) {
-        const { data: urlData } = supabase.storage.from('motto_assets').getPublicUrl(fileName)
-        uploadedUrl = urlData.publicUrl
-      } else if (uploadError) {
-        console.error('Storage upload error:', uploadError)
-      }
-    }
-
     const parseNum = (value: unknown) => {
       if (typeof value === 'number') return value
       if (typeof value === 'string') return parseFloat(value.replace(/,/g, '.')) || 0
       return 0
     }
 
-    const payload = {
-      user_id: user?.id,
-      batch_id: batchId,
-      image_url: uploadedUrl,
-      supplier: parsedSupplier
-        ? {
-            id: parsedSupplier.id || null,
-            name: parsedSupplier.name,
-            phone: parsedSupplier.phone || null,
-            iban: parsedSupplier.iban || null,
-            address: parsedSupplier.address || null,
-            date: parsedSupplier.date,
-            totalAmount: parsedSupplier.totalAmount,
-            paidAmount: parsedSupplier.paidAmount,
+    let rpcResult
+    try {
+      rpcResult = await persistWithOrganizationDocument(
+        supabase,
+        selectedFile && activeOrg
+          ? {
+              organizationId: activeOrg.id,
+              bucket: 'motto_assets',
+              kind: 'supplier-receipt',
+              file: selectedFile,
+            }
+          : null,
+        null,
+        async (uploadedUrl) => {
+          if (duplicateBatchId) {
+            const { error: delError } = await supabase.rpc('delete_receipt_transaction', {
+              p_batch_id: duplicateBatchId,
+            })
+            if (delError) throw delError
           }
-        : null,
-      items: selectedItems.map((item) => ({
-        matchedMaterialId: item.matchedMaterialId || null,
-        name: item.name || 'İsimsiz Ürün',
-        category: item.category || 'Diğer',
-        unit: item.unit || 'Adet',
-        quantity: parseNum(item.quantity),
-        unitPrice: parseNum(item.unitPrice),
-      })),
-    }
 
-    const { data: rpcResult, error: rpcError } = await supabase.rpc('process_receipt_upload', { payload })
-
-    if (rpcError) {
-      console.error('RPC ERROR DETAILS:', rpcError)
-      devError('Fiş yükleme atomic işlem hatası:', rpcError?.message, rpcError?.details, rpcError?.hint, rpcError?.code)
-      setError(
-        'Kayıt sırasında kritik bir hata oluştu. İşlem geri alındı: ' + (rpcError?.message || JSON.stringify(rpcError)),
+          const payload = {
+            user_id: user?.id,
+            batch_id: batchId,
+            image_url: uploadedUrl,
+            supplier: parsedSupplier
+              ? {
+                  id: parsedSupplier.id || null,
+                  name: parsedSupplier.name,
+                  phone: parsedSupplier.phone || null,
+                  iban: parsedSupplier.iban || null,
+                  address: parsedSupplier.address || null,
+                  date: parsedSupplier.date,
+                  totalAmount: parsedSupplier.totalAmount,
+                  paidAmount: parsedSupplier.paidAmount,
+                }
+              : null,
+            items: selectedItems.map((item) => ({
+              matchedMaterialId: item.matchedMaterialId || null,
+              name: item.name || 'İsimsiz Ürün',
+              category: item.category || 'Diğer',
+              unit: item.unit || 'Adet',
+              quantity: parseNum(item.quantity),
+              unitPrice: parseNum(item.unitPrice),
+            })),
+          }
+          const { data, error: rpcError } = await supabase.rpc('process_receipt_upload', { payload })
+          if (rpcError) throw rpcError
+          return data
+        },
       )
+    } catch (error) {
+      devError('Fiş yükleme atomic işlem hatası:', error)
+      setError('Fiş ve finansal kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.')
       setLoading(false)
       return
     }

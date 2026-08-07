@@ -224,6 +224,31 @@ describe('private document storage service', () => {
     expect(remove).not.toHaveBeenCalled()
   })
 
+  it('passes the newly uploaded storage reference to the business write', async () => {
+    const upload = vi.fn().mockResolvedValue({ data: { path: scopedPath }, error: null })
+    const from = vi.fn(() => ({ upload }))
+    const supabase = { storage: { from } } as unknown as SupabaseClient
+    const persist = vi.fn().mockResolvedValue({ id: 'document-1' })
+
+    await persistWithOrganizationDocument(supabase, createUploadInput(), null, persist)
+
+    expect(persist).toHaveBeenCalledWith(`storage://motto_assets/${scopedPath}`)
+  })
+
+  it('does not invoke the business write when document upload fails', async () => {
+    const providerError = { message: 'bucket policy denied', statusCode: '403' }
+    const upload = vi.fn().mockResolvedValue({ data: null, error: providerError })
+    const from = vi.fn(() => ({ upload }))
+    const supabase = { storage: { from } } as unknown as SupabaseClient
+    const persist = vi.fn().mockResolvedValue({ id: 'document-1' })
+
+    await expect(persistWithOrganizationDocument(supabase, createUploadInput(), null, persist)).rejects.toThrow(
+      'Belge yüklenemedi. Lütfen tekrar deneyin.',
+    )
+
+    expect(persist).not.toHaveBeenCalled()
+  })
+
   it('preserves the business error when cleanup also fails', async () => {
     const upload = vi.fn().mockResolvedValue({ data: { path: scopedPath }, error: null })
     const cleanupError = { message: 'delete policy denied', statusCode: '403' }

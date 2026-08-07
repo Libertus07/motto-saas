@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
+import { persistWithOrganizationDocument } from '@/features/documents'
+import { devError } from '@/lib/debug'
 import { saveProductWithRecipe } from '@/features/products/services/product-service'
 import type { NewZReportProduct, ParsedExpenseItem, ParsedSaleItem, ParsedZReport, ZReportProduct } from '../types'
 import { findBestProductMatch, matchExpenseCategory } from '../z-report-utils'
@@ -215,24 +217,30 @@ export function useZReportWorkspace() {
         : false
       if (existingBatchId && !replaceExisting) return
 
-      let documentUrl: string | null = null
-      if (selectedFile) {
-        const extension = selectedFile.name.split('.').pop()
-        const fileName = `z-report-${crypto.randomUUID()}.${extension}`
-        const { data, error } = await supabase.storage.from('receipts').upload(fileName, selectedFile)
-        if (error) throw new Error(`Belge yüklenemedi: ${error.message}`)
-        documentUrl = supabase.storage.from('receipts').getPublicUrl(data.path).data.publicUrl
-      }
-      await processZReport(supabase, {
-        organizationId: activeOrg.id,
-        report: { ...parsedData, date: reportDate },
-        documentUrl,
-        replaceExisting,
-      })
+      await persistWithOrganizationDocument(
+        supabase,
+        selectedFile
+          ? {
+              organizationId: activeOrg.id,
+              bucket: 'receipts',
+              kind: 'z-report',
+              file: selectedFile,
+            }
+          : null,
+        null,
+        (documentUrl) =>
+          processZReport(supabase, {
+            organizationId: activeOrg.id,
+            report: { ...parsedData, date: reportDate },
+            documentUrl,
+            replaceExisting,
+          }),
+      )
       await showAlert('Z Raporu başarıyla işlendi ve stoklar düşüldü!', 'success')
       router.push('/dashboard/raporlar')
     } catch (error: unknown) {
-      await showAlert(`Kayıt sırasında hata oluştu: ${getErrorMessage(error)}`, 'error')
+      devError('Z Raporu kaydedilemedi.', error)
+      await showAlert('Z Raporu kaydedilemedi. Lütfen tekrar deneyin.', 'error')
     } finally {
       setLoading(false)
     }
