@@ -4,10 +4,9 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
-import { persistWithOrganizationDocument } from '@/features/documents'
+import { persistInvestmentReceiptWrite } from '@/features/documents'
 import { devError } from '@/lib/debug'
 import { formatCurrency } from '@/lib/format'
 
@@ -161,8 +160,9 @@ export default function YatirimFisiYukle() {
         return
       }
 
-      const acc = Object.values(accounts).find((a) => a.id === selectedAccount)
-      if (!acc) throw new Error('Hesap bulunamadı')
+      if (!Object.values(accounts).some((account) => account.id === selectedAccount)) {
+        throw new Error('Hesap bulunamadı')
+      }
 
       const investmentName = parsedData.name || `${parsedData.quantity} Birim ${parsedData.asset_type.toUpperCase()}`
 
@@ -171,6 +171,7 @@ export default function YatirimFisiYukle() {
       const { data: dupData } = await supabase
         .from('investment_transactions')
         .select('id')
+        .eq('organization_id', activeOrg.id)
         .eq('transaction_date', parsedData.purchase_date)
         .eq('total_amount', parsedData.total_amount)
         .eq('transaction_type', 'buy')
@@ -189,44 +190,15 @@ export default function YatirimFisiYukle() {
       }
       // --- ÇİFT KAYIT KONTROLÜ BİTİŞ ---
 
-      await persistWithOrganizationDocument(
-        supabase,
-        selectedFile
-          ? {
-              organizationId: activeOrg.id,
-              bucket: 'motto_assets',
-              kind: 'investment-receipt',
-              file: selectedFile,
-            }
-          : null,
-        null,
-        async (uploadedUrl) => {
-          if (duplicateTransactionId) {
-            const { error: delError } = await supabase.rpc('delete_investment_transaction', {
-              p_transaction_id: duplicateTransactionId,
-              p_organization_id: activeOrg.id,
-            })
-            if (delError) throw delError
-          }
-
-          const { error: rpcError } = await supabase.rpc('buy_investment_transaction', {
-            p_asset_type: parsedData.asset_type,
-            p_name: investmentName,
-            p_quantity: parsedData.quantity,
-            p_price: parsedData.price_per_unit,
-            p_account_id: selectedAccount,
-            p_notes: parsedData.notes || null,
-            p_purchase_date: parsedData.purchase_date,
-            p_document_url: uploadedUrl,
-            p_organization_id: activeOrg.id,
-          })
-          if (rpcError) throw rpcError
-        },
-      )
-
-      // 4. Log
-      await logActivity('Yatırım Fişi', 'EKLEME', `Yatırım eklendi: ${investmentName}`, {
-        detay: `Tutar (₺${parsedData.total_amount}) | Ödenen Hesap (${acc.name})`,
+      await persistInvestmentReceiptWrite(supabase, activeOrg.id, selectedFile, duplicateTransactionId, {
+        p_asset_type: parsedData.asset_type,
+        p_name: investmentName,
+        p_quantity: parsedData.quantity,
+        p_price: parsedData.price_per_unit,
+        p_account_id: selectedAccount,
+        p_notes: parsedData.notes || null,
+        p_purchase_date: parsedData.purchase_date,
+        p_organization_id: activeOrg.id,
       })
 
       await showAlert('Yatırım fişi başarıyla kaydedildi!', 'success')

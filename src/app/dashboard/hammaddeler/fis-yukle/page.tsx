@@ -5,14 +5,13 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
-import { logActivity } from '@/lib/logger'
 import { devError } from '@/lib/debug'
 import { formatCurrency } from '@/lib/format'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
 import dynamic from 'next/dynamic'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
-import { persistWithOrganizationDocument } from '@/features/documents'
+import { persistSupplierReceiptWrite } from '@/features/documents'
 
 const ImagePreprocessModal = dynamic(
   () => import('@/components/ui/ImagePreprocessModal').then((mod) => mod.ImagePreprocessModal),
@@ -73,11 +72,12 @@ export default function FisYukle() {
 
   // Tedarikçi adı değiştiğinde borcunu getir
   useEffect(() => {
-    if (step === 'review' && parsedSupplier?.name) {
+    if (step === 'review' && parsedSupplier?.name && activeOrg?.id) {
       const checkDebt = async () => {
         const { data } = await supabase
           .from('suppliers')
           .select('total_debt')
+          .eq('organization_id', activeOrg.id)
           .ilike('name', `%${parsedSupplier.name}%`)
           .limit(1)
 
@@ -91,7 +91,7 @@ export default function FisYukle() {
       const timer = setTimeout(checkDebt, 500)
       return () => clearTimeout(timer)
     }
-  }, [parsedSupplier?.name, step, supabase])
+  }, [activeOrg?.id, parsedSupplier?.name, step, supabase])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = Array.from(e.target.files || [])
@@ -145,13 +145,17 @@ export default function FisYukle() {
 
   const analyzeReceipt = async () => {
     if (!image && !fileText) return
+    if (!activeOrg?.id) {
+      await showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
+      return
+    }
     setLoading(true)
     setError('')
 
     try {
       const [{ data: existingMaterials }, { data: existingSuppliers }] = await Promise.all([
-        supabase.from('materials').select('*'),
-        supabase.from('suppliers').select('id, name'),
+        supabase.from('materials').select('*').eq('organization_id', activeOrg.id),
+        supabase.from('suppliers').select('id, name').eq('organization_id', activeOrg.id),
       ])
 
       setMaterials(existingMaterials || [])
@@ -217,10 +221,14 @@ export default function FisYukle() {
   }
 
   const startManualMode = async () => {
+    if (!activeOrg?.id) {
+      await showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
+      return
+    }
     setLoading(true)
     const [{ data: existingMaterials }, { data: existingSuppliers }] = await Promise.all([
-      supabase.from('materials').select('*'),
-      supabase.from('suppliers').select('id, name'),
+      supabase.from('materials').select('*').eq('organization_id', activeOrg.id),
+      supabase.from('suppliers').select('id, name').eq('organization_id', activeOrg.id),
     ])
 
     setMaterials(existingMaterials || [])
@@ -285,8 +293,8 @@ export default function FisYukle() {
   const applyChanges = async () => {
     setLoading(true)
 
-    if (selectedFile && !activeOrg?.id) {
-      setError('Belge yüklenemedi. Organizasyon bilgisi bulunamadı.')
+    if (!activeOrg?.id) {
+      setError('Fiş kaydedilemedi. Aktif işletme bilgisi bulunamadı.')
       setLoading(false)
       return
     }
@@ -297,6 +305,7 @@ export default function FisYukle() {
       const { data: dupData } = await supabase
         .from('supplier_transactions')
         .select('batch_id, id')
+        .eq('organization_id', activeOrg.id)
         .eq('supplier_id', parsedSupplier.id)
         .eq('transaction_date', parsedSupplier.date)
         .eq('amount', parsedSupplier.totalAmount)
@@ -329,57 +338,31 @@ export default function FisYukle() {
       return 0
     }
 
-    let rpcResult
     try {
-      rpcResult = await persistWithOrganizationDocument(
-        supabase,
-        selectedFile && activeOrg
+      await persistSupplierReceiptWrite(supabase, activeOrg.id, selectedFile, duplicateBatchId, {
+        user_id: user?.id,
+        batch_id: batchId,
+        supplier: parsedSupplier
           ? {
-              organizationId: activeOrg.id,
-              bucket: 'motto_assets',
-              kind: 'supplier-receipt',
-              file: selectedFile,
+              id: parsedSupplier.id || null,
+              name: parsedSupplier.name,
+              phone: parsedSupplier.phone || null,
+              iban: parsedSupplier.iban || null,
+              address: parsedSupplier.address || null,
+              date: parsedSupplier.date,
+              totalAmount: parsedSupplier.totalAmount,
+              paidAmount: parsedSupplier.paidAmount,
             }
           : null,
-        null,
-        async (uploadedUrl) => {
-          if (duplicateBatchId) {
-            const { error: delError } = await supabase.rpc('delete_receipt_transaction', {
-              p_batch_id: duplicateBatchId,
-            })
-            if (delError) throw delError
-          }
-
-          const payload = {
-            user_id: user?.id,
-            batch_id: batchId,
-            image_url: uploadedUrl,
-            supplier: parsedSupplier
-              ? {
-                  id: parsedSupplier.id || null,
-                  name: parsedSupplier.name,
-                  phone: parsedSupplier.phone || null,
-                  iban: parsedSupplier.iban || null,
-                  address: parsedSupplier.address || null,
-                  date: parsedSupplier.date,
-                  totalAmount: parsedSupplier.totalAmount,
-                  paidAmount: parsedSupplier.paidAmount,
-                }
-              : null,
-            items: selectedItems.map((item) => ({
-              matchedMaterialId: item.matchedMaterialId || null,
-              name: item.name || 'İsimsiz Ürün',
-              category: item.category || 'Diğer',
-              unit: item.unit || 'Adet',
-              quantity: parseNum(item.quantity),
-              unitPrice: parseNum(item.unitPrice),
-            })),
-          }
-          const { data, error: rpcError } = await supabase.rpc('process_receipt_upload', { payload })
-          if (rpcError) throw rpcError
-          return data
-        },
-      )
+        items: selectedItems.map((item) => ({
+          matchedMaterialId: item.matchedMaterialId || null,
+          name: item.name || 'İsimsiz Ürün',
+          category: item.category || 'Diğer',
+          unit: item.unit || 'Adet',
+          quantity: parseNum(item.quantity),
+          unitPrice: parseNum(item.unitPrice),
+        })),
+      })
     } catch (error) {
       devError('Fiş yükleme atomic işlem hatası:', error)
       setError('Fiş ve finansal kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.')
@@ -387,13 +370,6 @@ export default function FisYukle() {
       return
     }
 
-    const auditDetailsText = rpcResult?.audit_details || ''
-    await logActivity(
-      'Stok',
-      'EKLEME',
-      `Yapay zeka ile fiş okunarak ${selectedItems.length} kalem ürün/stok sisteme eklendi.`,
-      { batchId, detay: auditDetailsText },
-    )
     setStep('done')
     setLoading(false)
   }

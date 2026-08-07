@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
-import { persistWithOrganizationDocument } from '@/features/documents'
+import { persistZReportWrite } from '@/features/documents'
 import { devError } from '@/lib/debug'
 import { saveProductWithRecipe } from '@/features/products/services/product-service'
 import type { NewZReportProduct, ParsedExpenseItem, ParsedSaleItem, ParsedZReport, ZReportProduct } from '../types'
@@ -217,24 +217,13 @@ export function useZReportWorkspace() {
         : false
       if (existingBatchId && !replaceExisting) return
 
-      await persistWithOrganizationDocument(
-        supabase,
-        selectedFile
-          ? {
-              organizationId: activeOrg.id,
-              bucket: 'receipts',
-              kind: 'z-report',
-              file: selectedFile,
-            }
-          : null,
-        null,
-        (documentUrl) =>
-          processZReport(supabase, {
-            organizationId: activeOrg.id,
-            report: { ...parsedData, date: reportDate },
-            documentUrl,
-            replaceExisting,
-          }),
+      await persistZReportWrite(supabase, activeOrg.id, selectedFile, (documentUrl) =>
+        processZReport(supabase, {
+          organizationId: activeOrg.id,
+          report: { ...parsedData, date: reportDate },
+          documentUrl,
+          replaceExisting,
+        }),
       )
       await showAlert('Z Raporu başarıyla işlendi ve stoklar düşüldü!', 'success')
       router.push('/dashboard/raporlar')

@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(49);
+SELECT plan(54);
 
 SELECT has_table(
     'private',
@@ -424,9 +424,9 @@ SELECT lives_ok(
     INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
     VALUES (
         'motto_assets',
-        '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf',
+        '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf',
         'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        '{"state":"inserted"}'::jsonb
+        '{"state":"inserted","contentLength":1024,"mimetype":"application/pdf"}'::jsonb
     )
     $$,
     'an active member can insert an allowed organization-scoped financial document'
@@ -434,11 +434,12 @@ SELECT lives_ok(
 
 SELECT throws_ok(
     $$
-    INSERT INTO storage.objects (bucket_id, name, owner_id)
+    INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
     VALUES (
         'motto_assets',
         '11111111-1111-4111-8111-111111111111/supplier-receipt/unsafe.svg',
-        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '{"contentLength":1024,"mimetype":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}'::jsonb
     )
     $$,
     '42501',
@@ -448,11 +449,12 @@ SELECT throws_ok(
 
 SELECT throws_ok(
     $$
-    INSERT INTO storage.objects (bucket_id, name, owner_id)
+    INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
     VALUES (
         'motto_assets',
         '22222222-2222-4222-8222-222222222222/supplier-receipt/cross-tenant.pdf',
-        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '{"contentLength":1024,"mimetype":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}'::jsonb
     )
     $$,
     '42501',
@@ -462,19 +464,92 @@ SELECT throws_ok(
 
 SELECT lives_ok(
     $$
-    INSERT INTO storage.objects (bucket_id, name, owner_id)
+    INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
     VALUES (
         'receipts',
-        '11111111-1111-4111-8111-111111111111/z-report/report.xlsx',
-        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+        '11111111-1111-4111-8111-111111111111/z-report/cccccccc-cccc-4ccc-8ccc-cccccccccccc.xlsx',
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '{"contentLength":1024,"mimetype":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}'::jsonb
     )
     $$,
     'the receipts insert policy accepts its additional spreadsheet extension'
 );
 
+SELECT lives_ok(
+    $$
+    INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
+    VALUES (
+        'motto_assets',
+        '11111111-1111-4111-8111-111111111111/supplier-receipt/dddddddd-dddd-4ddd-8ddd-dddddddddddd.xlsx',
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '{"contentLength":1024,"mimetype":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}'::jsonb
+    )
+    $$,
+    'the motto assets policy accepts structured files only for supplier receipts'
+);
+
+SELECT throws_ok(
+    $$
+    INSERT INTO storage.objects (bucket_id, name, owner_id)
+    VALUES (
+        'motto_assets',
+        '11111111-1111-4111-8111-111111111111/investment-receipt/source.xlsx',
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    )
+    $$,
+    '42501',
+    'new row violates row-level security policy for table "objects"',
+    'structured files remain rejected for investment receipts'
+);
+
+SELECT throws_ok(
+    $$
+    INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
+    VALUES (
+        'motto_assets',
+        '11111111-1111-4111-8111-111111111111/supplier-receipt/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.xlsx',
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '{"contentLength":1024,"mimetype":"image/svg+xml"}'::jsonb
+    )
+    $$,
+    '42501',
+    'new row violates row-level security policy for table "objects"',
+    'the insert policy rejects an extension and MIME mismatch'
+);
+
+SELECT throws_ok(
+    $$
+    INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
+    VALUES (
+        'motto_assets',
+        '11111111-1111-4111-8111-111111111111/supplier-receipt/ffffffff-ffff-4fff-8fff-ffffffffffff.xlsx',
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '{"contentLength":10485761,"mimetype":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}'::jsonb
+    )
+    $$,
+    '42501',
+    'new row violates row-level security policy for table "objects"',
+    'the insert policy rejects an oversized supplier source'
+);
+
+SELECT throws_ok(
+    $$
+    INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
+    VALUES (
+        'motto_assets',
+        '11111111-1111-4111-8111-111111111111/supplier-receipt/extra/12121212-1212-4121-8121-121212121212.pdf',
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '{"contentLength":1024,"mimetype":"application/pdf"}'::jsonb
+    )
+    $$,
+    '42501',
+    'new row violates row-level security policy for table "objects"',
+    'the insert policy rejects extra path segments'
+);
+
 SELECT is(
     (SELECT count(*)::integer FROM storage.objects WHERE bucket_id IN ('motto_assets', 'receipts')),
-    2,
+    3,
     'the select policy exposes the active organization financial documents'
 );
 
@@ -495,9 +570,9 @@ SET LOCAL ROLE authenticated;
 SELECT lives_ok(
     $$
     UPDATE storage.objects
-    SET metadata = '{"state":"owner-updated"}'::jsonb
+    SET metadata = '{"state":"owner-updated","contentLength":1024,"mimetype":"application/pdf"}'::jsonb
     WHERE bucket_id = 'motto_assets'
-      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf'
     $$,
     'the active object owner can update an allowed financial document'
 );
@@ -509,7 +584,7 @@ SELECT is(
         SELECT metadata->>'state'
         FROM storage.objects
         WHERE bucket_id = 'motto_assets'
-          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf'
     ),
     'owner-updated',
     'the owner update policy changes the stored object metadata'
@@ -523,7 +598,7 @@ SELECT throws_ok(
     UPDATE storage.objects
     SET owner_id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
     WHERE bucket_id = 'motto_assets'
-      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf'
     $$,
     '42501',
     'new row violates row-level security policy for table "objects"',
@@ -537,7 +612,7 @@ SELECT is(
         SELECT owner_id
         FROM storage.objects
         WHERE bucket_id = 'motto_assets'
-          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf'
     ),
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     'a denied owner reassignment leaves the financial document owner unchanged'
@@ -551,7 +626,7 @@ SELECT throws_ok(
     UPDATE storage.objects
     SET name = '22222222-2222-4222-8222-222222222222/supplier-receipt/cross-tenant.pdf'
     WHERE bucket_id = 'motto_assets'
-      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf'
     $$,
     '42501',
     'new row violates row-level security policy for table "objects"',
@@ -566,9 +641,9 @@ SELECT is(
         FROM storage.objects
         WHERE bucket_id = 'motto_assets'
           AND owner_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-          AND name LIKE '%/supplier-receipt/owner.pdf'
+          AND name LIKE '%/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf'
     ),
-    '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf',
+    '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf',
     'a denied cross-tenant rename leaves the financial document path unchanged'
 );
 
@@ -578,7 +653,7 @@ SET LOCAL ROLE authenticated;
 UPDATE storage.objects
 SET metadata = '{"state":"non-owner-updated"}'::jsonb
 WHERE bucket_id = 'motto_assets'
-  AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf';
+  AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf';
 
 RESET ROLE;
 
@@ -587,7 +662,7 @@ SELECT is(
         SELECT metadata->>'state'
         FROM storage.objects
         WHERE bucket_id = 'motto_assets'
-          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf'
     ),
     'owner-updated',
     'an active non-owner cannot update another member financial document'
@@ -601,7 +676,7 @@ SELECT lives_ok(
     $$
     DELETE FROM storage.objects
     WHERE bucket_id = 'motto_assets'
-      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf'
     $$,
     'an active non-owner cannot reach the managed delete trigger for another member document'
 );
@@ -614,7 +689,7 @@ SELECT is(
         SELECT count(*)::integer
         FROM storage.objects
         WHERE bucket_id = 'motto_assets'
-          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf'
     ),
     1,
     'a non-owner delete attempt leaves the financial document unchanged'
@@ -663,7 +738,7 @@ SELECT lives_ok(
     $$
     DELETE FROM storage.objects
     WHERE bucket_id = 'motto_assets'
-      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf'
     $$,
     'the active object owner can delete their financial document'
 );
@@ -676,7 +751,7 @@ SELECT is(
         SELECT count(*)::integer
         FROM storage.objects
         WHERE bucket_id = 'motto_assets'
-          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.pdf'
     ),
     0,
     'the owner delete policy removes the financial document object'

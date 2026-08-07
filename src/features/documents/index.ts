@@ -13,6 +13,20 @@ export {
   uploadOrganizationDocument,
 } from './document-storage-service'
 
+export {
+  createFinancialDocumentUploadInput,
+  scopeSupplierReceiptPayload,
+  withInvestmentReplacement,
+} from './financial-document-write-contracts'
+
+export type { FinancialDocumentFlow } from './financial-document-write-contracts'
+
+export {
+  persistInvestmentReceiptWrite,
+  persistSupplierReceiptWrite,
+  persistZReportWrite,
+} from './financial-document-write-service'
+
 export type {
   PrivateDocumentBucket,
   PrivateDocumentKind,

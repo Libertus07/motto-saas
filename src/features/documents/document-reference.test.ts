@@ -17,6 +17,27 @@ function createFile(type: string, size = 1) {
 }
 
 describe('private document references', () => {
+  it.each([
+    ['application/xml', 'xml'],
+    ['text/xml', 'xml'],
+    ['application/json', 'json'],
+    ['application/vnd.ms-excel', 'xls'],
+    ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx'],
+  ])('accepts structured supplier receipts with a MIME-derived %s path', (mimeType, extension) => {
+    vi.stubGlobal('crypto', { randomUUID: () => '22222222-2222-4222-8222-222222222222' })
+    const input = {
+      organizationId,
+      bucket: 'motto_assets' as const,
+      kind: 'supplier-receipt' as const,
+      file: new File(['content'], `unsafe.exe`, { type: mimeType }),
+    }
+
+    expect(validateOrganizationDocument(input)).toBeNull()
+    expect(buildOrganizationDocumentPath(input)).toBe(
+      `${organizationId}/supplier-receipt/22222222-2222-4222-8222-222222222222.${extension}`,
+    )
+    vi.unstubAllGlobals()
+  })
   it('round-trips a controlled storage reference', () => {
     const stored = serializeStorageDocumentReference({
       bucket: 'motto_assets',
