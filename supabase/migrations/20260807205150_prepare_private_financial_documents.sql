@@ -31,39 +31,53 @@ LANGUAGE sql
 IMMUTABLE
 SET search_path = ''
 AS $$
-    SELECT CASE
-        WHEN p_bucket_id NOT IN ('motto_assets', 'receipts') THEN NULL
-        WHEN p_reference LIKE 'storage://' || p_bucket_id || '/%' THEN
-            NULLIF(
-                substring(
-                    p_reference
-                    FROM length('storage://' || p_bucket_id || '/') + 1
-                ),
-                ''
-            )
-        WHEN p_reference ~ (
-            '^https://[^/?#]+/storage/v1/object/public/'
-            || p_bucket_id
-            || '/[^?#]+([?#].*)?$'
-        ) THEN
-            NULLIF(
-                split_part(
+    WITH extracted_reference AS (
+        SELECT CASE
+            WHEN p_bucket_id NOT IN ('motto_assets', 'receipts') THEN NULL
+            WHEN left(
+                p_reference,
+                length('storage://' || p_bucket_id || '/')
+            ) = 'storage://' || p_bucket_id || '/' THEN
+                NULLIF(
+                    substring(
+                        p_reference
+                        FROM length('storage://' || p_bucket_id || '/') + 1
+                    ),
+                    ''
+                )
+            WHEN p_reference ~ (
+                '^https://[a-z0-9]{20}[.]supabase[.]co/storage/v1/object/public/'
+                || p_bucket_id
+                || '/[^?#]+([?#].*)?$'
+            ) THEN
+                NULLIF(
                     split_part(
                         split_part(
-                            p_reference,
-                            '/storage/v1/object/public/' || p_bucket_id || '/',
-                            2
+                            split_part(
+                                p_reference,
+                                '/storage/v1/object/public/' || p_bucket_id || '/',
+                                2
+                            ),
+                            '?',
+                            1
                         ),
-                        '?',
+                        '#',
                         1
                     ),
-                    '#',
-                    1
-                ),
-                ''
-            )
-        ELSE NULL
-    END;
+                    ''
+                )
+            ELSE NULL
+        END AS object_name
+    )
+    SELECT object_name
+    FROM extracted_reference
+    WHERE object_name IS NOT NULL
+      AND position('?' IN object_name) = 0
+      AND position('#' IN object_name) = 0
+      AND position('%' IN object_name) = 0
+      AND position(chr(92) IN object_name) = 0
+      AND object_name !~ '(^|/)[.]{1,2}(/|$)'
+      AND object_name !~ '(^/|/$|//)';
 $$;
 
 REVOKE ALL ON FUNCTION private.storage_object_name_from_reference(text, text)

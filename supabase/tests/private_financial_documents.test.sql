@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(37);
+SELECT plan(48);
 
 SELECT has_table(
     'private',
@@ -184,7 +184,7 @@ SELECT is(
 SELECT is(
     private.storage_object_name_from_reference(
         'receipts',
-        'https://project.supabase.co/storage/v1/object/public/receipts/legacy/z-report.xlsx?download=1'
+        'https://abcdefghijklmnopqrst.supabase.co/storage/v1/object/public/receipts/legacy/z-report.xlsx?download=1'
     ),
     'legacy/z-report.xlsx',
     'the internal parser extracts legacy public Storage URLs without query parameters'
@@ -197,6 +197,33 @@ SELECT is(
     ),
     NULL,
     'the internal parser does not cross bucket boundaries'
+);
+
+SELECT is(
+    private.storage_object_name_from_reference(
+        'motto_assets',
+        'storage://mottoXassets/victim.pdf'
+    ),
+    NULL,
+    'the stable reference parser treats bucket underscores as literal characters'
+);
+
+SELECT is(
+    private.storage_object_name_from_reference(
+        'motto_assets',
+        'https://attacker.example/storage/v1/object/public/motto_assets/victim.pdf'
+    ),
+    NULL,
+    'the legacy parser rejects public-object URLs from untrusted origins'
+);
+
+SELECT is(
+    private.storage_object_name_from_reference(
+        'motto_assets',
+        'storage://motto_assets/reports/../victim.pdf'
+    ),
+    NULL,
+    'the stable reference parser rejects traversal segments'
 );
 
 SELECT ok(
@@ -479,6 +506,63 @@ SELECT is(
     'the owner update policy changes the stored object metadata'
 );
 
+SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', true);
+SET LOCAL ROLE authenticated;
+
+SELECT throws_ok(
+    $$
+    UPDATE storage.objects
+    SET owner_id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    WHERE bucket_id = 'motto_assets'
+      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+    $$,
+    '42501',
+    'new row violates row-level security policy for table "objects"',
+    'an object owner cannot reassign financial document ownership'
+);
+
+RESET ROLE;
+
+SELECT is(
+    (
+        SELECT owner_id
+        FROM storage.objects
+        WHERE bucket_id = 'motto_assets'
+          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+    ),
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    'a denied owner reassignment leaves the financial document owner unchanged'
+);
+
+SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', true);
+SET LOCAL ROLE authenticated;
+
+SELECT throws_ok(
+    $$
+    UPDATE storage.objects
+    SET name = '22222222-2222-4222-8222-222222222222/supplier-receipt/cross-tenant.pdf'
+    WHERE bucket_id = 'motto_assets'
+      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+    $$,
+    '42501',
+    'new row violates row-level security policy for table "objects"',
+    'an object owner cannot rename a financial document into another organization'
+);
+
+RESET ROLE;
+
+SELECT is(
+    (
+        SELECT name
+        FROM storage.objects
+        WHERE bucket_id = 'motto_assets'
+          AND owner_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+          AND name LIKE '%/supplier-receipt/owner.pdf'
+    ),
+    '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf',
+    'a denied cross-tenant rename leaves the financial document path unchanged'
+);
+
 SELECT set_config('request.jwt.claim.sub', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', true);
 SET LOCAL ROLE authenticated;
 
@@ -498,6 +582,68 @@ SELECT is(
     ),
     'owner-updated',
     'an active non-owner cannot update another member financial document'
+);
+
+SELECT set_config('request.jwt.claim.sub', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', true);
+SET LOCAL session_replication_role = replica;
+SET LOCAL ROLE authenticated;
+
+SELECT lives_ok(
+    $$
+    DELETE FROM storage.objects
+    WHERE bucket_id = 'motto_assets'
+      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+    $$,
+    'an active non-owner cannot reach the managed delete trigger for another member document'
+);
+
+RESET ROLE;
+SET LOCAL session_replication_role = origin;
+
+SELECT is(
+    (
+        SELECT count(*)::integer
+        FROM storage.objects
+        WHERE bucket_id = 'motto_assets'
+          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/owner.pdf'
+    ),
+    1,
+    'a non-owner delete attempt leaves the financial document unchanged'
+);
+
+INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
+VALUES (
+    'motto_assets',
+    '11111111-1111-4111-8111-111111111111/supplier-receipt/suspended-owner.pdf',
+    'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    '{"state":"suspended-owner"}'::jsonb
+);
+
+SELECT set_config('request.jwt.claim.sub', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', true);
+SET LOCAL session_replication_role = replica;
+SET LOCAL ROLE authenticated;
+
+SELECT lives_ok(
+    $$
+    DELETE FROM storage.objects
+    WHERE bucket_id = 'motto_assets'
+      AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/suspended-owner.pdf'
+    $$,
+    'a suspended object owner cannot reach the managed delete trigger'
+);
+
+RESET ROLE;
+SET LOCAL session_replication_role = origin;
+
+SELECT is(
+    (
+        SELECT count(*)::integer
+        FROM storage.objects
+        WHERE bucket_id = 'motto_assets'
+          AND name = '11111111-1111-4111-8111-111111111111/supplier-receipt/suspended-owner.pdf'
+    ),
+    1,
+    'a suspended owner delete attempt leaves the financial document unchanged'
 );
 
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', true);
