@@ -6,6 +6,13 @@ export {
   validateOrganizationDocument,
 } from './document-reference'
 
+export {
+  persistWithOrganizationDocument,
+  removeOrganizationDocument,
+  resolveDocumentPreviewUrl,
+  uploadOrganizationDocument,
+} from './document-storage-service'
+
 export type {
   PrivateDocumentBucket,
   PrivateDocumentKind,
