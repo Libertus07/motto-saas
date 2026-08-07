@@ -167,7 +167,7 @@ SELECT is(
           AND policyname IN ('Public Okuma Izinleri', 'Allow Uploads 1lnm9mj_1')
     ),
     0,
-    'financial document buckets do not expose list operations through broad SELECT policies'
+    'financial document buckets keep broad legacy SELECT policies removed while tenant-scoped SELECT may coexist'
 );
 
 SELECT * FROM finish();
