@@ -2,10 +2,11 @@ import type { ChangeEvent, Dispatch, SetStateAction } from 'react'
 import { useCallback, useState } from 'react'
 
 import type { NotificationSeverity } from '@/components/NotificationProvider'
+import { validateOrganizationDocument } from '../../documents/document-reference'
 
 import type { BuyFormState } from '../types'
 
-type DocumentForm = { document_url?: string }
+type DocumentForm = { document_file: File | null; document_url: string }
 type ShowAlert = (message: string, severity?: NotificationSeverity, title?: string) => Promise<void>
 
 type InvestmentAnalysisResponse = {
@@ -36,9 +37,11 @@ function readFileAsDataUrl(file: File): Promise<string> {
 export function useInvestmentDocuments({
   setBuyForm,
   showAlert,
+  organizationId,
 }: {
   setBuyForm: Dispatch<SetStateAction<BuyFormState>>
   showAlert: ShowAlert
+  organizationId: string | undefined
 }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
 
@@ -101,21 +104,26 @@ export function useInvestmentDocuments({
       const file = event.target.files?.[0]
       if (!file) return
 
-      if (file.size > 2 * 1024 * 1024) {
-        await showAlert('Dosya boyutu çok büyük! Maksimum 2 MB yükleyebilirsiniz.', 'warning')
+      if (!organizationId) {
+        await showAlert('Aktif organizasyon bulunamadı.', 'error')
         return
       }
 
-      try {
-        const documentUrl = await readFileAsDataUrl(file)
-        formSetter({ ...formState, document_url: documentUrl })
-      } catch (error) {
-        await showAlert(getErrorMessage(error), 'error')
-      } finally {
-        event.target.value = ''
+      const validationError = validateOrganizationDocument({
+        organizationId,
+        bucket: 'motto_assets',
+        kind: 'investment-document',
+        file,
+      })
+      if (validationError) {
+        await showAlert(validationError, 'warning')
+        return
       }
+
+      formSetter({ ...formState, document_file: file })
+      event.target.value = ''
     },
-    [showAlert],
+    [organizationId, showAlert],
   )
 
   return { isAnalyzing, analyzeReceipt, uploadDocument }

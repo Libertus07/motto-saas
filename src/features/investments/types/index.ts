@@ -22,6 +22,7 @@ export type BuyFormState = {
   notes: string
   purchase_date: string
   document_url: string
+  document_file: File | null
 }
 
 export type RentFormState = {
@@ -36,6 +37,7 @@ export type EditFormState = {
   notes: string
   purchase_date: string
   document_url: string
+  document_file: File | null
 }
 
 export type ValueFormState = {

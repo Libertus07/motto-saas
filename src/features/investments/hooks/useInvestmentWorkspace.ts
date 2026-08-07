@@ -16,7 +16,7 @@ export function useInvestmentWorkspace() {
   const data = useInvestmentsData()
   const ui = useInvestmentsUI()
   const { buyForm, setBuyForm } = ui
-  const documents = useInvestmentDocuments({ setBuyForm, showAlert })
+  const documents = useInvestmentDocuments({ setBuyForm, showAlert, organizationId: data.activeOrganizationId })
 
   useAppTour('yatirimlar', investmentTourSteps, 800)
 
@@ -44,7 +44,7 @@ export function useInvestmentWorkspace() {
       event.preventDefault()
       if (!(await data.buyInvestment(ui.buyForm))) return
 
-      ui.setIsBuyModalOpen(false)
+      ui.closeBuyModal()
       ui.resetForms()
       if (data.rates && ui.buyForm.asset_type !== 'real_estate') {
         const assetType = ui.buyForm.asset_type as 'gold' | 'usd' | 'eur'
@@ -78,7 +78,7 @@ export function useInvestmentWorkspace() {
     async (event: FormEvent) => {
       event.preventDefault()
       if (!ui.selectedInvestment || !(await data.editInvestment(ui.selectedInvestment.id, ui.editForm))) return
-      ui.setIsEditModalOpen(false)
+      ui.closeEditModal()
     },
     [data, ui],
   )
@@ -143,7 +143,7 @@ export function useInvestmentWorkspace() {
       selectedInvestment: ui.selectedInvestment,
       buy: {
         isOpen: ui.isBuyModalOpen,
-        onClose: () => ui.setIsBuyModalOpen(false),
+        onClose: ui.closeBuyModal,
         form: ui.buyForm,
         setForm: ui.setBuyForm,
         onSubmit: submitBuy,
@@ -166,7 +166,7 @@ export function useInvestmentWorkspace() {
       },
       edit: {
         isOpen: ui.isEditModalOpen,
-        onClose: () => ui.setIsEditModalOpen(false),
+        onClose: ui.closeEditModal,
         form: ui.editForm,
         setForm: ui.setEditForm,
         onSubmit: submitEdit,

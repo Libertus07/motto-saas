@@ -32,7 +32,12 @@ export function EditInvestmentModal({
           <h3 className="text-xl font-bold text-white flex items-center gap-2">
             <span>✏️</span> Yatırımı Düzenle
           </h3>
-          <button onClick={onClose} className="text-stone-500 hover:text-white text-xl">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Yatırım düzenleme penceresini kapat"
+            className="min-h-11 min-w-11 text-stone-500 hover:text-white text-xl"
+          >
             ✕
           </button>
         </div>
@@ -93,16 +98,24 @@ export function EditInvestmentModal({
             </div>
 
             <div>
-              <label className="text-stone-400 text-sm mb-1 block">Belge Güncelle</label>
+              <label htmlFor="edit-investment-document" className="text-stone-400 text-sm mb-1 block">
+                Belge Güncelle
+              </label>
               <input
+                id="edit-investment-document"
                 type="file"
                 accept="image/*,application/pdf,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                 onChange={(e) => onFileUpload(e, setForm, form)}
+                aria-describedby="edit-investment-document-status"
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-3 text-stone-400 focus:outline-none focus:border-amber-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-stone-950 hover:file:bg-amber-400"
               />
-              {form.document_url && !form.document_url.startsWith('data:') && (
-                <p className="text-xs text-amber-500 mt-2">Mevcut bir belge yüklü.</p>
-              )}
+              <p id="edit-investment-document-status" className="text-xs text-amber-500 mt-2" aria-live="polite">
+                {form.document_file
+                  ? `Belge seçildi: ${form.document_file.name}`
+                  : form.document_url && !form.document_url.startsWith('data:')
+                    ? 'Mevcut bir belge yüklü.'
+                    : null}
+              </p>
             </div>
 
             <div>
