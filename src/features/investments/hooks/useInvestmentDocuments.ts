@@ -2,6 +2,7 @@ import type { ChangeEvent, Dispatch, SetStateAction } from 'react'
 import { useCallback, useState } from 'react'
 
 import type { NotificationSeverity } from '@/components/NotificationProvider'
+import { devError } from '@/lib/debug'
 import { validateOrganizationDocument } from '../../documents/document-reference'
 
 import type { BuyFormState } from '../types'
@@ -17,13 +18,6 @@ type InvestmentAnalysisResponse = {
   notes?: string
   purchase_date?: string
 }
-
-const getErrorMessage = (error: unknown) =>
-  error instanceof Error
-    ? error.message
-    : typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
-      ? error.message
-      : 'Bilinmeyen hata'
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -51,6 +45,7 @@ export function useInvestmentDocuments({
       if (!file) return
 
       if (file.size > 3 * 1024 * 1024) {
+        event.target.value = ''
         await showAlert(
           'Seçilen dosya çok büyük. Lütfen 3 MB altı bir dosya seçin veya kırparak tekrar deneyin.',
           'warning',
@@ -82,11 +77,8 @@ export function useInvestmentDocuments({
         }))
         await showAlert('Fiş başarıyla okundu ve form dolduruldu.', 'success')
       } catch (error) {
-        let message = getErrorMessage(error)
-        if (message === 'The string did not match the expected pattern.') {
-          message = 'Tarayıcı kaynaklı bir hata oluştu. Fotoğraf formatı desteklenmiyor olabilir.'
-        }
-        await showAlert(message || 'Yapay zeka fişi okuyamadı.', 'error')
+        devError('Yatırım belgesi analiz edilemedi.', error)
+        await showAlert('Yatırım belgesi analiz edilemedi. Lütfen tekrar deneyin.', 'error')
       } finally {
         setIsAnalyzing(false)
         event.target.value = ''
@@ -105,6 +97,7 @@ export function useInvestmentDocuments({
       if (!file) return
 
       if (!organizationId) {
+        event.target.value = ''
         await showAlert('Aktif organizasyon bulunamadı.', 'error')
         return
       }
@@ -116,6 +109,7 @@ export function useInvestmentDocuments({
         file,
       })
       if (validationError) {
+        event.target.value = ''
         await showAlert(validationError, 'warning')
         return
       }

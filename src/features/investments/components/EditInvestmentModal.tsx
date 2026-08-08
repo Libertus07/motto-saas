@@ -104,7 +104,7 @@ export function EditInvestmentModal({
               <input
                 id="edit-investment-document"
                 type="file"
-                accept="image/*,application/pdf,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
                 onChange={(e) => onFileUpload(e, setForm, form)}
                 aria-describedby="edit-investment-document-status"
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-3 text-stone-400 focus:outline-none focus:border-amber-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-stone-950 hover:file:bg-amber-400"

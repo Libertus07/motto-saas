@@ -109,7 +109,7 @@ export function useInvestmentsData() {
     setSaving(true)
 
     try {
-      if (!activeOrg?.id) throw new Error('Aktif organizasyon bulunamadÄ±.')
+      if (!activeOrg?.id) throw new Error('Aktif organizasyon bulunamadı.')
       const selectedAcc = accounts.find((a) => a.id === form.account_id)
       if (!selectedAcc) throw new Error('Hesap bulunamadı.')
 
@@ -151,7 +151,8 @@ export function useInvestmentsData() {
       fetchData()
       return true
     } catch (error: unknown) {
-      await showAlert('Hata: ' + getErrorMessage(error), 'error')
+      devError('Yatırım kaydedilemedi.', error)
+      await showAlert('Yatırım kaydedilemedi. Lütfen tekrar deneyin.', 'error')
       return false
     } finally {
       setSaving(false)
@@ -195,7 +196,8 @@ export function useInvestmentsData() {
       await fetchData()
       return true
     } catch (error: unknown) {
-      await showAlert('Hata: ' + getErrorMessage(error), 'error')
+      devError('Yatırım güncellenemedi.', error)
+      await showAlert('Yatırım güncellenemedi. Lütfen tekrar deneyin.', 'error')
       return false
     } finally {
       setSaving(false)
