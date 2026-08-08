@@ -334,98 +334,232 @@ değiştirilir. Çıktıda ham belge URL'si veya `data:` gövdesi bulunmaz.
 ### 9.1 Dört belge kolonunun format dağılımı
 
 ```sql
-WITH document_references AS (
+WITH reference_rules (
+    source_table,
+    expected_bucket,
+    expected_kind,
+    allowed_extension_pattern
+) AS (
+    VALUES
+        ('stock_movements'::text, 'motto_assets'::text, 'supplier-receipt'::text, '(jpg|png|webp|pdf|xml|json|xls|xlsx)'::text),
+        ('sales', 'receipts', 'z-report', '(jpg|png|webp|pdf|xml|json|xls|xlsx)'),
+        ('investments', 'motto_assets', 'investment-document', '(jpg|png|webp|pdf)'),
+        ('investment_transactions', 'motto_assets', 'investment-receipt', '(jpg|png|webp|pdf)')
+),
+document_references AS (
     SELECT
         'stock_movements'::text AS source_table,
         organization_id,
-        document_url,
-        'storage://motto_assets/' || organization_id::text || '/supplier-receipt/%' AS expected_pattern
+        document_url
     FROM public.stock_movements
     UNION ALL
     SELECT
         'sales',
         organization_id,
-        document_url,
-        'storage://receipts/' || organization_id::text || '/z-report/%'
+        document_url
     FROM public.sales
     UNION ALL
     SELECT
         'investments',
         organization_id,
-        document_url,
-        'storage://motto_assets/' || organization_id::text || '/investment-document/%'
+        document_url
     FROM public.investments
     UNION ALL
     SELECT
         'investment_transactions',
         organization_id,
-        document_url,
-        'storage://motto_assets/' || organization_id::text || '/investment-receipt/%'
+        document_url
     FROM public.investment_transactions
+),
+reference_inputs AS (
+    SELECT
+        document_references.source_table,
+        document_references.organization_id,
+        document_references.document_url,
+        reference_rules.expected_bucket,
+        reference_rules.expected_kind,
+        reference_rules.allowed_extension_pattern,
+        CASE
+            WHEN position(',' IN document_references.document_url) > 0
+            THEN substring(
+                document_references.document_url
+                FROM position(',' IN document_references.document_url) + 1
+            )
+        END AS base64_payload
+    FROM document_references
+    INNER JOIN reference_rules USING (source_table)
+),
+classified_references AS (
+    SELECT
+        source_table,
+        organization_id,
+        CASE
+            WHEN document_url IS NULL OR btrim(document_url) = '' THEN 'null_or_empty'
+            WHEN document_url ~ (
+                '^storage://' || expected_bucket || '/' || organization_id::text || '/' || expected_kind || '/' ||
+                '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.' ||
+                allowed_extension_pattern || '$'
+            ) THEN 'new_storage_tenant_scoped'
+            WHEN document_url ~ '^data:(image/jpeg|image/png|image/webp|application/pdf);base64,[A-Za-z0-9+/]+={0,2}$'
+              AND length(base64_payload) % 4 = 0 THEN 'legacy_data_safe'
+            WHEN document_url ~ '^https://[^[:space:]]+$' THEN 'legacy_https_candidate'
+            ELSE 'unsafe_or_unknown'
+        END AS reference_format
+    FROM reference_inputs
 )
 SELECT
     source_table,
-    CASE
-        WHEN document_url IS NULL OR btrim(document_url) = '' THEN 'null_or_empty'
-        WHEN document_url LIKE expected_pattern THEN 'new_storage_tenant_scoped'
-        WHEN document_url LIKE 'storage://%' THEN 'storage_wrong_scope_or_kind'
-        WHEN document_url LIKE 'data:%' THEN 'legacy_data'
-        WHEN document_url ~ '^https://' THEN 'legacy_https'
-        ELSE 'unsafe_or_unknown'
-    END AS reference_format,
+    reference_format,
     count(*) AS reference_count
-FROM document_references
+FROM classified_references
 WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
 GROUP BY source_table, reference_format
 ORDER BY source_table, reference_format;
 ```
 
-`storage_wrong_scope_or_kind` ve `unsafe_or_unknown` sonuçları sıfır olmadan `GO` verilmez. `null_or_empty`,
-`legacy_data` ve `legacy_https` ayrı sınıflar olarak kaydedilir; legacy URL'nin güvenilir origin doğrulaması ham
-değer kanıt paketine alınmadan uygulama smoke testiyle yapılır. Bu sorgu yalnız dağılım verir; yeni yazım kanıtı
-için aşağıdaki kayıt bazlı kontrol gerekir.
+`unsafe_or_unknown` sonucu sıfır olmadan `GO` verilmez. Bu sınıf; yanlış bucket/tenant/kind/uzantı, eksik nesne
+adı, `.`/`..`, ek slash/backslash, geçersiz `storage://` öneki ve desteklenmeyen ya da bozuk `data:` değerlerini
+kapsar. `new_storage_tenant_scoped` yalnız uygulamanın ürettiği tam biçimi kabul eder: satırın kendi
+`organization_id` değeri, doğru bucket/kind, RFC 4122 sürüm 4 nesne UUID'si ve belge türünün MIME eşlemesinden
+gelen küçük harfli uzantı. Tedarikçi fişi ve Z raporu `jpg/png/webp/pdf/xml/json/xls/xlsx`; yatırım belgesi ve
+yatırım fişi yalnız `jpg/png/webp/pdf` kabul eder.
+
+`legacy_data_safe` yalnız uygulamadaki dört exact prefix'i, boş olmayan Base64 alfabesini, en fazla iki sondaki
+padding karakterini ve dörde bölünebilir payload uzunluğunu kabul eder. `legacy_https_candidate` SQL düzeyinde
+yalnız aday sınıfıdır; gerçek URL ayrıştırma, güvenilir origin ve önizleme uygunluğu ham değer kanıt paketine
+alınmadan uygulama smoke testiyle doğrulanır. Bu sorgu yalnız dağılım verir; yeni yazım kanıtı için aşağıdaki aynı
+predicate'i kullanan kayıt bazlı kontrol gerekir.
 
 ### 9.2 Yeni smoke kayıtlarının formatı
 
 ```sql
-SELECT 'stock_movements' AS source_table, id,
-       document_url LIKE (
-           'storage://motto_assets/' || organization_id::text || '/supplier-receipt/%'
-       ) AS is_expected_tenant_storage_reference
-FROM public.stock_movements
-WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
-  AND id = '<SUPPLIER_RECEIPT_STOCK_MOVEMENT_UUID>'::uuid
-UNION ALL
-SELECT 'sales', id,
-       document_url LIKE (
-           'storage://receipts/' || organization_id::text || '/z-report/%'
-       )
-FROM public.sales
-WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
-  AND id = '<Z_REPORT_SALE_UUID>'::uuid
-UNION ALL
-SELECT 'investments', id,
-       document_url LIKE (
-           'storage://motto_assets/' || organization_id::text || '/investment-document/%'
-       )
-FROM public.investments
-WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
-  AND id = '<INVESTMENT_UUID>'::uuid
-UNION ALL
-SELECT 'investment_transactions', id,
-       document_url LIKE (
-           'storage://motto_assets/' || organization_id::text || '/investment-receipt/%'
-       )
-FROM public.investment_transactions
-WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
-  AND id = '<INVESTMENT_TRANSACTION_UUID>'::uuid;
+WITH reference_rules (
+    source_table,
+    expected_bucket,
+    expected_kind,
+    allowed_extension_pattern
+) AS (
+    VALUES
+        ('stock_movements'::text, 'motto_assets'::text, 'supplier-receipt'::text, '(jpg|png|webp|pdf|xml|json|xls|xlsx)'::text),
+        ('sales', 'receipts', 'z-report', '(jpg|png|webp|pdf|xml|json|xls|xlsx)'),
+        ('investments', 'motto_assets', 'investment-document', '(jpg|png|webp|pdf)'),
+        ('investment_transactions', 'motto_assets', 'investment-receipt', '(jpg|png|webp|pdf)')
+),
+smoke_references AS (
+    SELECT 'stock_movements'::text AS source_table, id, organization_id, document_url
+    FROM public.stock_movements
+    WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
+      AND id = '<SUPPLIER_RECEIPT_STOCK_MOVEMENT_UUID>'::uuid
+    UNION ALL
+    SELECT 'sales', id, organization_id, document_url
+    FROM public.sales
+    WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
+      AND id = '<Z_REPORT_SALE_UUID>'::uuid
+    UNION ALL
+    SELECT 'investments', id, organization_id, document_url
+    FROM public.investments
+    WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
+      AND id = '<INVESTMENT_UUID>'::uuid
+    UNION ALL
+    SELECT 'investment_transactions', id, organization_id, document_url
+    FROM public.investment_transactions
+    WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
+      AND id = '<INVESTMENT_TRANSACTION_UUID>'::uuid
+)
+SELECT
+    smoke_references.source_table,
+    smoke_references.id,
+    smoke_references.document_url ~ (
+        '^storage://' || reference_rules.expected_bucket || '/' || smoke_references.organization_id::text || '/' ||
+        reference_rules.expected_kind || '/' ||
+        '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.' ||
+        reference_rules.allowed_extension_pattern || '$'
+    ) AS is_expected_tenant_storage_reference
+FROM smoke_references
+INNER JOIN reference_rules USING (source_table)
+ORDER BY smoke_references.source_table;
 ```
 
-Dört satırın tamamı mevcut ve `is_expected_tenant_storage_reference = true` olmalıdır. Böylece bucket/kind kadar
-referansın tenant path segmenti de satırın kendi `organization_id` değeriyle doğrulanır. Tam referans değeri kanıt
-paketine kopyalanmaz.
+Dört satırın tamamı mevcut ve `is_expected_tenant_storage_reference = true` olmalıdır. Bu boolean, 9.1'deki
+`new_storage_tenant_scoped` predicate'inin aynısıdır; biri değiştirilirse ikisi aynı review içinde birlikte
+güncellenir. Tam referans değeri kanıt paketine kopyalanmaz.
 
-### 9.3 Legacy değerlerin değişmediğinin kanıtı
+### 9.3 Exact predicate negatif/pozitif kontrolü
+
+Aşağıdaki salt okunur self-test, sorgu predicate'inin gevşemediğini kanıtlar. Sonuç **sıfır satır** olmalıdır;
+tek satır bile `NO-GO` nedenidir. Fixture'lar müşteri verisi içermez.
+
+```sql
+WITH fixtures (case_name, organization_id, expected_bucket, expected_kind, allowed_extension_pattern, document_url, expected_valid) AS (
+    VALUES
+        ('valid_supplier_pdf', '11111111-1111-4111-8111-111111111111'::uuid, 'motto_assets', 'supplier-receipt', '(jpg|png|webp|pdf|xml|json|xls|xlsx)', 'storage://motto_assets/11111111-1111-4111-8111-111111111111/supplier-receipt/22222222-2222-4222-8222-222222222222.pdf', true),
+        ('valid_z_report_xlsx', '11111111-1111-4111-8111-111111111111'::uuid, 'receipts', 'z-report', '(jpg|png|webp|pdf|xml|json|xls|xlsx)', 'storage://receipts/11111111-1111-4111-8111-111111111111/z-report/22222222-2222-4222-8222-222222222222.xlsx', true),
+        ('empty_path', '11111111-1111-4111-8111-111111111111'::uuid, 'motto_assets', 'supplier-receipt', '(jpg|png|webp|pdf|xml|json|xls|xlsx)', 'storage://motto_assets/', false),
+        ('wrong_prefix', '11111111-1111-4111-8111-111111111111'::uuid, 'motto_assets', 'supplier-receipt', '(jpg|png|webp|pdf|xml|json|xls|xlsx)', 'storage:/motto_assets/11111111-1111-4111-8111-111111111111/supplier-receipt/22222222-2222-4222-8222-222222222222.pdf', false),
+        ('dot_path', '11111111-1111-4111-8111-111111111111'::uuid, 'motto_assets', 'supplier-receipt', '(jpg|png|webp|pdf|xml|json|xls|xlsx)', 'storage://motto_assets/11111111-1111-4111-8111-111111111111/supplier-receipt/./22222222-2222-4222-8222-222222222222.pdf', false),
+        ('dotdot_path', '11111111-1111-4111-8111-111111111111'::uuid, 'motto_assets', 'supplier-receipt', '(jpg|png|webp|pdf|xml|json|xls|xlsx)', 'storage://motto_assets/11111111-1111-4111-8111-111111111111/supplier-receipt/../22222222-2222-4222-8222-222222222222.pdf', false),
+        ('extra_slash_path', '11111111-1111-4111-8111-111111111111'::uuid, 'motto_assets', 'supplier-receipt', '(jpg|png|webp|pdf|xml|json|xls|xlsx)', 'storage://motto_assets/11111111-1111-4111-8111-111111111111/supplier-receipt//22222222-2222-4222-8222-222222222222.pdf', false),
+        ('backslash_path', '11111111-1111-4111-8111-111111111111'::uuid, 'motto_assets', 'supplier-receipt', '(jpg|png|webp|pdf|xml|json|xls|xlsx)', 'storage://motto_assets/11111111-1111-4111-8111-111111111111\\supplier-receipt\\22222222-2222-4222-8222-222222222222.pdf', false),
+        ('wrong_extension', '11111111-1111-4111-8111-111111111111'::uuid, 'motto_assets', 'investment-document', '(jpg|png|webp|pdf)', 'storage://motto_assets/11111111-1111-4111-8111-111111111111/investment-document/22222222-2222-4222-8222-222222222222.xlsx', false),
+        ('wrong_organization', '11111111-1111-4111-8111-111111111111'::uuid, 'motto_assets', 'supplier-receipt', '(jpg|png|webp|pdf|xml|json|xls|xlsx)', 'storage://motto_assets/99999999-9999-4999-8999-999999999999/supplier-receipt/22222222-2222-4222-8222-222222222222.pdf', false),
+        ('wrong_kind', '11111111-1111-4111-8111-111111111111'::uuid, 'motto_assets', 'investment-receipt', '(jpg|png|webp|pdf)', 'storage://motto_assets/11111111-1111-4111-8111-111111111111/investment-document/22222222-2222-4222-8222-222222222222.pdf', false),
+        ('wrong_bucket', '11111111-1111-4111-8111-111111111111'::uuid, 'receipts', 'z-report', '(jpg|png|webp|pdf|xml|json|xls|xlsx)', 'storage://motto_assets/11111111-1111-4111-8111-111111111111/z-report/22222222-2222-4222-8222-222222222222.pdf', false)
+),
+evaluated AS (
+    SELECT
+        case_name,
+        expected_valid,
+        document_url ~ (
+            '^storage://' || expected_bucket || '/' || organization_id::text || '/' || expected_kind || '/' ||
+            '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.' ||
+            allowed_extension_pattern || '$'
+        ) AS actual_valid
+    FROM fixtures
+)
+SELECT case_name, expected_valid, actual_valid
+FROM evaluated
+WHERE actual_valid IS DISTINCT FROM expected_valid;
+```
+
+Safe legacy `data:` predicate'i için aşağıdaki ikinci self-test de **sıfır satır** dönmelidir:
+
+```sql
+WITH fixtures (case_name, document_url, expected_valid) AS (
+    VALUES
+        ('valid_pdf', 'data:application/pdf;base64,cGRm', true),
+        ('empty_payload', 'data:application/pdf;base64,', false),
+        ('unsupported_svg', 'data:image/svg+xml;base64,PHN2Zy8+', false),
+        ('whitespace_in_payload', 'data:image/png;base64,aG Vs', false),
+        ('invalid_padding', 'data:image/jpeg;base64,YQ===', false),
+        ('invalid_length', 'data:image/webp;base64,YQ=', false)
+),
+reference_inputs AS (
+    SELECT
+        case_name,
+        document_url,
+        expected_valid,
+        CASE
+            WHEN position(',' IN document_url) > 0
+            THEN substring(document_url FROM position(',' IN document_url) + 1)
+        END AS base64_payload
+    FROM fixtures
+),
+evaluated AS (
+    SELECT
+        case_name,
+        expected_valid,
+        document_url ~ '^data:(image/jpeg|image/png|image/webp|application/pdf);base64,[A-Za-z0-9+/]+={0,2}$'
+        AND length(base64_payload) % 4 = 0 AS actual_valid
+    FROM reference_inputs
+)
+SELECT case_name, expected_valid, actual_valid
+FROM evaluated
+WHERE actual_valid IS DISTINCT FROM expected_valid;
+```
+
+Negatif fixture sonuçları release kanıtında isimleriyle kaydedilir; ham payload kaydedilmez.
+
+### 9.4 Legacy değerlerin değişmediğinin kanıtı
 
 Hazırlık öncesi ve gözlem sonunda seçilen legacy kayıtlar için yalnız aşağıdaki hash sorgusu çalıştırılır:
 
@@ -454,7 +588,7 @@ WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
 Önce/sonra hash'leri aynı olmalı ve ilgili legacy önizleme smoke testi geçmelidir. Hash eşleşmesi tek başına
 okunabilirlik kanıtı değildir.
 
-### 9.4 Bucket durum kaydı
+### 9.5 Bucket durum kaydı
 
 ```sql
 SELECT id, public, file_size_limit, allowed_mime_types
