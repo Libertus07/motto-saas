@@ -13,6 +13,9 @@ export {
   uploadOrganizationDocument,
 } from './document-storage-service'
 
+export { loadSupplierDocumentReference, openSupplierDocument } from './supplier-document-reference'
+export { useDocumentPreview } from './useDocumentPreview'
+
 export {
   createFinancialDocumentUploadInput,
   scopeSupplierReceiptPayload,

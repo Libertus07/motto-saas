@@ -58,7 +58,8 @@ export type InvestmentListActions = {
   onRent: (investment: EnhancedInvestment) => void
   onUpdateValue: (investment: EnhancedInvestment) => void
   onNote: (note: string) => void
-  onDoc: (url: string) => void
+  onDoc: (reference: string) => Promise<void>
+  documentPreviewLoadingReference: string | null
   onEdit: (investment: EnhancedInvestment) => void
   onDelete: (id: string) => void
 }

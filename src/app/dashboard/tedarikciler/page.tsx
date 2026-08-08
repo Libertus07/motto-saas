@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
+import { openSupplierDocument, useDocumentPreview } from '@/features/documents'
 import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
@@ -90,7 +91,7 @@ export default function Tedarikciler() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [groupedReceipts, setGroupedReceipts] = useState<GroupedReceipt[]>([])
   const [expandedBatch, setExpandedBatch] = useState<string | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [viewingDocumentBatchId, setViewingDocumentBatchId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'hareketler' | 'urunler' | 'bilgiler'>('hareketler')
   const [supplierSearch, setSupplierSearch] = useState('')
 
@@ -107,6 +108,8 @@ export default function Tedarikciler() {
   const [paymentAccountId, setPaymentAccountId] = useState<string>('')
 
   const supabase = useMemo(() => createClient(), [])
+  const documentRequestPending = useRef(false)
+  const { previewUrl, openDocument, closeDocument } = useDocumentPreview()
 
   const fetchAccounts = useCallback(async () => {
     if (!activeOrg) return
@@ -184,25 +187,21 @@ export default function Tedarikciler() {
   }
 
   const viewDocument = async (batchId: string | null) => {
-    if (!batchId) {
-      await showAlert('Bu işlem için ekli belge bulunamadı.', 'error')
-      return
-    }
-    setLoading(true)
-    const { data } = await supabase
-      .from('stock_movements')
-      .select('document_url')
-      .eq('batch_id', batchId)
-      .eq('organization_id', activeOrg?.id)
-      .not('document_url', 'is', null)
-      .limit(1)
-      .single()
+    if (documentRequestPending.current) return
 
-    setLoading(false)
-    if (data?.document_url) {
-      setPreviewUrl(data.document_url)
-    } else {
-      await showAlert('Veritabanında bu kayıt için herhangi bir fatura/fiş görseli bulunamadı.', 'error')
+    documentRequestPending.current = true
+    setViewingDocumentBatchId(batchId)
+    try {
+      await openSupplierDocument({
+        batchId,
+        openDocument,
+        organizationId: activeOrg?.id ?? null,
+        showAlert,
+        supabase,
+      })
+    } finally {
+      documentRequestPending.current = false
+      setViewingDocumentBatchId(null)
     }
   }
 
@@ -759,11 +758,15 @@ export default function Tedarikciler() {
 
                                 {group.batchId && (
                                   <button
+                                    type="button"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      viewDocument(group.batchId)
+                                      void viewDocument(group.batchId)
                                     }}
-                                    className="p-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white rounded-xl border border-stone-700 text-xs transition-colors"
+                                    disabled={viewingDocumentBatchId === group.batchId}
+                                    aria-busy={viewingDocumentBatchId === group.batchId}
+                                    aria-label="Tedarikçi belgesini görüntüle"
+                                    className="p-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white rounded-xl border border-stone-700 text-xs transition-colors disabled:cursor-wait disabled:opacity-60"
                                     title="Belgeyi Gör"
                                   >
                                     🖼️ Belge
@@ -1061,7 +1064,7 @@ export default function Tedarikciler() {
       {/* Belge Önizleme Modalı */}
       <DocumentPreviewModal
         isOpen={!!previewUrl}
-        onClose={() => setPreviewUrl(null)}
+        onClose={closeDocument}
         url={previewUrl}
         title="Tedarikçi Belgesi Önizleme"
       />

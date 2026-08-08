@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
+import { useDocumentPreview } from '@/features/documents'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useNotification } from '@/components/NotificationProvider'
@@ -41,9 +42,9 @@ export default function YatirimGecmisi() {
   const [transactions, setTransactions] = useState<InvestmentTransaction[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedMonth, setSelectedMonth] = useState<string>('all')
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const { showAlert, showConfirm } = useNotification()
   const { activeOrg } = useOrganization()
+  const { previewUrl, previewReference, openDocument, closeDocument } = useDocumentPreview()
 
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
@@ -267,11 +268,15 @@ export default function YatirimGecmisi() {
 
                       {inv.document_url && (
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation()
-                            setPreviewUrl(inv.document_url)
+                            void openDocument(inv.document_url)
                           }}
-                          className="bg-stone-800 hover:bg-stone-700 text-stone-300 px-3 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors border border-stone-700 active:scale-95"
+                          disabled={previewReference === inv.document_url}
+                          aria-busy={previewReference === inv.document_url}
+                          aria-label="Yatırım belgesini görüntüle"
+                          className="bg-stone-800 hover:bg-stone-700 text-stone-300 px-3 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors border border-stone-700 active:scale-95 disabled:cursor-wait disabled:opacity-60"
                         >
                           <span>🖼️</span> Belgeyi Gör
                         </button>
@@ -301,7 +306,7 @@ export default function YatirimGecmisi() {
       {/* Belge Önizleme Modalı */}
       <DocumentPreviewModal
         isOpen={!!previewUrl}
-        onClose={() => setPreviewUrl(null)}
+        onClose={closeDocument}
         url={previewUrl}
         title="Yatırım Belgesi Önizleme"
       />

@@ -2,6 +2,7 @@ import type { FormEvent } from 'react'
 import { useCallback, useEffect, useMemo } from 'react'
 
 import { useNotification } from '@/components/NotificationProvider'
+import { useDocumentPreview } from '@/features/documents'
 import { useAppTour } from '@/hooks/useAppTour'
 
 import type { EnhancedInvestment } from '../types'
@@ -15,6 +16,7 @@ export function useInvestmentWorkspace() {
   const { showAlert } = useNotification()
   const data = useInvestmentsData()
   const ui = useInvestmentsUI()
+  const documentPreview = useDocumentPreview()
   const { buyForm, setBuyForm } = ui
   const documents = useInvestmentDocuments({ setBuyForm, showAlert, organizationId: data.activeOrganizationId })
 
@@ -130,10 +132,8 @@ export function useInvestmentWorkspace() {
         ui.setNotePreviewText(note)
         ui.setIsNoteModalOpen(true)
       },
-      onDoc: (url: string) => {
-        ui.setDocPreviewUrl(url)
-        ui.setIsDocModalOpen(true)
-      },
+      onDoc: documentPreview.openDocument,
+      documentPreviewLoadingReference: documentPreview.previewReference,
       onEdit: ui.openEditModal,
       onDelete: data.deleteInvestment,
     },
@@ -172,9 +172,9 @@ export function useInvestmentWorkspace() {
         onSubmit: submitEdit,
       },
       documentPreview: {
-        isOpen: ui.isDocModalOpen,
-        onClose: () => ui.setIsDocModalOpen(false),
-        url: ui.docPreviewUrl,
+        isOpen: !!documentPreview.previewUrl,
+        onClose: documentPreview.closeDocument,
+        url: documentPreview.previewUrl ?? '',
       },
       notePreview: {
         isOpen: ui.isNoteModalOpen,

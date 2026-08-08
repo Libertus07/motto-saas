@@ -26,6 +26,7 @@ export function InvestmentCard({
   onUpdateValue,
   onNote,
   onDoc,
+  documentPreviewLoadingReference,
   onEdit,
   onDelete,
 }: InvestmentCardProps) {
@@ -109,8 +110,10 @@ export function InvestmentCard({
             {investment.document_url ? (
               <button
                 type="button"
-                onClick={() => onDoc(investment.document_url!)}
-                className="flex items-center gap-2 rounded-lg border border-blue-600/30 bg-blue-600/20 px-3 py-1.5 text-xs font-bold text-blue-400 transition-colors hover:bg-blue-600/40"
+                onClick={() => void onDoc(investment.document_url!)}
+                disabled={documentPreviewLoadingReference === investment.document_url}
+                aria-busy={documentPreviewLoadingReference === investment.document_url}
+                className="flex items-center gap-2 rounded-lg border border-blue-600/30 bg-blue-600/20 px-3 py-1.5 text-xs font-bold text-blue-400 transition-colors hover:bg-blue-600/40 disabled:cursor-wait disabled:opacity-60"
               >
                 📎 Belge
               </button>

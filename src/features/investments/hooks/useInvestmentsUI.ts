@@ -50,10 +50,6 @@ export function useInvestmentsUI() {
     document_file: null,
   })
 
-  // Doc Preview
-  const [isDocModalOpen, setIsDocModalOpen] = useState(false)
-  const [docPreviewUrl, setDocPreviewUrl] = useState('')
-
   // Note Preview
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
   const [notePreviewText, setNotePreviewText] = useState('')
@@ -128,11 +124,6 @@ export function useInvestmentsUI() {
     setIsEditModalOpen,
     editForm,
     setEditForm,
-
-    isDocModalOpen,
-    setIsDocModalOpen,
-    docPreviewUrl,
-    setDocPreviewUrl,
 
     isNoteModalOpen,
     setIsNoteModalOpen,
