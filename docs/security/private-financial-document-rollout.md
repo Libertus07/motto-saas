@@ -82,6 +82,8 @@ migration'ın kontrolsüz uygulanmasına izin vermez.
 ### 3.2 Uyumlu uygulama artifact'i
 
 - Kaynak commit: `108f36d920f43f0c7295e107a21214ea3b21803d`
+- Uyumluluk migration'ını ekleyen commit: `1e8a8ea6bd66537c6e0439cab06b2252dd86b0c7` (uygulama artifact'inin
+  ancestor'ı)
 - Ek uyumluluk migration'ı:
   `supabase/migrations/20260807231139_secure_atomic_financial_receipt_writes.sql`
 - İlgili uygulama servisleri:
@@ -209,24 +211,80 @@ npx supabase@2.111.0 migration list --linked
 Komut etkileşimli bırakılır; operatör hedefi son kez görmeden otomatik onay verilmez. Uygulama zamanı, CLI exit
 code'u ve remote migration listesi kanıt kaydına yazılır.
 
-### 6.3 Uyumlu migration ve uygulama dağıtım kapısı
+### 6.3 Hazırlık sonrası, eski uygulama uyumluluk kapısı
+
+Hazırlık migration'ı uygulandıktan sonra **uyumluluk migration'ı veya yeni uygulama dağıtılmadan önce**, halen
+yayında olan eski uygulama sürümüyle ayrı bir geriye uyumluluk kapısı çalıştırılır. Test, yalnız sentetik belge ve
+önceden tanımlanmış test organizasyonuyla yapılır; müşteri verisi kullanılmaz.
+
+Zorunlu sıra:
+
+1. Halen yayındaki uygulamanın URL'si, deployment kimliği ve tam commit SHA'sı kaydedilir.
+2. Aktif aynı-organizasyon test üyesiyle eski uygulamadan desteklenen sentetik bir belge yüklenir.
+3. Oluşan kayıt kimliği ve referans sınıfı `legacy_data` veya `legacy_https` olarak, ham URL ya da belge içeriği
+   kaydedilmeden doğrulanır.
+4. Aynı yeni kayıt halen yayındaki uygulamanın normal liste/geçmiş akışından açılır; önizleme ile desteklenen
+   indirme/yeni sekme davranışı doğrulanır.
+5. Ayrı, önceden var olan bir legacy `data:` ve güvenilir public Storage URL kaydı da önizlenir; önce/sonra
+   referans hash'leri eşit olmalıdır.
+6. Test kaydının temizlenmesi gerekiyorsa yalnız normal uygulama iş akışı ve önceden onaylanmış test verisi
+   prosedürü kullanılır; `storage.objects` veya iş tablolarına doğrudan silme yapılmaz.
+
+Bu kapının tüm adımları geçmeden `20260807231139_secure_atomic_financial_receipt_writes.sql` uygulanmaz ve yeni
+uygulama artifact'i dağıtılmaz. Başarısızlıkta sonuç `NO-GO` olur:
+
+- Uyumlu migration ve uygulama deploy'u durdurulur.
+- Sürüm sahibi, veritabanı sahibi, güvenlik doğrulayıcısı ve geri alma karar sahibi bilgilendirilir; kanıt paketi
+  korunur.
+- Hazırlık migration'ı yalnız müşteri etkisi olmadığı doğrulanırsa yerinde kalabilir. Müşteri etkisi veya devam
+  eden eski-uygulama regresyonu varsa veritabanı sahibi ayrı onaylı ileri düzeltme/recovery planı hazırlar; ad hoc
+  ters SQL, history repair veya bucket'ı public yapma uygulanmaz.
+- Sorun giderilip bu kapı baştan ve eksiksiz geçmeden release yeniden başlatılmaz.
+
+### 6.4 Uyumlu migration ve uygulama dağıtım kapısı
 
 Onaylanan uygulama artifact'inin çalışma dizininde hedef doğrulama tekrarlanır:
 
 ```powershell
+$expectedProjectRef = '<EXPECTED_PROJECT_REF>'
+$actualProjectRef = (Get-Content -Raw 'supabase/.temp/project-ref').Trim()
+if ($expectedProjectRef -eq '<EXPECTED_PROJECT_REF>' -or $actualProjectRef -ne $expectedProjectRef) {
+  throw 'Uyumlu migration için Supabase hedefi doğrulanamadı.'
+}
+
 $expectedApplicationCommit = '108f36d920f43f0c7295e107a21214ea3b21803d'
 $actualCommit = (git rev-parse HEAD).Trim()
 if ($actualCommit -ne $expectedApplicationCommit) {
   throw 'Uygulama artifact commit SHA değeri eşleşmiyor.'
 }
 
+npx supabase@2.111.0 migration list --linked
 npx supabase@2.111.0 db push --linked --dry-run
 ```
 
 Dry-run çıktısında uygulanacak migration listesi **yalnız**
-`20260807231139_secure_atomic_financial_receipt_writes.sql` olmalıdır. Sonuç imzalandıktan ve canlı uygulama
-onayı yeniden doğrulandıktan sonra migration uygulanır; ardından aynı tam SHA'dan üretilmiş uygulama artifact'i
-kurumun onaylı dağıtım mekanizmasıyla dağıtılır. Bu belgede Vercel proje adı veya deploy komutu varsayılmaz.
+`20260807231139_secure_atomic_financial_receipt_writes.sql` olmalıdır. Eski uygulama uyumluluk kapısının kanıtı,
+dry-run çıktısı ve gerçek migration uygulama onayı release kaydında ayrı kimliklerle bulunmalıdır. Kayıtlı kapı
+ve onay yoksa aşağıdaki gerçek uygulama komutları çalıştırılmaz:
+
+```powershell
+$legacyCompatibilityEvidence = '<PRE_APP_LEGACY_COMPATIBILITY_EVIDENCE_ID>'
+$compatibilityMigrationApproval = '<RECORDED_COMPATIBILITY_MIGRATION_APPROVAL_ID>'
+if (
+  $legacyCompatibilityEvidence -eq '<PRE_APP_LEGACY_COMPATIBILITY_EVIDENCE_ID>' -or
+  $compatibilityMigrationApproval -eq '<RECORDED_COMPATIBILITY_MIGRATION_APPROVAL_ID>'
+) {
+  throw 'Eski uygulama uyumluluk kanıtı veya migration uygulama onayı kaydedilmedi.'
+}
+
+npx supabase@2.111.0 db push --linked
+npx supabase@2.111.0 migration list --linked
+```
+
+Post-apply migration listesinde iki beklenen migration'ın remote tarafta bulunduğu ve yeni/beklenmeyen migration
+uygulanmadığı kanıtlanır. Gerçek uygulama zamanı, CLI exit code'u, uygulayan veritabanı sahibi ve kanıt bağlantısı
+release kaydına eklenir. Bu kapı geçtikten sonra aynı tam SHA'dan üretilmiş uygulama artifact'i kurumun onaylı
+dağıtım mekanizmasıyla dağıtılır. Bu belgede Vercel proje adı veya deploy komutu varsayılmaz.
 
 Uygulama URL'si, platform deployment kimliği, tam commit SHA, artifact checksum'u ve dağıtım zamanı release
 kaydına yazılır. Preview/branch URL'si ile üretim URL'si karıştırılmaz.
@@ -277,29 +335,43 @@ değiştirilir. Çıktıda ham belge URL'si veya `data:` gövdesi bulunmaz.
 
 ```sql
 WITH document_references AS (
-    SELECT 'stock_movements'::text AS source_table, organization_id, document_url
+    SELECT
+        'stock_movements'::text AS source_table,
+        organization_id,
+        document_url,
+        'storage://motto_assets/' || organization_id::text || '/supplier-receipt/%' AS expected_pattern
     FROM public.stock_movements
-    WHERE document_url IS NOT NULL
     UNION ALL
-    SELECT 'sales', organization_id, document_url
+    SELECT
+        'sales',
+        organization_id,
+        document_url,
+        'storage://receipts/' || organization_id::text || '/z-report/%'
     FROM public.sales
-    WHERE document_url IS NOT NULL
     UNION ALL
-    SELECT 'investments', organization_id, document_url
+    SELECT
+        'investments',
+        organization_id,
+        document_url,
+        'storage://motto_assets/' || organization_id::text || '/investment-document/%'
     FROM public.investments
-    WHERE document_url IS NOT NULL
     UNION ALL
-    SELECT 'investment_transactions', organization_id, document_url
+    SELECT
+        'investment_transactions',
+        organization_id,
+        document_url,
+        'storage://motto_assets/' || organization_id::text || '/investment-receipt/%'
     FROM public.investment_transactions
-    WHERE document_url IS NOT NULL
 )
 SELECT
     source_table,
     CASE
-        WHEN document_url LIKE 'storage://%' THEN 'storage'
-        WHEN document_url LIKE 'data:%' THEN 'data'
-        WHEN document_url ~ '^https?://' THEN 'http'
-        ELSE 'other'
+        WHEN document_url IS NULL OR btrim(document_url) = '' THEN 'null_or_empty'
+        WHEN document_url LIKE expected_pattern THEN 'new_storage_tenant_scoped'
+        WHEN document_url LIKE 'storage://%' THEN 'storage_wrong_scope_or_kind'
+        WHEN document_url LIKE 'data:%' THEN 'legacy_data'
+        WHEN document_url ~ '^https://' THEN 'legacy_https'
+        ELSE 'unsafe_or_unknown'
     END AS reference_format,
     count(*) AS reference_count
 FROM document_references
@@ -308,38 +380,49 @@ GROUP BY source_table, reference_format
 ORDER BY source_table, reference_format;
 ```
 
-`other` sonucu incelenmeden `GO` verilmez. Bu sorgu yalnız dağılım verir; yeni yazım kanıtı için aşağıdaki kayıt
-bazlı kontrol gerekir.
+`storage_wrong_scope_or_kind` ve `unsafe_or_unknown` sonuçları sıfır olmadan `GO` verilmez. `null_or_empty`,
+`legacy_data` ve `legacy_https` ayrı sınıflar olarak kaydedilir; legacy URL'nin güvenilir origin doğrulaması ham
+değer kanıt paketine alınmadan uygulama smoke testiyle yapılır. Bu sorgu yalnız dağılım verir; yeni yazım kanıtı
+için aşağıdaki kayıt bazlı kontrol gerekir.
 
 ### 9.2 Yeni smoke kayıtlarının formatı
 
 ```sql
 SELECT 'stock_movements' AS source_table, id,
-       document_url LIKE 'storage://motto_assets/%/supplier-receipt/%' AS is_expected_storage_reference
+       document_url LIKE (
+           'storage://motto_assets/' || organization_id::text || '/supplier-receipt/%'
+       ) AS is_expected_tenant_storage_reference
 FROM public.stock_movements
 WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
   AND id = '<SUPPLIER_RECEIPT_STOCK_MOVEMENT_UUID>'::uuid
 UNION ALL
 SELECT 'sales', id,
-       document_url LIKE 'storage://receipts/%/z-report/%'
+       document_url LIKE (
+           'storage://receipts/' || organization_id::text || '/z-report/%'
+       )
 FROM public.sales
 WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
   AND id = '<Z_REPORT_SALE_UUID>'::uuid
 UNION ALL
 SELECT 'investments', id,
-       document_url LIKE 'storage://motto_assets/%/investment-document/%'
+       document_url LIKE (
+           'storage://motto_assets/' || organization_id::text || '/investment-document/%'
+       )
 FROM public.investments
 WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
   AND id = '<INVESTMENT_UUID>'::uuid
 UNION ALL
 SELECT 'investment_transactions', id,
-       document_url LIKE 'storage://motto_assets/%/investment-receipt/%'
+       document_url LIKE (
+           'storage://motto_assets/' || organization_id::text || '/investment-receipt/%'
+       )
 FROM public.investment_transactions
 WHERE organization_id = '<TEST_ORGANIZATION_UUID>'::uuid
   AND id = '<INVESTMENT_TRANSACTION_UUID>'::uuid;
 ```
 
-Dört satırın tamamı mevcut ve `is_expected_storage_reference = true` olmalıdır. Tam referans değeri kanıt
+Dört satırın tamamı mevcut ve `is_expected_tenant_storage_reference = true` olmalıdır. Böylece bucket/kind kadar
+referansın tenant path segmenti de satırın kendi `organization_id` değeriyle doğrulanır. Tam referans değeri kanıt
 paketine kopyalanmaz.
 
 ### 9.3 Legacy değerlerin değişmediğinin kanıtı
@@ -416,14 +499,18 @@ redakte mesaj tutulur. URL query string'leri, Authorization header'ları ve belg
 
 1. **Yerel kapı:** Tüm yerel kanıtlar aynı SHA için geçmezse `NO-GO`.
 2. **Hazırlık dry-run:** Liste yalnız hazırlık migration'ı değilse `NO-GO`.
-3. **Hazırlık uygulaması:** Sonuç, migration listesi ve legacy uyumluluk kanıtı kaydedilir.
-4. **Uyumlu migration dry-run:** Liste yalnız uyumluluk migration'ı değilse `NO-GO`.
-5. **Uyumlu migration + uygulama:** Önce veritabanı uyumluluğu, ardından aynı onaylı SHA'dan uygulama dağıtılır.
-6. **Smoke + güvenlik:** Tüm matrisler geçmezse uygulama rollback değerlendirmesi başlar.
-7. **Gözlem:** Pencere boyunca eşikler korunmazsa uygulama rollback yapılır.
-8. **Uyumluluk sign-off:** Kanıt paketi tamamlanır; sonuç yalnız Task 7 için `GO` veya `NO-GO` olur.
-9. **Ayrı enforcement onayı:** Task 8 için kullanıcıdan yeni doğrudan onay alınır. Task 7 `GO` sonucu bu onayın
-   yerine geçmez.
+3. **Hazırlık uygulaması:** Sonuç ve post-apply migration listesi kaydedilir.
+4. **Eski uygulama legacy kapısı:** Halen yayındaki eski uygulamayla sentetik legacy/public yükleme ve önizleme
+   tamamen geçmezse `NO-GO`; uyumlu migration veya yeni uygulama deploy'u yapılmaz.
+5. **Uyumlu migration dry-run ve kayıtlı onay:** Liste yalnız uyumluluk migration'ı değilse veya gerçek uygulama
+   onayı kayıtlı değilse `NO-GO`.
+6. **Uyumlu migration uygulaması:** Post-apply migration listesi ve uygulama kanıtı kaydedilir.
+7. **Uyumlu uygulama deploy'u:** Yalnız aynı onaylı SHA'dan uygulama dağıtılır.
+8. **Smoke + güvenlik:** Tüm matrisler geçmezse uygulama rollback değerlendirmesi başlar.
+9. **Gözlem:** Pencere boyunca eşikler korunmazsa uygulama rollback yapılır.
+10. **Uyumluluk sign-off:** Kanıt paketi tamamlanır; sonuç yalnız Task 7 için `GO` veya `NO-GO` olur.
+11. **Ayrı enforcement onayı:** Task 8 için kullanıcıdan yeni doğrudan onay alınır. Task 7 `GO` sonucu bu onayın
+    yerine geçmez.
 
 ## 12. Geri alma karar ağacı
 
@@ -490,6 +577,15 @@ Her alan doldurulur; “başarılı” gibi kanıtsız serbest metin yeterli de�
 
 - Hazırlık migration'ı dry-run çıktısı/onayı:
 - Hazırlık migration'ı uygulanma zamanı ve saat dilimi:
+- Hazırlık sonrası halen yayındaki eski uygulamanın URL/deployment kimliği/commit SHA'sı:
+- Eski uygulama ile sentetik legacy/public upload kayıt kimliği ve referans sınıfı:
+- Eski uygulama ile yeni legacy/public kaydın önizleme/indirme sonucu:
+- Önceden var olan legacy `data:` ve public URL önizleme/hash sonucu:
+- Eski uygulama uyumluluk kapısı kararı, onaylayanlar ve kanıt bağlantısı:
+- Eski uygulama kapısı başarısızsa `NO-GO`, escalation ve recovery/rollback kararı:
+- Uyumlu migration preflight/dry-run kanıtı:
+- Uyumlu migration gerçek uygulama onay kimliği:
+- Uyumlu migration post-apply `migration list --linked` kanıtı:
 - Uygulama URL'si, deployment kimliği, commit SHA ve dağıtım zamanı:
 - Uyumlu migration uygulanma zamanı:
 - Aktif aynı-tenant smoke sonuçları:
@@ -531,7 +627,11 @@ Kanıt paketi bağlantısı:
 
 Yerel kalite sonucu:
 Hazırlık migration sonucu:
+Hazırlık sonrası eski uygulama legacy/public upload sonucu:
+Hazırlık sonrası eski uygulama legacy/public preview sonucu:
+Eski uygulama uyumluluk kapısı kararı ve kanıtı:
 Uyumluluk migration sonucu:
+Uyumlu migration uygulama onayı ve post-apply liste sonucu:
 Same-tenant smoke sonucu:
 Outsider denial sonucu:
 Suspended-member denial sonucu:
