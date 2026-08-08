@@ -44,7 +44,7 @@ export default function YatirimGecmisi() {
   const [selectedMonth, setSelectedMonth] = useState<string>('all')
   const { showAlert, showConfirm } = useNotification()
   const { activeOrg } = useOrganization()
-  const { previewUrl, previewReference, openDocument, closeDocument } = useDocumentPreview()
+  const { previewUrl, previewReference, openDocument, closeDocument } = useDocumentPreview(activeOrg?.id ?? null)
 
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()

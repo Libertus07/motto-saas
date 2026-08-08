@@ -7,6 +7,7 @@ const SUPPLIER_DOCUMENT_MISSING_MESSAGE = 'Bu işlem için ekli belge bulunamad�
 
 type OpenSupplierDocumentInput = {
   batchId: string | null
+  isRequestCurrent: () => boolean
   openDocument: (reference: string) => Promise<void>
   organizationId: string | null
   showAlert: (message: string, type: 'error') => Promise<void>
@@ -37,11 +38,14 @@ export async function loadSupplierDocumentReference(
 
 export async function openSupplierDocument({
   batchId,
+  isRequestCurrent,
   openDocument,
   organizationId,
   showAlert,
   supabase,
 }: OpenSupplierDocumentInput): Promise<void> {
+  if (!isRequestCurrent()) return
+
   if (!batchId || !organizationId) {
     await showAlert(SUPPLIER_DOCUMENT_MISSING_MESSAGE, 'error')
     return
@@ -49,6 +53,8 @@ export async function openSupplierDocument({
 
   try {
     const reference = await loadSupplierDocumentReference(supabase, organizationId, batchId)
+    if (!isRequestCurrent()) return
+
     if (!reference) {
       await showAlert(SUPPLIER_DOCUMENT_MISSING_MESSAGE, 'error')
       return
@@ -56,6 +62,7 @@ export async function openSupplierDocument({
 
     await openDocument(reference)
   } catch {
+    if (!isRequestCurrent()) return
     await showAlert(SUPPLIER_DOCUMENT_ERROR_MESSAGE, 'error')
   }
 }

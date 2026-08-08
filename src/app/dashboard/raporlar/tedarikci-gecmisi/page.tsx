@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react'
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
 import { openSupplierDocument, useDocumentPreview } from '@/features/documents'
 import { createClient } from '@/lib/supabase'
@@ -71,7 +71,9 @@ export default function TedarikciGecmisi() {
   const [allReceipts, setAllReceipts] = useState<GroupedReceipt[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [viewingDocumentBatchId, setViewingDocumentBatchId] = useState<string | null>(null)
+  const [viewingDocument, setViewingDocument] = useState<{ batchId: string | null; organizationId: string } | null>(
+    null,
+  )
 
   const [, setExpandedMain] = useState<string | null>(null) // Ay veya Tedarikçi
   const [expandedReceipt, setExpandedReceipt] = useState<string | null>(null) // Fişin içi
@@ -83,8 +85,25 @@ export default function TedarikciGecmisi() {
 
   const supabase = useMemo(() => createClient(), [])
   const documentRequestPending = useRef(false)
-  const { previewUrl, openDocument, closeDocument } = useDocumentPreview()
+  const documentRequestGeneration = useRef(0)
+  const documentRequestMounted = useRef(false)
+  const documentScope = useRef<string | null>(null)
+  const organizationId = activeOrg?.id ?? null
+  const viewingDocumentBatchId = viewingDocument?.organizationId === organizationId ? viewingDocument.batchId : null
+  const { previewUrl, openDocument, closeDocument } = useDocumentPreview(activeOrg?.id ?? null)
   const router = useRouter()
+
+  useLayoutEffect(() => {
+    documentRequestMounted.current = true
+    documentScope.current = organizationId
+    documentRequestGeneration.current += 1
+    documentRequestPending.current = false
+    return () => {
+      documentRequestMounted.current = false
+      documentRequestGeneration.current += 1
+      documentRequestPending.current = false
+    }
+  }, [organizationId])
 
   const fetchReceipts = useCallback(async () => {
     if (!activeOrg) return
@@ -160,19 +179,28 @@ export default function TedarikciGecmisi() {
   const viewDocument = async (batchId: string | null) => {
     if (documentRequestPending.current) return
 
+    const requestOrganizationId = organizationId
+    const requestGeneration = ++documentRequestGeneration.current
+    const isRequestCurrent = () =>
+      documentRequestMounted.current &&
+      documentScope.current === requestOrganizationId &&
+      documentRequestGeneration.current === requestGeneration
     documentRequestPending.current = true
-    setViewingDocumentBatchId(batchId)
+    if (requestOrganizationId) setViewingDocument({ batchId, organizationId: requestOrganizationId })
     try {
       await openSupplierDocument({
         batchId,
+        isRequestCurrent,
         openDocument,
-        organizationId: activeOrg?.id ?? null,
+        organizationId: requestOrganizationId,
         showAlert,
         supabase,
       })
     } finally {
-      documentRequestPending.current = false
-      setViewingDocumentBatchId(null)
+      if (isRequestCurrent()) {
+        documentRequestPending.current = false
+        setViewingDocument(null)
+      }
     }
   }
 

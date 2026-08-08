@@ -51,7 +51,7 @@ export default function GecmisRaporlar() {
   const [expandedDate, setExpandedDate] = useState<string | null>(null)
   const { showAlert, showConfirm } = useNotification()
   const { activeOrg } = useOrganization()
-  const { previewUrl, previewReference, openDocument, closeDocument } = useDocumentPreview()
+  const { previewUrl, previewReference, openDocument, closeDocument } = useDocumentPreview(activeOrg?.id ?? null)
 
   // Filters & Sorting
   const [selectedMonth, setSelectedMonth] = useState<string>('all')

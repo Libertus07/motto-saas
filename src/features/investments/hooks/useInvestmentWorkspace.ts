@@ -16,7 +16,7 @@ export function useInvestmentWorkspace() {
   const { showAlert } = useNotification()
   const data = useInvestmentsData()
   const ui = useInvestmentsUI()
-  const documentPreview = useDocumentPreview()
+  const documentPreview = useDocumentPreview(data.activeOrganizationId ?? null)
   const { buyForm, setBuyForm } = ui
   const documents = useInvestmentDocuments({ setBuyForm, showAlert, organizationId: data.activeOrganizationId })
 

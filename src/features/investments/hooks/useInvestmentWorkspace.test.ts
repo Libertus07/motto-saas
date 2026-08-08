@@ -80,6 +80,7 @@ describe('investment document preview boundary', () => {
     await workspace.list.onDoc('storage://motto_assets/org-1/investment-document/document.pdf')
 
     expect(mocks.openDocument).toHaveBeenCalledWith('storage://motto_assets/org-1/investment-document/document.pdf')
+    expect(mocks.useDocumentPreview).toHaveBeenCalledWith('org-1')
     expect(workspace.list.documentPreviewLoadingReference).toBe(
       'storage://motto_assets/org-1/investment-document/document.pdf',
     )

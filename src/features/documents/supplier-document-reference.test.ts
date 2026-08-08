@@ -21,6 +21,14 @@ function createQuery(result: { data: { document_url: string } | null; error: Err
   return query
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 describe('loadSupplierDocumentReference', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -83,6 +91,7 @@ describe('openSupplierDocument', () => {
 
     await openSupplierDocument({
       batchId: 'batch-1',
+      isRequestCurrent: () => true,
       openDocument,
       organizationId: 'org-1',
       showAlert,
@@ -100,6 +109,7 @@ describe('openSupplierDocument', () => {
 
     await openSupplierDocument({
       batchId: null,
+      isRequestCurrent: () => true,
       openDocument,
       organizationId: null,
       showAlert,
@@ -119,6 +129,7 @@ describe('openSupplierDocument', () => {
 
     await openSupplierDocument({
       batchId: 'batch-1',
+      isRequestCurrent: () => true,
       openDocument,
       organizationId: 'org-1',
       showAlert,
@@ -127,5 +138,51 @@ describe('openSupplierDocument', () => {
 
     expect(openDocument).not.toHaveBeenCalled()
     expect(showAlert).toHaveBeenCalledWith('Belge görüntülenemedi. Lütfen tekrar deneyin.', 'error')
+  })
+
+  it('discards a supplier lookup result after its organization scope becomes stale', async () => {
+    const result = deferred<{ data: { document_url: string } | null; error: Error | null }>()
+    const query = createQuery({ data: null, error: null })
+    query.maybeSingle.mockReturnValue(result.promise)
+    const openDocument = vi.fn().mockResolvedValue(undefined)
+    const showAlert = vi.fn().mockResolvedValue(undefined)
+    let isCurrent = true
+
+    const opening = openSupplierDocument({
+      batchId: 'batch-a',
+      isRequestCurrent: () => isCurrent,
+      openDocument,
+      organizationId: 'org-a',
+      showAlert,
+      supabase: { from: vi.fn().mockReturnValue(query) } as never,
+    })
+    isCurrent = false
+    result.resolve({
+      data: { document_url: 'storage://motto_assets/org-a/supplier-receipt/receipt.pdf' },
+      error: null,
+    })
+    await opening
+
+    expect(openDocument).not.toHaveBeenCalled()
+    expect(showAlert).not.toHaveBeenCalled()
+  })
+
+  it('does not query or open a supplier document after its consumer unmounts', async () => {
+    const from = vi.fn()
+    const openDocument = vi.fn()
+    const showAlert = vi.fn().mockResolvedValue(undefined)
+
+    await openSupplierDocument({
+      batchId: 'batch-a',
+      isRequestCurrent: () => false,
+      openDocument,
+      organizationId: 'org-a',
+      showAlert,
+      supabase: { from } as never,
+    })
+
+    expect(from).not.toHaveBeenCalled()
+    expect(openDocument).not.toHaveBeenCalled()
+    expect(showAlert).not.toHaveBeenCalled()
   })
 })
