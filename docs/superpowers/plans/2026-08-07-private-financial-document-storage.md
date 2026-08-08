@@ -384,7 +384,7 @@ export function useDocumentPreview() {
 - Create: `docs/security/private-financial-document-rollout.md`
 - Modify: `docs/superpowers/plans/2026-08-07-private-financial-document-storage.md` (check completed boxes only)
 
-- [ ] Document the exact rollout, recovery owner, and evidence fields: local migration/test result, preparation migration applied time, app deployment URL/commit, same-tenant smoke result, cross-tenant denial result, error-rate check, enforcement approval, and final bucket state.
+- [x] Document the exact rollout, recovery owner, and evidence fields: local migration/test result, preparation migration applied time, app deployment URL/commit, same-tenant smoke result, cross-tenant denial result, error-rate check, enforcement approval, and final bucket state.
 - [ ] Apply only the preparation migration to the target environment. Verify that the currently deployed application still uploads and previews a legacy document.
 - [ ] Deploy the compatible application commits from Tasks 1–6.
 - [ ] Smoke-test one supplier receipt, one Z report, one investment document, and all corresponding history previews with an active member.
@@ -392,7 +392,7 @@ export function useDocumentPreview() {
 - [ ] Query the four document columns and confirm new writes use `storage://`; confirm existing public URLs/data URLs remain unchanged and readable.
 - [ ] Monitor application and Storage errors for the agreed observation window. If the compatibility checks fail, roll back the application only; the preparation migration is backward-compatible and can remain.
 - [ ] Record explicit approval before Task 8. Do not infer approval from a successful deploy.
-- [ ] Commit: `git commit -m "docs: add private document rollout runbook"`
+- [x] Commit: `git commit -m "docs: add private document rollout runbook"`
 
 ### Task 8: Enforce private buckets only after the compatibility release passes
 
