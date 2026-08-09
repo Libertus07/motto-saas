@@ -385,13 +385,13 @@ export function useDocumentPreview() {
 - Modify: `docs/superpowers/plans/2026-08-07-private-financial-document-storage.md` (check completed boxes only)
 
 - [x] Document the exact rollout, recovery owner, and evidence fields: local migration/test result, preparation migration applied time, app deployment URL/commit, same-tenant smoke result, cross-tenant denial result, error-rate check, enforcement approval, and final bucket state.
-- [ ] Apply only the preparation migration to the target environment. Verify that the currently deployed application still uploads and previews a legacy document.
-- [ ] Deploy the compatible application commits from Tasks 1–6.
-- [ ] Smoke-test one supplier receipt, one Z report, one investment document, and all corresponding history previews with an active member.
+- [x] Apply only the preparation migration to the target environment. Verify that the currently deployed application still uploads and previews a legacy document.
+- [x] Deploy the compatible application commits from Tasks 1–6.
+- [x] Smoke-test one supplier receipt, one Z report, one investment document, and all corresponding history previews with an active member.
 - [ ] Verify a user outside the organization and a suspended member cannot create a signed URL for the tested objects.
-- [ ] Query the four document columns and confirm new writes use `storage://`; confirm existing public URLs/data URLs remain unchanged and readable.
-- [ ] Monitor application and Storage errors for the agreed observation window. If the compatibility checks fail, roll back the application only; the preparation migration is backward-compatible and can remain.
-- [ ] Record explicit approval before Task 8. Do not infer approval from a successful deploy.
+- [x] Query the four document columns and confirm new writes use `storage://`; confirm existing public URLs/data URLs remain unchanged and readable.
+- [x] Monitor application and Storage errors for the agreed observation window. If the compatibility checks fail, roll back the application only; the preparation migration is backward-compatible and can remain.
+- [x] Record explicit approval before Task 8. Do not infer approval from a successful deploy. Approval recorded on 2026-08-09 for exact project `zahdmrvhxsmqpeesrfkt` after the enforcement design review.
 - [x] Commit: `git commit -m "docs: add private document rollout runbook"`
 
 ### Task 8: Enforce private buckets only after the compatibility release passes
@@ -405,7 +405,7 @@ export function useDocumentPreview() {
 - [ ] Add failing pgTAP assertions that `motto_assets` and `receipts` have `public = false`, correct MIME/size limits, all named broad legacy policies are absent, and the exact four tenant policies remain.
 - [ ] Run database tests and witness the new assertions fail while buckets are still public.
 - [ ] Run `npx supabase@2.111.0 migration new enforce_private_financial_documents` and use the exact emitted filename.
-- [ ] In the enforcement migration, update both bucket rows to `public = false`. Set `motto_assets` to 3 MiB and JPEG/PNG/WebP/PDF. Set `receipts` to 10 MiB and the approved image/PDF/XML/JSON/XLS/XLSX MIME types.
+- [ ] In the enforcement migration, update both bucket rows to `public = false`. Set `motto_assets` to 3 MiB and `receipts` to 10 MiB. At the bucket boundary allow the approved JPEG/PNG/WebP/PDF/XML/JSON/XLS/XLSX MIME union required by their current document kinds; preserve the stricter path-aware validator so investment documents and investment receipts remain JPEG/PNG/WebP/PDF-only.
 - [ ] Drop every known broad legacy policy with `DROP POLICY IF EXISTS`, including `Giris Yapanlar Yukleyebilir`, `Sahibi Guncelleyebilir`, `Sahibi Silebilir`, `Allow Uploads 1lnm9mj_0`, `Allow Uploads 1lnm9mj_1`, and `Public Okuma Izinleri`. Before finalizing, inspect the target environment's `pg_policies` and add any semantically equivalent broad financial-bucket policy by its exact name.
 - [ ] Do not directly insert, update, or delete `storage.objects`, and do not create custom functions/tables inside the managed `storage` schema.
 - [ ] Reset the local stack, run all pgTAP tests and advisors, then apply the enforcement migration to the target environment.

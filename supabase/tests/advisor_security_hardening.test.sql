@@ -164,10 +164,17 @@ SELECT is(
         FROM pg_policies
         WHERE schemaname = 'storage'
           AND tablename = 'objects'
-          AND policyname IN ('Public Okuma Izinleri', 'Allow Uploads 1lnm9mj_1')
+          AND policyname IN (
+              'Giris Yapanlar Yukleyebilir',
+              'Sahibi Guncelleyebilir',
+              'Sahibi Silebilir',
+              'Allow Uploads 1lnm9mj_0',
+              'Allow Uploads 1lnm9mj_1',
+              'Public Okuma Izinleri'
+          )
     ),
     0,
-    'financial document buckets keep broad legacy SELECT policies removed while tenant-scoped SELECT may coexist'
+    'financial document buckets remove every known broad legacy policy while tenant-scoped policies remain'
 );
 
 SELECT * FROM finish();

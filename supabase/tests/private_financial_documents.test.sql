@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(54);
+SELECT plan(56);
 
 SELECT has_table(
     'private',
@@ -336,6 +336,54 @@ SELECT is(
         )
     ),
     'financial Storage uses the exact four authenticated operation-specific policies'
+);
+
+SELECT is(
+    (
+        SELECT jsonb_build_array(public, file_size_limit, allowed_mime_types)
+        FROM storage.buckets
+        WHERE id = 'motto_assets'
+    ),
+    jsonb_build_array(
+        false,
+        3145728::bigint,
+        ARRAY[
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+            'application/pdf',
+            'application/xml',
+            'text/xml',
+            'application/json',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ]::text[]
+    ),
+    'motto_assets is private and keeps the exact supported 3 MiB MIME contract'
+);
+
+SELECT is(
+    (
+        SELECT jsonb_build_array(public, file_size_limit, allowed_mime_types)
+        FROM storage.buckets
+        WHERE id = 'receipts'
+    ),
+    jsonb_build_array(
+        false,
+        10485760::bigint,
+        ARRAY[
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+            'application/pdf',
+            'application/xml',
+            'text/xml',
+            'application/json',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ]::text[]
+    ),
+    'receipts is private and keeps the exact supported 10 MiB MIME contract'
 );
 
 INSERT INTO private.organization_document_objects (organization_id, bucket_id, object_name)
