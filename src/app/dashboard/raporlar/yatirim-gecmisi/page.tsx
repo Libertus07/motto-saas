@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
 import { useDocumentPreview } from '@/features/documents'
+import {
+  fetchInvestmentHistory,
+  type InvestmentHistoryTransaction,
+} from '@/features/investments/services/investment-history-service'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useNotification } from '@/components/NotificationProvider'
@@ -12,35 +16,20 @@ import { deleteInvestmentTransactionWithRefund } from '@/lib/investment-transact
 import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
 import { useOrganization } from '@/context/OrganizationContext'
 
-type InvestmentTransaction = {
-  id: string
-  investment_id: string
-  transaction_type: string
-  quantity: number
-  price_per_unit: number
-  total_amount: number
-  transaction_date: string
-  notes: string
-  document_url: string
-  investments: {
-    name: string
-    asset_type: string
-  }
-}
-
 type GroupedMonth = {
   monthKey: string
   monthLabel: string
   totalAmount: number
   receiptCount: number
-  items: InvestmentTransaction[]
+  items: InvestmentHistoryTransaction[]
 }
 
 const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : 'Bilinmeyen hata')
 
 export default function YatirimGecmisi() {
-  const [transactions, setTransactions] = useState<InvestmentTransaction[]>([])
+  const [transactions, setTransactions] = useState<InvestmentHistoryTransaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedMonth, setSelectedMonth] = useState<string>('all')
   const { showAlert, showConfirm } = useNotification()
   const { activeOrg } = useOrganization()
@@ -50,29 +39,27 @@ export default function YatirimGecmisi() {
   const router = useRouter()
 
   const fetchInvestments = useCallback(async () => {
-    if (!activeOrg) return
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('investment_transactions')
-      .select(
-        `
-                *,
-                investments (name, asset_type)
-            `,
-      )
-      .eq('organization_id', activeOrg.id)
-      .order('transaction_date', { ascending: false })
-
-    if (error) {
-      console.error('Supabase Error Details:', error)
-      devError('Yatırım işlemleri çekilirken hata:', error?.message, error?.details, error?.hint)
+    const organizationId = activeOrg?.id
+    if (!organizationId) {
+      setTransactions([])
       setLoading(false)
       return
     }
 
-    setTransactions(data || [])
-    setLoading(false)
-  }, [activeOrg, supabase])
+    setLoading(true)
+    setLoadError(null)
+
+    try {
+      const data = await fetchInvestmentHistory(supabase, organizationId)
+      setTransactions(data)
+    } catch (error: unknown) {
+      devError('Yatırım işlemleri çekilirken hata:', error)
+      setTransactions([])
+      setLoadError('Yatırım geçmişi şu anda yüklenemedi. Lütfen tekrar deneyin.')
+    } finally {
+      setLoading(false)
+    }
+  }, [activeOrg?.id, supabase])
 
   useEffect(() => {
     if (!activeOrg?.id) return
@@ -80,7 +67,7 @@ export default function YatirimGecmisi() {
       void fetchInvestments()
     }, 0)
     return () => clearTimeout(timer)
-  }, [activeOrg, fetchInvestments])
+  }, [activeOrg?.id, fetchInvestments])
 
   // Ay Listesi (Filtre için)
   const availableMonths = useMemo(() => {
@@ -197,6 +184,19 @@ export default function YatirimGecmisi() {
             <div className="animate-spin text-purple-400 text-4xl mb-4">⚙️</div>
             <p className="text-stone-400">Veriler yükleniyor...</p>
           </div>
+        ) : loadError ? (
+          <div role="alert" className="bg-red-950/30 border border-red-500/30 rounded-2xl p-8 text-center">
+            <div className="text-4xl mb-3">⚠️</div>
+            <h3 className="text-lg font-bold text-white mb-2">Yatırım Geçmişi Yüklenemedi</h3>
+            <p className="text-stone-300">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => void fetchInvestments()}
+              className="mt-5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 font-bold px-5 py-2 rounded-lg transition-colors"
+            >
+              Tekrar Dene
+            </button>
+          </div>
         ) : displayData.length === 0 ? (
           <div className="bg-stone-900 border border-stone-800 rounded-2xl p-12 text-center">
             <div className="text-6xl mb-4">📄</div>
@@ -271,7 +271,8 @@ export default function YatirimGecmisi() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
-                            void openDocument(inv.document_url)
+                            const documentReference = inv.document_url
+                            if (documentReference) void openDocument(documentReference)
                           }}
                           disabled={previewReference === inv.document_url}
                           aria-busy={previewReference === inv.document_url}
