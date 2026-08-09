@@ -137,19 +137,13 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
           </div>
         ) : isImage ? (
           <div className="w-full min-h-full flex flex-col items-center justify-start my-auto">
-            <div
-              className={`relative ${
-                viewMode === 'fitWidth' ? 'w-full sm:w-auto sm:max-w-2xl h-[78vh]' : 'w-full h-[78vh]'
-              }`}
-            >
+            <div className={`relative ${viewMode === 'fitWidth' ? 'w-full sm:max-w-2xl h-[78vh]' : 'w-full h-[78vh]'}`}>
               <Image
                 src={url}
                 alt="Fatura Önizleme"
                 fill
                 unoptimized
-                className={`rounded-2xl shadow-2xl border border-stone-800/80 transition-all duration-200 ease-out origin-top ${
-                  viewMode === 'fitWidth' ? 'object-contain sm:object-cover' : 'object-contain'
-                }`}
+                className="rounded-2xl shadow-2xl border border-stone-800/80 transition-all duration-200 ease-out origin-top object-contain"
                 style={{
                   transform: `scale(${zoom})`,
                 }}

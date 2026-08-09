@@ -4,6 +4,22 @@ import { describe, expect, it, vi } from 'vitest'
 import { DocumentPreviewModal } from './DocumentPreviewModal'
 
 describe('DocumentPreviewModal', () => {
+  it('gives the initial desktop image preview a real width and keeps the whole document visible', () => {
+    const markup = renderToStaticMarkup(
+      <DocumentPreviewModal
+        isOpen
+        onClose={vi.fn()}
+        url="https://example.com/document.jpg?token=test"
+        title="Test Belgesi"
+      />,
+    )
+
+    expect(markup).not.toContain('sm:w-auto')
+    expect(markup).toContain('w-full sm:max-w-2xl h-[78vh]')
+    expect(markup).not.toContain('sm:object-cover')
+    expect(markup).toContain('object-contain')
+  })
+
   it('keeps the PDF preview and document actions available', () => {
     const markup = renderToStaticMarkup(
       <DocumentPreviewModal isOpen onClose={vi.fn()} url="data:application/pdf;base64,AA==" title="Test Belgesi" />,
