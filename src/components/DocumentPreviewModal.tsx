@@ -45,6 +45,9 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
 
   if (!isOpen || !url) return null
 
+  const isLegacyDataUrl = url.startsWith('data:')
+  const isSecureWebUrl = url.startsWith('https://')
+  const isSafeDocumentUrl = isLegacyDataUrl || isSecureWebUrl
   const isPdf = url.startsWith('data:application/pdf') || url.toLowerCase().includes('.pdf')
   const isImage = !isPdf && (url.startsWith('data:image') || /\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(url))
 
@@ -58,6 +61,8 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
   }
 
   const handleDownload = () => {
+    if (!isSafeDocumentUrl) return
+
     const link = document.createElement('a')
     link.href = url
     link.download = isPdf ? 'belge.pdf' : 'belge.png'
@@ -161,15 +166,28 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
               seçenekleri kullanın.
             </p>
             <div className="flex justify-center gap-3">
-              <button
-                onClick={handleOpenNewTab}
-                className="bg-amber-500 hover:bg-amber-400 text-stone-950 px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
-              >
-                ↗️ Sekmede Aç
-              </button>
+              {isSecureWebUrl ? (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-amber-500 hover:bg-amber-400 text-stone-950 px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+                >
+                  ↗️ Sekmede Aç
+                </a>
+              ) : (
+                <button
+                  onClick={isLegacyDataUrl ? handleOpenNewTab : undefined}
+                  disabled={!isLegacyDataUrl}
+                  className="bg-amber-500 hover:bg-amber-400 text-stone-950 px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-amber-500/20 active:scale-95 transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  ↗️ Sekmede Aç
+                </button>
+              )}
               <button
                 onClick={handleDownload}
-                className="bg-stone-800 hover:bg-stone-700 text-stone-200 px-5 py-2.5 rounded-xl font-bold text-sm border border-stone-700 active:scale-95 transition-all"
+                disabled={!isSafeDocumentUrl}
+                className="bg-stone-800 hover:bg-stone-700 text-stone-200 px-5 py-2.5 rounded-xl font-bold text-sm border border-stone-700 active:scale-95 transition-all disabled:cursor-not-allowed disabled:opacity-50"
               >
                 📥 Cihaza İndir
               </button>
@@ -228,19 +246,34 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
           <div className="w-px h-6 bg-stone-800 shrink-0" />
 
           {/* Sekmede Aç (Yeni Sekmede Aç) */}
-          <button
-            onClick={handleOpenNewTab}
-            className="h-9 px-3.5 bg-stone-800/90 hover:bg-stone-700 text-stone-200 rounded-xl border border-stone-700 text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
-            title="Yeni Sekmede / Tam Ekran Aç"
-          >
-            <span className="text-sm">↗️</span>
-            <span>Sekmede Aç</span>
-          </button>
+          {isSecureWebUrl ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-9 px-3.5 bg-stone-800/90 hover:bg-stone-700 text-stone-200 rounded-xl border border-stone-700 text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+              title="Yeni Sekmede / Tam Ekran Aç"
+            >
+              <span className="text-sm">↗️</span>
+              <span>Sekmede Aç</span>
+            </a>
+          ) : (
+            <button
+              onClick={isLegacyDataUrl ? handleOpenNewTab : undefined}
+              disabled={!isLegacyDataUrl}
+              className="h-9 px-3.5 bg-stone-800/90 hover:bg-stone-700 text-stone-200 rounded-xl border border-stone-700 text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
+              title="Yeni Sekmede / Tam Ekran Aç"
+            >
+              <span className="text-sm">↗️</span>
+              <span>Sekmede Aç</span>
+            </button>
+          )}
 
           {/* İndir Butonu */}
           <button
             onClick={handleDownload}
-            className="h-9 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-extrabold text-xs rounded-xl shadow-lg shadow-amber-500/20 flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+            disabled={!isSafeDocumentUrl}
+            className="h-9 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-extrabold text-xs rounded-xl shadow-lg shadow-amber-500/20 flex items-center gap-1.5 transition-all active:scale-95 shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
             title="Belgeyi Cihaza İndir"
           >
             <span className="text-sm">📥</span>
