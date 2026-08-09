@@ -37,11 +37,11 @@
 - Consumes: approved design `docs/superpowers/specs/2026-08-09-private-financial-document-enforcement-design.md`.
 - Produces: executable pgTAP contract for final bucket configuration and policy removal.
 
-- [ ] **Step 1: Record the explicit Task 8 approval and correct the original MIME requirement**
+- [x] **Step 1: Record the explicit Task 8 approval and correct the original MIME requirement**
 
 Mark completed Task 7 evidence boxes only where the live report already proves completion. Mark the explicit Task 8 approval box complete with the 2026-08-09 approval record. Replace the original `motto_assets` four-MIME requirement with the approved nine-MIME union while retaining the 3 MiB limit and the stricter per-kind validator requirement.
 
-- [ ] **Step 2: Add two failing bucket-contract assertions**
+- [x] **Step 2: Add two failing bucket-contract assertions**
 
 Increase `private_financial_documents.test.sql` from `plan(54)` to `plan(56)` and add literal assertions equivalent to:
 
@@ -87,7 +87,7 @@ SELECT is(
 
 These tests catch a public bucket, wrong byte limit, missing structured format, unsupported added format, or order drift in the persisted allowlist.
 
-- [ ] **Step 3: Expand the existing legacy-policy denial assertion**
+- [x] **Step 3: Expand the existing legacy-policy denial assertion**
 
 Keep `advisor_security_hardening.test.sql` at `plan(9)` and replace the existing two-name query with all six prohibited names:
 
@@ -104,7 +104,7 @@ AND policyname IN (
 
 The existing exact-four-policy assertion remains unchanged and proves the tenant policies survive.
 
-- [ ] **Step 4: Run RED and record the expected failures**
+- [x] **Step 4: Run RED and record the expected failures**
 
 Run:
 
@@ -114,7 +114,7 @@ npx supabase@2.111.0 test db --local supabase/tests/private_financial_documents.
 
 Expected: exactly the two bucket assertions and the broad-policy assertion fail because both buckets are public/unlimited and four broad policies still exist. Any parser/setup error or unrelated failure must be fixed before proceeding.
 
-- [ ] **Step 5: Commit the RED contract and plan correction**
+- [x] **Step 5: Commit the RED contract and plan correction**
 
 ```text
 git add -- docs/superpowers/plans/2026-08-07-private-financial-document-storage.md supabase/tests/private_financial_documents.test.sql supabase/tests/advisor_security_hardening.test.sql
@@ -134,7 +134,7 @@ git commit -m "test: define private financial bucket enforcement"
 - Consumes: the Task 1 pgTAP contract and the existing four financial-document policies.
 - Produces: one replayable migration containing bucket configuration and legacy-policy removal only.
 
-- [ ] **Step 1: Generate the migration filename with pinned CLI**
+- [x] **Step 1: Generate the migration filename with pinned CLI**
 
 Run:
 
@@ -144,7 +144,7 @@ npx supabase@2.111.0 migration new enforce_private_financial_documents
 
 Use the exact emitted filename. Do not invent or rename its timestamp.
 
-- [ ] **Step 2: Implement the minimal bucket update**
+- [x] **Step 2: Implement the minimal bucket update**
 
 Write the following shape with schema qualification and deterministic literals:
 
@@ -188,7 +188,7 @@ END;
 $migration$;
 ```
 
-- [ ] **Step 3: Remove only the known broad financial policies**
+- [x] **Step 3: Remove only the known broad financial policies**
 
 Use exactly:
 
@@ -203,7 +203,7 @@ DROP POLICY IF EXISTS "Public Okuma Izinleri" ON storage.objects;
 
 Do not touch the four policies beginning `Financial documents can be ...` or organization-branding policies. Do not mutate object rows.
 
-- [ ] **Step 4: Reset the local stack and verify GREEN**
+- [x] **Step 4: Reset the local stack and verify GREEN**
 
 Run:
 
@@ -215,7 +215,7 @@ npx supabase@2.111.0 db lint --local --schema public,private,storage --level war
 
 Expected: every pgTAP file passes; the two buckets have exact configuration; all six legacy names are absent; the exact four tenant policies remain.
 
-- [ ] **Step 5: Review migration safety and commit GREEN**
+- [x] **Step 5: Review migration safety and commit GREEN**
 
 Verify the migration contains no `storage.objects` DML, no custom `storage` function/table, no object move/delete, and no unrelated policy. Then:
 
@@ -240,23 +240,23 @@ git commit -m "feat: enforce private financial document buckets"
 - Consumes: Task 2 migration and the current production database.
 - Produces: reproducible local quality evidence plus a fresh encrypted, restore-tested logical backup.
 
-- [ ] **Step 1: Run the full local database and application gates**
+- [x] **Step 1: Run the full local database and application gates**
 
 Run `npm run check`, the full local pgTAP suite, local security/performance advisors, targeted Prettier/diff checks, and `npm run build`. Record the known `/dashboard/kasa/sayim` missing-env prerender boundary only if compile and TypeScript pass and the same unrelated environment condition remains.
 
-- [ ] **Step 2: Export a fresh logical backup outside the repository**
+- [x] **Step 2: Export a fresh logical backup outside the repository**
 
 Using the verified live session-pooler connection assembled in memory from the ignored local environment file, export roles, Auth data, public/private schemas, and public/private data with Supabase CLI `2.111.0`. Do not echo the connection string or password. Write plaintext only to a newly created temporary directory outside the repository.
 
-- [ ] **Step 3: Encrypt and validate the artifact**
+- [x] **Step 3: Encrypt and validate the artifact**
 
 Zip the dump files, compute SHA-256, encrypt the archive with Windows DPAPI `CurrentUser` plus a versioned project-specific entropy value, write a redacted manifest, immediately decrypt to memory, and assert the plaintext hash matches. Clear plaintext byte arrays and delete plaintext staging files after verification.
 
-- [ ] **Step 4: Restore into an isolated local database**
+- [x] **Step 4: Restore into an isolated local database**
 
 Restore roles, schemas, Auth data, and public/private data into a disposable local database. Compare table inventory, aggregate row counts, constraints, both migration records, bucket configuration baseline, and the four document-column reference distributions. Destroy the disposable database and plaintext files; retain only the DPAPI artifact and manifest.
 
-- [ ] **Step 5: Record recovery ownership and limitations**
+- [x] **Step 5: Record recovery ownership and limitations**
 
 Record the Windows restore owner, retention review date, encrypted/plain hashes, restore result, and the fact that logical database backups contain Storage metadata but not underlying object bytes. Do not record secrets or customer rows.
 
@@ -273,11 +273,11 @@ Record the Windows restore owner, retention review date, encrypted/plain hashes,
 - Consumes: clean commits, fresh backup evidence, exact linked target, and local GREEN gates.
 - Produces: private production buckets with preserved objects and tenant policies.
 
-- [ ] **Step 1: Reconfirm immutable target and baseline**
+- [x] **Step 1: Reconfirm immutable target and baseline**
 
 Confirm Supabase project name/ref/org/region/health, Vercel project/team/deployment commit, local branch HEAD, remote migration list, bucket/object counts, exact policies, advisors, and one-hour Storage/API/Vercel error baseline. Stop on any drift.
 
-- [ ] **Step 2: Run exact linked dry-run**
+- [x] **Step 2: Run exact linked dry-run**
 
 Run:
 
@@ -288,7 +288,7 @@ npx supabase@2.111.0 db push --linked --dry-run
 
 Expected: the dry-run lists exactly one migration, the CLI-generated `enforce_private_financial_documents` file. Any other migration is NO-GO.
 
-- [ ] **Step 3: Apply the approved migration**
+- [x] **Step 3: Apply the approved migration**
 
 Run:
 
@@ -299,7 +299,7 @@ npx supabase@2.111.0 migration list --linked
 
 Record timestamps and redacted output. Do not repair migration history or run ad hoc reverse SQL.
 
-- [ ] **Step 4: Verify the production catalog immediately**
+- [x] **Step 4: Verify the production catalog immediately**
 
 Read-only checks must prove exact private/limit/MIME configuration, absence of all six broad policies, presence of the exact four tenant policies, unchanged object counts, unchanged stable-reference hashes, and no new advisor finding attributable to enforcement.
 
@@ -320,21 +320,23 @@ Read-only checks must prove exact private/limit/MIME configuration, absence of a
 
 - [ ] **Step 1: Verify authorized production behavior**
 
+Post-enforcement signed previews were verified for all four existing document kinds on desktop. The plan remains open for a fresh post-enforcement upload plus the explicit mobile/download/open-in-new-tab matrix.
+
 With the synthetic tenant and test document, verify supplier receipt, Z report, investment receipt, and investment document upload/history/signed-preview behavior. Verify desktop/mobile initial preview, download, and open-in-new-tab behavior without persisting signed URLs.
 
-- [ ] **Step 2: Verify denial boundaries**
+- [x] **Step 2: Verify denial boundaries**
 
 Use rollback-only database security fixtures and safe HTTP/browser probes to prove outsider, suspended, anonymous, wrong-tenant, traversal, wrong-kind, unsupported-MIME, and oversize requests are denied. Do not create persistent synthetic memberships or customer-facing rows.
 
-- [ ] **Step 3: Verify private access semantics**
+- [x] **Step 3: Verify private access semantics**
 
 Confirm a copied raw public object URL now fails without authorization while the application obtains a short-lived signed URL for an authorized active member. Confirm existing legacy references remain unchanged in the database.
 
-- [ ] **Step 4: Observe release health**
+- [x] **Step 4: Observe release health**
 
 Compare Supabase Storage/API/Postgres and Vercel runtime errors with the pre-apply baseline. Any new authorization regression, 5xx cluster, legitimate signed-access failure, object-count drift, or reference-hash drift is NO-GO and triggers a forward-fix decision.
 
-- [ ] **Step 5: Refresh architecture evidence and perform final review**
+- [x] **Step 5: Refresh architecture evidence and perform final review**
 
 Run `graphify update .`, refresh codebase-memory in fast persistent mode, restore incidental generated changes that are not intended for commit, run `git diff --check`, inspect every Task 8 commit, and keep the worktree clean.
 

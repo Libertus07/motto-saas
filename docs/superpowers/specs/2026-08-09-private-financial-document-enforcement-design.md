@@ -1,7 +1,8 @@
 # Private Financial Document Enforcement Design
 
-**Date:** 2026-08-09  
-**Status:** Approved for implementation  
+**Date:** 2026-08-09
+
+**Status:** Approved for implementation
 **Scope:** Task 8 enforcement for the production Supabase project `zahdmrvhxsmqpeesrfkt`
 
 ## Objective

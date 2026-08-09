@@ -402,16 +402,16 @@ export function useDocumentPreview() {
 - Modify: `supabase/tests/private_financial_documents.test.sql`
 - Modify: `supabase/tests/advisor_security_hardening.test.sql`
 
-- [ ] Add failing pgTAP assertions that `motto_assets` and `receipts` have `public = false`, correct MIME/size limits, all named broad legacy policies are absent, and the exact four tenant policies remain.
-- [ ] Run database tests and witness the new assertions fail while buckets are still public.
-- [ ] Run `npx supabase@2.111.0 migration new enforce_private_financial_documents` and use the exact emitted filename.
-- [ ] In the enforcement migration, update both bucket rows to `public = false`. Set `motto_assets` to 3 MiB and `receipts` to 10 MiB. At the bucket boundary allow the approved JPEG/PNG/WebP/PDF/XML/JSON/XLS/XLSX MIME union required by their current document kinds; preserve the stricter path-aware validator so investment documents and investment receipts remain JPEG/PNG/WebP/PDF-only.
-- [ ] Drop every known broad legacy policy with `DROP POLICY IF EXISTS`, including `Giris Yapanlar Yukleyebilir`, `Sahibi Guncelleyebilir`, `Sahibi Silebilir`, `Allow Uploads 1lnm9mj_0`, `Allow Uploads 1lnm9mj_1`, and `Public Okuma Izinleri`. Before finalizing, inspect the target environment's `pg_policies` and add any semantically equivalent broad financial-bucket policy by its exact name.
-- [ ] Do not directly insert, update, or delete `storage.objects`, and do not create custom functions/tables inside the managed `storage` schema.
-- [ ] Reset the local stack, run all pgTAP tests and advisors, then apply the enforcement migration to the target environment.
+- [x] Add failing pgTAP assertions that `motto_assets` and `receipts` have `public = false`, correct MIME/size limits, all named broad legacy policies are absent, and the exact four tenant policies remain.
+- [x] Run database tests and witness the new assertions fail while buckets are still public.
+- [x] Run `npx supabase@2.111.0 migration new enforce_private_financial_documents` and use the exact emitted filename.
+- [x] In the enforcement migration, update both bucket rows to `public = false`. Set `motto_assets` to 3 MiB and `receipts` to 10 MiB. At the bucket boundary allow the approved JPEG/PNG/WebP/PDF/XML/JSON/XLS/XLSX MIME union required by their current document kinds; preserve the stricter path-aware validator so investment documents and investment receipts remain JPEG/PNG/WebP/PDF-only.
+- [x] Drop every known broad legacy policy with `DROP POLICY IF EXISTS`, including `Giris Yapanlar Yukleyebilir`, `Sahibi Guncelleyebilir`, `Sahibi Silebilir`, `Allow Uploads 1lnm9mj_0`, `Allow Uploads 1lnm9mj_1`, and `Public Okuma Izinleri`. Before finalizing, inspect the target environment's `pg_policies` and add any semantically equivalent broad financial-bucket policy by its exact name.
+- [x] Do not directly insert, update, or delete `storage.objects`, and do not create custom functions/tables inside the managed `storage` schema.
+- [x] Reset the local stack, run all pgTAP tests and advisors, then apply the enforcement migration to the target environment.
 - [ ] Repeat same-tenant upload/preview and cross-tenant/suspended/anonymous denial checks. Verify old copied public URLs now fail without authorization while signed previews work.
-- [ ] Recovery rule: if legitimate signed access fails, correct the forward RLS policy immediately; do not make the bucket public as a routine rollback. A temporary public rollback requires an explicit security incident decision.
-- [ ] Commit: `git commit -m "feat: enforce private financial document buckets"`
+- [x] Recovery rule: if legitimate signed access fails, correct the forward RLS policy immediately; do not make the bucket public as a routine rollback. A temporary public rollback requires an explicit security incident decision.
+- [x] Commit: `git commit -m "feat: enforce private financial document buckets"`
 
 ### Task 9: Full verification, architecture refresh, and delivery review
 
@@ -421,7 +421,7 @@ export function useDocumentPreview() {
 - Modify generated codebase-memory artifacts through the MCP workflow only
 - Review: all files changed in Tasks 1–8
 
-- [ ] Run focused tests:
+- [x] Run focused tests:
 
 ```text
 npm test -- src/features/documents/document-reference.test.ts
@@ -441,9 +441,9 @@ npm run test
 npm run build
 ```
 
-- [ ] Run Supabase security and performance advisors and classify every result; do not suppress findings to obtain green output.
-- [ ] Run `graphify update .` and refresh codebase-memory through its MCP workflow. Do not manually edit generated graph/memory files.
-- [ ] Review `git diff --check`, `git status`, every changed migration, and generated TypeScript contracts if schema-visible types changed. Confirm no secret, `.env`, cache, unrelated watcher output, or accidental live URL is staged.
+- [x] Run Supabase security and performance advisors and classify every result; do not suppress findings to obtain green output.
+- [x] Run `graphify update .` and refresh codebase-memory through its MCP workflow. Do not manually edit generated graph/memory files.
+- [x] Review `git diff --check`, `git status`, every changed migration, and generated TypeScript contracts if schema-visible types changed. Confirm no secret, `.env`, cache, unrelated watcher output, or accidental live URL is staged.
 - [ ] Perform a final mobile/desktop browser pass for upload progress, failed upload, signed preview, modal close, download/open, slow network, expired signed link reopened from the original action, and Turkish error copy.
 - [ ] Confirm Definition of Done: new objects are organization-scoped; both financial buckets are private; active same-tenant access works; anonymous/cross-tenant/suspended access fails; old public/data references remain viewable only through compatible resolution; failed business writes leave no newly uploaded orphan; branding remains public and unaffected.
 - [ ] Request code review with special attention to tenant leakage, SECURITY DEFINER grants/search path, legacy mapping ambiguity, policy deployment order, raw provider errors, and accidental deletion of shared historical documents.
