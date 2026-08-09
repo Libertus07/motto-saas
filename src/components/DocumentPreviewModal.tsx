@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 
+import { openDocumentInNewTab } from './document-preview-utils'
+
 type DocumentPreviewModalProps = {
   isOpen: boolean
   onClose: () => void
@@ -65,30 +67,7 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
   }
 
   const handleOpenNewTab = () => {
-    if (url.startsWith('data:')) {
-      try {
-        const arr = url.split(',')
-        const mimeMatch = arr[0].match(/:(.*?);/)
-        const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream'
-        const bstr = atob(arr[1])
-        let n = bstr.length
-        const u8arr = new Uint8Array(n)
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n)
-        }
-        const blob = new Blob([u8arr], { type: mime })
-        const blobUrl = URL.createObjectURL(blob)
-        window.open(blobUrl, '_blank')
-      } catch {
-        const win = window.open()
-        if (win)
-          win.document.write(
-            `<iframe src="${url}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`,
-          )
-      }
-    } else {
-      window.open(url, '_blank')
-    }
+    openDocumentInNewTab(url)
   }
 
   return (
