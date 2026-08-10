@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useNotification } from '@/components/NotificationProvider'
 import { devError } from '@/lib/debug'
@@ -18,6 +18,14 @@ export function useInvestmentsData() {
   const { showAlert, showConfirm } = useNotification()
   const { activeOrg } = useOrganization()
   const supabase = useMemo(() => createClient(), [])
+  const activeOrganizationIdRef = useRef(activeOrg?.id)
+
+  useEffect(() => {
+    activeOrganizationIdRef.current = activeOrg?.id
+    return () => {
+      activeOrganizationIdRef.current = undefined
+    }
+  }, [activeOrg?.id])
 
   const [accounts, setAccounts] = useState<Account[]>([])
   const [investments, setInvestments] = useState<Investment[]>([])
@@ -40,12 +48,14 @@ export function useInvestmentsData() {
 
   const fetchData = useCallback(async () => {
     if (!activeOrg) return
+    const requestedOrganizationId = activeOrg.id
     setLoading(true)
     const { data: invData } = await supabase
       .from('investments')
       .select('*')
       .eq('organization_id', activeOrg.id)
       .order('created_at')
+    if (activeOrganizationIdRef.current !== requestedOrganizationId) return
     setInvestments(invData || [])
 
     const { data: txData } = await supabase
@@ -53,6 +63,7 @@ export function useInvestmentsData() {
       .select('*')
       .eq('organization_id', activeOrg.id)
       .order('created_at', { ascending: false })
+    if (activeOrganizationIdRef.current !== requestedOrganizationId) return
     setTransactions(txData || [])
 
     const { data: accData } = await supabase
@@ -60,6 +71,7 @@ export function useInvestmentsData() {
       .select('*')
       .eq('organization_id', activeOrg.id)
       .order('created_at')
+    if (activeOrganizationIdRef.current !== requestedOrganizationId) return
     if (accData) {
       setAccounts(accData)
     }
@@ -110,6 +122,9 @@ export function useInvestmentsData() {
 
     try {
       if (!activeOrg?.id) throw new Error('Aktif organizasyon bulunamadı.')
+      if (form.document_file && form.document_organization_id !== activeOrg.id) {
+        throw new Error('Belge farklı bir işletme için hazırlandı.')
+      }
       const selectedAcc = accounts.find((a) => a.id === form.account_id)
       if (!selectedAcc) throw new Error('Hesap bulunamadı.')
 
@@ -166,6 +181,9 @@ export function useInvestmentsData() {
       const cost = parseFloat(form.average_cost)
 
       if (!activeOrg?.id) throw new Error('Aktif organizasyon bulunamadı.')
+      if (form.document_file && form.document_organization_id !== activeOrg.id) {
+        throw new Error('Belge farklı bir işletme için hazırlandı.')
+      }
       await persistWithOrganizationDocument(
         supabase,
         form.document_file

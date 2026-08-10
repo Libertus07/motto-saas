@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
-import { persistInvestmentReceiptWrite } from '@/features/documents'
+import { persistInvestmentReceiptWrite, validateOrganizationDocument } from '@/features/documents'
 import {
   getFirstInvestmentReceiptValidationError,
   validateInvestmentReceiptPurchase,
@@ -33,21 +33,37 @@ type ParsedInvestment = {
 
 const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : 'Bilinmeyen hata')
 
-export default function YatirimFisiYukle() {
+export default function YatirimFisiYuklePage() {
+  const { activeOrg } = useOrganization()
+
+  return <YatirimFisiYukle key={activeOrg?.id ?? 'no-active-organization'} />
+}
+
+function YatirimFisiYukle() {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [fileType, setFileType] = useState<'image' | 'pdf' | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const { showAlert, showConfirm } = useNotification()
   const { activeOrg } = useOrganization()
+  const activeOrganizationId = activeOrg?.id
 
   const [parsedData, setParsedData] = useState<ParsedInvestment | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [selectedAccount, setSelectedAccount] = useState<string>('')
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
+  const activeOrganizationIdRef = useRef(activeOrg?.id)
+
+  useEffect(() => {
+    activeOrganizationIdRef.current = activeOrg?.id
+    return () => {
+      activeOrganizationIdRef.current = undefined
+    }
+  }, [activeOrg?.id])
 
   const purchaseValidation = parsedData
     ? validateInvestmentReceiptPurchase({
@@ -62,40 +78,52 @@ export default function YatirimFisiYukle() {
     : {}
 
   useEffect(() => {
+    let active = true
     const fetchAccounts = async () => {
-      if (!activeOrg) return
+      if (!activeOrganizationId) return
       const { data } = await supabase
         .from('accounts')
         .select('id, name, type, balance')
-        .eq('organization_id', activeOrg.id)
+        .eq('organization_id', activeOrganizationId)
+      if (!active) return
       if (data) {
         setAccounts(data)
         if (data.length > 0) setSelectedAccount(data[0].id)
       }
     }
-    fetchAccounts()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeOrg?.id])
+    void fetchAccounts()
+    return () => {
+      active = false
+    }
+  }, [activeOrganizationId, supabase])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
-    setSelectedFile(file)
-
-    // Vercel 4.5MB request body limit => ~3.3MB file size max.
-    if (file.size > 3 * 1024 * 1024) {
-      showAlert(
-        'Seçtiğiniz belge çok büyük (Max 3MB). Sunucu limitlerine takılmamak için lütfen dosya boyutunu küçültün.',
-        'warning',
-      )
+    const organizationId = activeOrg?.id
+    if (!organizationId) {
       e.target.value = ''
+      void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
       return
     }
+    const validationError = validateOrganizationDocument({
+      organizationId,
+      bucket: 'motto_assets',
+      kind: 'investment-receipt',
+      file,
+    })
+    if (validationError) {
+      e.target.value = ''
+      void showAlert(validationError, 'warning')
+      return
+    }
+    setSelectedFile(file)
+    setPendingOrganizationId(organizationId)
 
     if (file.type === 'application/pdf') {
       const reader = new FileReader()
       reader.onload = () => {
+        if (activeOrganizationIdRef.current !== organizationId) return
         setImageUrl(reader.result as string)
         setFileType('pdf')
       }
@@ -103,6 +131,7 @@ export default function YatirimFisiYukle() {
     } else {
       const reader = new FileReader()
       reader.onload = () => {
+        if (activeOrganizationIdRef.current !== organizationId) return
         setImageUrl(reader.result as string)
         setFileType('image')
       }
@@ -112,6 +141,11 @@ export default function YatirimFisiYukle() {
 
   const handleAnalyze = async () => {
     if (!imageUrl) return
+    const requestedOrganizationId = activeOrg?.id
+    if (!requestedOrganizationId || pendingOrganizationId !== requestedOrganizationId) {
+      await showAlert('Belge farklı bir işletme için hazırlandı. Lütfen yeniden seçin.', 'warning')
+      return
+    }
     setAnalyzing(true)
 
     try {
@@ -123,6 +157,7 @@ export default function YatirimFisiYukle() {
 
       const data = await res.json()
       if (data.error) throw new Error(data.error)
+      if (activeOrganizationIdRef.current !== requestedOrganizationId) return
 
       const qty = data.quantity || 1
       const price = data.price_per_unit || 0
@@ -145,13 +180,22 @@ export default function YatirimFisiYukle() {
         notes: data.notes || 'Yapay Zeka ile oluşturuldu',
       })
     } catch (error: unknown) {
-      await showAlert('Analiz Hatası: ' + getErrorMessage(error), 'error')
+      if (activeOrganizationIdRef.current === requestedOrganizationId) {
+        await showAlert('Analiz Hatası: ' + getErrorMessage(error), 'error')
+      }
     } finally {
-      setAnalyzing(false)
+      if (activeOrganizationIdRef.current === requestedOrganizationId) {
+        setAnalyzing(false)
+      }
     }
   }
 
   const startManualMode = () => {
+    if (!activeOrg?.id) {
+      void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
+      return
+    }
+    setPendingOrganizationId(activeOrg.id)
     setParsedData({
       asset_type: 'usd',
       name: '',
@@ -209,16 +253,23 @@ export default function YatirimFisiYukle() {
       }
       // --- ÇİFT KAYIT KONTROLÜ BİTİŞ ---
 
-      await persistInvestmentReceiptWrite(supabase, activeOrg.id, selectedFile, duplicateTransactionId, {
-        p_asset_type: parsedData.asset_type,
-        p_name: investmentName,
-        p_quantity: parsedData.quantity,
-        p_price: parsedData.price_per_unit,
-        p_account_id: selectedAccount,
-        p_notes: parsedData.notes || null,
-        p_purchase_date: parsedData.purchase_date,
-        p_organization_id: activeOrg.id,
-      })
+      await persistInvestmentReceiptWrite(
+        supabase,
+        activeOrg.id,
+        selectedFile,
+        duplicateTransactionId,
+        {
+          p_asset_type: parsedData.asset_type,
+          p_name: investmentName,
+          p_quantity: parsedData.quantity,
+          p_price: parsedData.price_per_unit,
+          p_account_id: selectedAccount,
+          p_notes: parsedData.notes || null,
+          p_purchase_date: parsedData.purchase_date,
+          p_organization_id: activeOrg.id,
+        },
+        pendingOrganizationId,
+      )
 
       await showAlert('Yatırım fişi başarıyla kaydedildi!', 'success')
       router.push('/dashboard/raporlar/yatirim-gecmisi')
@@ -498,6 +549,7 @@ export default function YatirimFisiYukle() {
                   setImageUrl(null)
                   setFileType(null)
                   setSelectedFile(null)
+                  setPendingOrganizationId(null)
                 }}
                 disabled={loading}
                 className="bg-stone-800 hover:bg-stone-700 text-white font-bold px-8 py-4 rounded-xl transition-colors disabled:opacity-50"

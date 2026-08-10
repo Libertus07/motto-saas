@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { persistWithOrganizationDocument } from './document-storage-service'
 import {
+  assertFinancialDocumentOrganizationScope,
   createFinancialDocumentUploadInput,
   scopeSupplierReceiptPayload,
   withInvestmentReplacement,
@@ -13,7 +14,9 @@ export async function persistSupplierReceiptWrite<T extends Record<string, unkno
   file: File | null,
   replaceBatchId: string | null,
   payload: T,
+  pendingOrganizationId: string | null,
 ): Promise<unknown> {
+  assertFinancialDocumentOrganizationScope(organizationId, pendingOrganizationId)
   return persistWithOrganizationDocument(
     supabase,
     createFinancialDocumentUploadInput('supplier-receipt', organizationId, file),
@@ -34,7 +37,9 @@ export async function persistInvestmentReceiptWrite<T extends Record<string, unk
   file: File | null,
   replaceTransactionId: string | null,
   rpcArguments: T,
+  pendingOrganizationId: string | null,
 ): Promise<unknown> {
+  assertFinancialDocumentOrganizationScope(organizationId, pendingOrganizationId)
   return persistWithOrganizationDocument(
     supabase,
     createFinancialDocumentUploadInput('investment-receipt', organizationId, file),
@@ -55,7 +60,9 @@ export async function persistZReportWrite<T>(
   organizationId: string,
   file: File | null,
   persist: (documentReference: string | null) => Promise<T>,
+  pendingOrganizationId: string | null,
 ): Promise<T> {
+  assertFinancialDocumentOrganizationScope(organizationId, pendingOrganizationId)
   return persistWithOrganizationDocument(
     supabase,
     createFinancialDocumentUploadInput('z-report', organizationId, file),

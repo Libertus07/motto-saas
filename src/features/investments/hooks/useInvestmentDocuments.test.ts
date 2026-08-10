@@ -23,6 +23,7 @@ function createForm(): BuyFormState {
     purchase_date: '2026-08-08',
     document_url: 'storage://motto_assets/old/document.pdf',
     document_file: null,
+    document_organization_id: null,
   }
 }
 
@@ -144,7 +145,11 @@ describe('investment document selection', () => {
 
     await uploadDocument(event, setForm, form)
 
-    expect(setForm).toHaveBeenCalledWith({ ...form, document_file: file })
+    expect(setForm).toHaveBeenCalledWith({
+      ...form,
+      document_file: file,
+      document_organization_id: organizationId,
+    })
     expect(event.target.value).toBe('')
   })
 

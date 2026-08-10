@@ -22,6 +22,7 @@ describe('EditInvestmentModal document input', () => {
       purchase_date: '2026-08-08',
       document_url: '',
       document_file: null,
+      document_organization_id: null,
     }
 
     const markup = renderToStaticMarkup(

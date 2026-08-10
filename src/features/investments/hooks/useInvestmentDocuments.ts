@@ -7,7 +7,11 @@ import { validateOrganizationDocument } from '../../documents/document-reference
 
 import type { BuyFormState } from '../types'
 
-type DocumentForm = { document_file: File | null; document_url: string }
+type DocumentForm = {
+  document_file: File | null
+  document_url: string
+  document_organization_id: string | null
+}
 type ShowAlert = (message: string, severity?: NotificationSeverity, title?: string) => Promise<void>
 
 type InvestmentAnalysisResponse = {
@@ -114,7 +118,7 @@ export function useInvestmentDocuments({
         return
       }
 
-      formSetter({ ...formState, document_file: file })
+      formSetter({ ...formState, document_file: file, document_organization_id: organizationId })
       event.target.value = ''
     },
     [organizationId, showAlert],

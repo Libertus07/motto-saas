@@ -160,6 +160,10 @@ export function validateOrganizationDocument(input: UploadOrganizationDocumentIn
     return 'Belge türü için geçersiz depolama alanı.'
   }
 
+  if (input.file.size === 0) {
+    return 'Boş dosyalar yüklenemez.'
+  }
+
   const mimeType = getMimeType(input.file)
   const allowedMimeTypes =
     input.kind === 'z-report'
@@ -171,7 +175,7 @@ export function validateOrganizationDocument(input: UploadOrganizationDocumentIn
     return 'Bu belge türü desteklenmiyor.'
   }
 
-  const maximumSize = input.kind === 'z-report' || input.kind === 'supplier-receipt' ? TEN_MIB : THREE_MIB
+  const maximumSize = input.kind === 'z-report' ? TEN_MIB : THREE_MIB
   if (input.file.size > maximumSize) {
     return 'Dosya boyutu izin verilen sınırı aşıyor.'
   }

@@ -143,6 +143,17 @@ describe('private document references', () => {
     ).toBeTruthy()
   })
 
+  it('rejects an empty financial document before any upload starts', () => {
+    expect(
+      validateOrganizationDocument({
+        organizationId,
+        bucket: 'motto_assets',
+        kind: 'supplier-receipt',
+        file: createFile('application/pdf', 0),
+      }),
+    ).toBe('Boş dosyalar yüklenemez.')
+  })
+
   it('enforces document kind bucket, MIME, and size rules', () => {
     expect(
       validateOrganizationDocument({
@@ -174,6 +185,14 @@ describe('private document references', () => {
         bucket: 'motto_assets',
         kind: 'investment-receipt',
         file: createFile('image/webp', threeMiB + 1),
+      }),
+    ).toBeTruthy()
+    expect(
+      validateOrganizationDocument({
+        organizationId,
+        bucket: 'motto_assets',
+        kind: 'supplier-receipt',
+        file: createFile('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', threeMiB + 1),
       }),
     ).toBeTruthy()
     expect(

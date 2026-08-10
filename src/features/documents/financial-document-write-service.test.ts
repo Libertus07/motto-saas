@@ -37,7 +37,14 @@ describe('financial document write service', () => {
 
   it('calls the exact supplier RPC with tenant, replacement and stable reference', async () => {
     const { supabase, rpc } = createSupabase()
-    await persistSupplierReceiptWrite(supabase, organizationId, file, 'old-batch', { batch_id: 'new-batch' })
+    await persistSupplierReceiptWrite(
+      supabase,
+      organizationId,
+      file,
+      'old-batch',
+      { batch_id: 'new-batch' },
+      organizationId,
+    )
 
     expect(rpc).toHaveBeenCalledWith('process_receipt_upload', {
       payload: {
@@ -51,10 +58,17 @@ describe('financial document write service', () => {
 
   it('calls the exact investment RPC with tenant, replacement and stable reference', async () => {
     const { supabase, rpc } = createSupabase()
-    await persistInvestmentReceiptWrite(supabase, organizationId, file, 'old-transaction', {
-      p_organization_id: organizationId,
-      p_name: 'Altın',
-    })
+    await persistInvestmentReceiptWrite(
+      supabase,
+      organizationId,
+      file,
+      'old-transaction',
+      {
+        p_organization_id: organizationId,
+        p_name: 'Altın',
+      },
+      organizationId,
+    )
 
     expect(rpc).toHaveBeenCalledWith('buy_investment_transaction', {
       p_organization_id: organizationId,
@@ -67,7 +81,7 @@ describe('financial document write service', () => {
   it('forwards the stable Z-report reference to the atomic report callback', async () => {
     const { supabase } = createSupabase()
     const persist = vi.fn().mockResolvedValue({ ok: true })
-    await persistZReportWrite(supabase, organizationId, file, persist)
+    await persistZReportWrite(supabase, organizationId, file, persist, organizationId)
     expect(persist).toHaveBeenCalledWith(
       `storage://receipts/${organizationId}/z-report/22222222-2222-4222-8222-222222222222.pdf`,
     )
@@ -80,10 +94,10 @@ describe('financial document write service', () => {
       const persist = vi.fn()
       const operation =
         flow === 'supplier'
-          ? persistSupplierReceiptWrite(supabase, organizationId, file, null, {})
+          ? persistSupplierReceiptWrite(supabase, organizationId, file, null, {}, organizationId)
           : flow === 'investment'
-            ? persistInvestmentReceiptWrite(supabase, organizationId, file, null, {})
-            : persistZReportWrite(supabase, organizationId, file, persist)
+            ? persistInvestmentReceiptWrite(supabase, organizationId, file, null, {}, organizationId)
+            : persistZReportWrite(supabase, organizationId, file, persist, organizationId)
 
       await expect(operation).rejects.toThrow('Belge yüklenemedi. Lütfen tekrar deneyin.')
       expect(rpc).not.toHaveBeenCalled()
@@ -97,8 +111,27 @@ describe('financial document write service', () => {
       data: null,
       error: { message: 'database internals' },
     } as never)
-    await expect(persistSupplierReceiptWrite(supabase, organizationId, null, null, {})).rejects.toThrow(
+    await expect(persistSupplierReceiptWrite(supabase, organizationId, null, null, {}, organizationId)).rejects.toThrow(
       'Fiş kaydedilemedi. Lütfen tekrar deneyin.',
     )
   })
+
+  it.each(['supplier', 'investment', 'z-report'] as const)(
+    'rejects a stale %s write that was prepared for another organization before upload',
+    async (flow) => {
+      const { supabase, rpc } = createSupabase()
+      const persist = vi.fn()
+      const staleOrganizationId = '33333333-3333-4333-8333-333333333333'
+      const operation =
+        flow === 'supplier'
+          ? persistSupplierReceiptWrite(supabase, organizationId, file, null, {}, staleOrganizationId)
+          : flow === 'investment'
+            ? persistInvestmentReceiptWrite(supabase, organizationId, file, null, {}, staleOrganizationId)
+            : persistZReportWrite(supabase, organizationId, file, persist, staleOrganizationId)
+
+      await expect(operation).rejects.toThrow('Belge farklı bir işletme için hazırlandı. Lütfen yeniden seçin.')
+      expect(rpc).not.toHaveBeenCalled()
+      expect(persist).not.toHaveBeenCalled()
+    },
+  )
 })

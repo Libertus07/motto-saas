@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(56);
+SELECT plan(64);
 
 SELECT has_table(
     'private',
@@ -393,6 +393,111 @@ VALUES (
     'legacy/supplier-receipt.pdf'
 );
 
+INSERT INTO private.organization_document_objects (organization_id, bucket_id, object_name)
+VALUES (
+    '22222222-2222-4222-8222-222222222222',
+    'motto_assets',
+    '11111111-1111-4111-8111-111111111111/supplier-receipt/file.pdf'
+);
+
+SELECT throws_ok(
+    $$
+    INSERT INTO private.organization_document_objects (organization_id, bucket_id, object_name)
+    VALUES (
+        '22222222-2222-4222-8222-222222222222',
+        'motto_assets',
+        'legacy/supplier-receipt.pdf'
+    )
+    $$,
+    '23505',
+    'duplicate key value violates unique constraint "organization_document_objects_object_key"',
+    'one physical legacy object cannot authorize more than one organization'
+);
+
+ALTER TABLE private.organization_document_objects
+DROP CONSTRAINT organization_document_objects_object_key;
+
+INSERT INTO private.organization_document_objects (organization_id, bucket_id, object_name)
+VALUES (
+    '22222222-2222-4222-8222-222222222222',
+    'motto_assets',
+    'legacy/supplier-receipt.pdf'
+);
+
+SELECT lives_ok(
+    $$SELECT private.reconcile_legacy_financial_document_mappings()$$,
+    'legacy reconciliation quarantines an object claimed by multiple organizations'
+);
+
+SELECT is(
+    (
+        SELECT count(*)::integer
+        FROM private.organization_document_objects
+        WHERE bucket_id = 'motto_assets'
+          AND object_name = 'legacy/supplier-receipt.pdf'
+    ),
+    0,
+    'reconciliation removes every authorization mapping for a conflicted legacy object'
+);
+
+SELECT is(
+    (
+        SELECT organization_ids
+        FROM private.organization_document_object_conflicts
+        WHERE bucket_id = 'motto_assets'
+          AND object_name = 'legacy/supplier-receipt.pdf'
+          AND resolved_at IS NULL
+    ),
+    ARRAY[
+        '11111111-1111-4111-8111-111111111111'::uuid,
+        '22222222-2222-4222-8222-222222222222'::uuid
+    ],
+    'reconciliation records every organization that claimed the conflicted legacy object'
+);
+
+ALTER TABLE private.organization_document_objects
+ADD CONSTRAINT organization_document_objects_object_key
+UNIQUE (bucket_id, object_name);
+
+INSERT INTO private.organization_document_objects (organization_id, bucket_id, object_name)
+VALUES (
+    '11111111-1111-4111-8111-111111111111',
+    'motto_assets',
+    'legacy/supplier-receipt.pdf'
+);
+
+INSERT INTO public.investments (
+    id,
+    asset_type,
+    name,
+    quantity,
+    average_cost,
+    purchase_date,
+    document_url,
+    organization_id
+)
+VALUES (
+    '14141414-1414-4141-8141-141414141414',
+    'real_estate',
+    'Scoped Document Fixture',
+    1,
+    1,
+    CURRENT_DATE,
+    'storage://motto_assets/11111111-1111-4111-8111-111111111111/investment-document/15151515-1515-4151-8151-151515151515.pdf',
+    '11111111-1111-4111-8111-111111111111'
+);
+
+SELECT throws_ok(
+    $$
+    UPDATE public.investments
+    SET organization_id = '22222222-2222-4222-8222-222222222222'
+    WHERE id = '14141414-1414-4141-8141-141414141414'
+    $$,
+    '22023',
+    'Geçerli bir yatırım belge referansı gereklidir.',
+    'an unchanged stable reference cannot move to another organization'
+);
+
 SELECT set_config('request.jwt.claim.sub', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 
@@ -412,6 +517,14 @@ SELECT ok(
         '33333333-3333-4333-8333-333333333333/supplier-receipt/file.pdf'
     ),
     'an active user cannot read a document outside their organizations'
+);
+
+SELECT ok(
+    NOT private.can_access_organization_document(
+        'motto_assets',
+        '11111111-1111-4111-8111-111111111111/supplier-receipt/file.pdf'
+    ),
+    'an organization-scoped path cannot be overridden by a conflicting legacy mapping'
 );
 
 SELECT set_config('request.jwt.claim.sub', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', true);
@@ -440,6 +553,24 @@ SELECT ok(
         'legacy/supplier-receipt.pdf'
     ),
     'an active member can read a mapped legacy document'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.process_z_report_atomic(
+        '11111111-1111-4111-8111-111111111111',
+        CURRENT_DATE,
+        '[{"product_id":null,"quantity":1,"total_price":1}]'::jsonb,
+        '[]'::jsonb,
+        '{}'::jsonb,
+        'https://attacker.example/z-report.pdf',
+        false,
+        '{}'::jsonb
+    )
+    $$,
+    '22023',
+    'Geçerli bir Z-Raporu belge referansı gereklidir.',
+    'Z-report writes reject a new unscoped document reference'
 );
 
 SELECT set_config('request.jwt.claim.sub', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', true);
@@ -478,6 +609,21 @@ SELECT lives_ok(
     )
     $$,
     'an active member can insert an allowed organization-scoped financial document'
+);
+
+SELECT throws_ok(
+    $$
+    INSERT INTO storage.objects (bucket_id, name, owner_id, metadata)
+    VALUES (
+        'motto_assets',
+        '11111111-1111-4111-8111-111111111111/supplier-receipt/13131313-1313-4131-8131-131313131313.pdf',
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '{"contentLength":0,"mimetype":"application/pdf"}'::jsonb
+    )
+    $$,
+    '42501',
+    'new row violates row-level security policy for table "objects"',
+    'the insert policy rejects zero-byte financial documents'
 );
 
 SELECT throws_ok(
@@ -572,7 +718,7 @@ SELECT throws_ok(
         'motto_assets',
         '11111111-1111-4111-8111-111111111111/supplier-receipt/ffffffff-ffff-4fff-8fff-ffffffffffff.xlsx',
         'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        '{"contentLength":10485761,"mimetype":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}'::jsonb
+        '{"contentLength":3145729,"mimetype":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}'::jsonb
     )
     $$,
     '42501',

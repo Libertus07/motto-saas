@@ -26,7 +26,7 @@ const NotePreviewModal = dynamic(() => import('./NotePreviewModal').then((module
   ssr: false,
 })
 
-type DocumentForm = { document_file: File | null; document_url: string }
+type DocumentForm = { document_file: File | null; document_url: string; document_organization_id: string | null }
 
 type InvestmentModalsProps = {
   accounts: Account[]

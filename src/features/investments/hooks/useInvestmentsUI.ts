@@ -23,6 +23,7 @@ export function useInvestmentsUI() {
     purchase_date: new Date().toISOString().split('T')[0],
     document_url: '',
     document_file: null,
+    document_organization_id: null,
   })
 
   // Rent Modal
@@ -48,6 +49,7 @@ export function useInvestmentsUI() {
     purchase_date: '',
     document_url: '',
     document_file: null,
+    document_organization_id: null,
   })
 
   // Note Preview
@@ -64,6 +66,7 @@ export function useInvestmentsUI() {
       purchase_date: inv.purchase_date || new Date().toISOString().split('T')[0],
       document_url: inv.document_url || '',
       document_file: null,
+      document_organization_id: null,
     })
     setIsEditModalOpen(true)
   }
@@ -78,6 +81,7 @@ export function useInvestmentsUI() {
       purchase_date: new Date().toISOString().split('T')[0],
       document_url: '',
       document_file: null,
+      document_organization_id: null,
     })
     setRentForm({ amount: '', account_id: '' })
     setValueForm({ current_value: '' })
@@ -85,12 +89,12 @@ export function useInvestmentsUI() {
 
   const closeBuyModal = () => {
     setIsBuyModalOpen(false)
-    setBuyForm((current) => ({ ...current, document_file: null }))
+    setBuyForm((current) => ({ ...current, document_file: null, document_organization_id: null }))
   }
 
   const closeEditModal = () => {
     setIsEditModalOpen(false)
-    setEditForm((current) => ({ ...current, document_file: null }))
+    setEditForm((current) => ({ ...current, document_file: null, document_organization_id: null }))
   }
 
   return {

@@ -35,6 +35,7 @@ describe('investment document form lifecycle', () => {
       purchase_date: '2026-08-08',
       document_url: 'storage://motto_assets/buy-old.pdf',
       document_file: new File(['buy'], 'buy.pdf', { type: 'application/pdf' }),
+      document_organization_id: '11111111-1111-4111-8111-111111111111',
     }
     const editForm: EditFormState = {
       name: 'Gram Altın',
@@ -44,6 +45,7 @@ describe('investment document form lifecycle', () => {
       purchase_date: '2026-08-08',
       document_url: 'storage://motto_assets/edit-old.pdf',
       document_file: new File(['edit'], 'edit.pdf', { type: 'application/pdf' }),
+      document_organization_id: '11111111-1111-4111-8111-111111111111',
     }
     const ui = useInvestmentsUI()
 
@@ -52,8 +54,8 @@ describe('investment document form lifecycle', () => {
 
     const updateBuy = mocks.setBuyForm.mock.calls[0]?.[0] as (current: BuyFormState) => BuyFormState
     const updateEdit = mocks.setEditForm.mock.calls[0]?.[0] as (current: EditFormState) => EditFormState
-    expect(updateBuy(buyForm)).toEqual({ ...buyForm, document_file: null })
-    expect(updateEdit(editForm)).toEqual({ ...editForm, document_file: null })
+    expect(updateBuy(buyForm)).toEqual({ ...buyForm, document_file: null, document_organization_id: null })
+    expect(updateEdit(editForm)).toEqual({ ...editForm, document_file: null, document_organization_id: null })
   })
 
   it('resets the buy form with no pending file or stale document reference', () => {

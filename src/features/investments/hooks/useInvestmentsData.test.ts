@@ -11,6 +11,8 @@ const { organizationId, objectId, mocks } = vi.hoisted(() => {
       showAlert: vi.fn().mockResolvedValue(undefined),
       showConfirm: vi.fn(),
       devError: vi.fn(),
+      setCollection: vi.fn(),
+      organizationRef: { current: organizationId },
       supabase: null as unknown,
     },
   }
@@ -20,7 +22,11 @@ vi.mock('react', () => ({
   useCallback: <T>(callback: T) => callback,
   useEffect: vi.fn(),
   useMemo: <T>(factory: () => T) => factory(),
-  useState: (initialValue: unknown) => [Array.isArray(initialValue) ? mocks.accounts : initialValue, vi.fn()],
+  useRef: () => mocks.organizationRef,
+  useState: (initialValue: unknown) => [
+    Array.isArray(initialValue) ? mocks.accounts : initialValue,
+    Array.isArray(initialValue) ? mocks.setCollection : vi.fn(),
+  ],
 }))
 
 vi.mock('@/lib/supabase', () => ({ createClient: () => mocks.supabase }))
@@ -56,6 +62,7 @@ function createBuyForm(file: File | null): BuyFormState {
     purchase_date: '2026-08-08',
     document_url: '',
     document_file: file,
+    document_organization_id: file ? organizationId : null,
   }
 }
 
@@ -68,12 +75,15 @@ function createEditForm(file: File | null, documentUrl = 'storage://motto_assets
     purchase_date: '2026-08-08',
     document_url: documentUrl,
     document_file: file,
+    document_organization_id: file ? organizationId : null,
   }
 }
 
 describe('investment document submissions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.activeOrg.id = organizationId
+    mocks.organizationRef.current = organizationId
     vi.stubGlobal('crypto', { randomUUID: () => objectId })
   })
 
@@ -136,6 +146,50 @@ describe('investment document submissions', () => {
     await expect(useInvestmentsData().buyInvestment(createBuyForm(file))).resolves.toBe(false)
 
     expect(remove).toHaveBeenCalledWith([`${organizationId}/investment-document/${objectId}.pdf`])
+  })
+
+  it('rejects a pending investment document selected for a different organization before upload', async () => {
+    const { supabase, upload, rpc } = createSupabase()
+    mocks.supabase = supabase
+    const form = Object.assign(createBuyForm(new File(['document'], 'belge.pdf', { type: 'application/pdf' })), {
+      document_organization_id: '33333333-3333-4333-8333-333333333333',
+    })
+
+    await expect(useInvestmentsData().buyInvestment(form)).resolves.toBe(false)
+
+    expect(upload).not.toHaveBeenCalled()
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('rejects a pending investment edit document selected for a different organization before upload', async () => {
+    const { supabase, upload, rpc } = createSupabase()
+    mocks.supabase = supabase
+    const form = Object.assign(createEditForm(new File(['document'], 'belge.pdf', { type: 'application/pdf' })), {
+      document_organization_id: '33333333-3333-4333-8333-333333333333',
+    })
+
+    await expect(useInvestmentsData().editInvestment('investment-1', form)).resolves.toBe(false)
+
+    expect(upload).not.toHaveBeenCalled()
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('does not publish an investment response after the active organization changes in flight', async () => {
+    let resolveInvestments: ((value: { data: unknown[] }) => void) | undefined
+    const firstResult = new Promise<{ data: unknown[] }>((resolve) => {
+      resolveInvestments = resolve
+    })
+    const order = vi.fn().mockReturnValueOnce(firstResult).mockResolvedValue({ data: [] })
+    const eq = vi.fn(() => ({ order }))
+    const select = vi.fn(() => ({ eq }))
+    mocks.supabase = { from: vi.fn(() => ({ select })) }
+    const request = useInvestmentsData().fetchData()
+
+    mocks.organizationRef.current = '33333333-3333-4333-8333-333333333333'
+    resolveInvestments?.({ data: [{ id: 'stale-investment' }] })
+    await request
+
+    expect(mocks.setCollection).not.toHaveBeenCalled()
   })
 
   it('never forwards the temporary analysis data URL to the buy RPC document argument', async () => {

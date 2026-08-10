@@ -8,6 +8,15 @@ const flowStorage = {
   'z-report': { bucket: 'receipts', kind: 'z-report' },
 } as const
 
+export function assertFinancialDocumentOrganizationScope(
+  organizationId: string,
+  pendingOrganizationId: string | null,
+): void {
+  if (!pendingOrganizationId || pendingOrganizationId !== organizationId) {
+    throw new Error('Belge farklı bir işletme için hazırlandı. Lütfen yeniden seçin.')
+  }
+}
+
 export function createFinancialDocumentUploadInput(
   flow: FinancialDocumentFlow,
   organizationId: string,

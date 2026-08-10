@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(18);
+SELECT plan(29);
 
 SELECT ok(
     NOT has_function_privilege(
@@ -150,7 +150,7 @@ SELECT lives_ok(
         json_build_object(
             'organization_id', '93333333-3333-4333-8333-333333333333',
             'batch_id', '97777777-7777-4777-8777-777777777777',
-            'image_url', 'storage://motto_assets/93333333-3333-4333-8333-333333333333/supplier-receipt/file.json',
+            'image_url', 'storage://motto_assets/93333333-3333-4333-8333-333333333333/supplier-receipt/97777777-7777-4777-8777-777777777777.json',
             'supplier', NULL,
             'items', json_build_array(
                 json_build_object(
@@ -268,6 +268,106 @@ SELECT throws_ok(
     'receipt upload rejects an organization without active membership'
 );
 
+SELECT throws_ok(
+    $$
+    SELECT public.process_receipt_upload(
+        json_build_object(
+            'organization_id', '93333333-3333-4333-8333-333333333333',
+            'batch_id', '90000000-0000-4000-8000-000000000001',
+            'image_url', 'https://attacker.example/public-receipt.pdf',
+            'supplier', NULL,
+            'items', json_build_array(
+                json_build_object(
+                    'name', 'Invalid Reference Material',
+                    'category', 'Test',
+                    'unit', 'Adet',
+                    'quantity', 1,
+                    'unitPrice', 2
+                )
+            )
+        )
+    )
+    $$,
+    '22023',
+    'Geçerli bir tedarikçi fişi belge referansı gereklidir.',
+    'receipt writes reject a new unscoped document reference'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.process_receipt_upload(
+        json_build_object(
+            'organization_id', '93333333-3333-4333-8333-333333333333',
+            'batch_id', '90000000-0000-4000-8000-000000000002',
+            'image_url', 'storage://motto_assets/92222222-2222-4222-8222-222222222222/supplier-receipt/90000000-0000-4000-8000-000000000002.pdf',
+            'supplier', NULL,
+            'items', json_build_array(
+                json_build_object(
+                    'name', 'Cross Tenant Reference Material',
+                    'category', 'Test',
+                    'unit', 'Adet',
+                    'quantity', 1,
+                    'unitPrice', 2
+                )
+            )
+        )
+    )
+    $$,
+    '22023',
+    'Geçerli bir tedarikçi fişi belge referansı gereklidir.',
+    'receipt writes reject a stable reference for another organization'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.process_receipt_upload(
+        json_build_object(
+            'organization_id', '93333333-3333-4333-8333-333333333333',
+            'batch_id', '90000000-0000-4000-8000-000000000003',
+            'image_url', 'storage://receipts/93333333-3333-4333-8333-333333333333/supplier-receipt/90000000-0000-4000-8000-000000000003.pdf',
+            'supplier', NULL,
+            'items', json_build_array(
+                json_build_object(
+                    'name', 'Wrong Bucket Reference Material',
+                    'category', 'Test',
+                    'unit', 'Adet',
+                    'quantity', 1,
+                    'unitPrice', 2
+                )
+            )
+        )
+    )
+    $$,
+    '22023',
+    'Geçerli bir tedarikçi fişi belge referansı gereklidir.',
+    'receipt writes reject a stable reference from another bucket'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.process_receipt_upload(
+        json_build_object(
+            'organization_id', '93333333-3333-4333-8333-333333333333',
+            'batch_id', '90000000-0000-4000-8000-000000000004',
+            'image_url', 'storage://motto_assets/93333333-3333-4333-8333-333333333333/investment-document/90000000-0000-4000-8000-000000000004.pdf',
+            'supplier', NULL,
+            'items', json_build_array(
+                json_build_object(
+                    'name', 'Wrong Kind Reference Material',
+                    'category', 'Test',
+                    'unit', 'Adet',
+                    'quantity', 1,
+                    'unitPrice', 2
+                )
+            )
+        )
+    )
+    $$,
+    '22023',
+    'Geçerli bir tedarikçi fişi belge referansı gereklidir.',
+    'receipt writes reject a stable reference for another document kind'
+);
+
 RESET ROLE;
 
 INSERT INTO public.accounts (id, name, type, balance, organization_id)
@@ -328,6 +428,49 @@ SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT throws_ok(
     $$
     SELECT public.buy_investment_transaction(
+        'gold', 'Unscoped Investment', 1, 10,
+        '99999999-9999-4999-8999-999999999999',
+        NULL, CURRENT_DATE, 'https://attacker.example/investment.pdf',
+        '93333333-3333-4333-8333-333333333333'
+    )
+    $$,
+    '22023',
+    'Geçerli bir yatırım belge referansı gereklidir.',
+    'base investment writes reject a new unscoped document reference'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.buy_investment_transaction(
+        'gold', 'Unscoped Replacement', 1, 10,
+        '99999999-9999-4999-8999-999999999999',
+        NULL, CURRENT_DATE, 'https://attacker.example/investment-receipt.pdf',
+        '93333333-3333-4333-8333-333333333333',
+        NULL
+    )
+    $$,
+    '22023',
+    'Geçerli bir yatırım belge referansı gereklidir.',
+    'replacement investment writes reject a new unscoped document reference'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.update_investment(
+        '9aaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        '93333333-3333-4333-8333-333333333333',
+        'Original Gold', 1, 100, NULL, CURRENT_DATE,
+        'https://attacker.example/replacement-document.pdf'
+    )
+    $$,
+    '22023',
+    'Geçerli bir yatırım belge referansı gereklidir.',
+    'investment updates reject a changed unscoped document reference'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.buy_investment_transaction(
         'gold', 'Replacement Gold', 1, 2000,
         '99999999-9999-4999-8999-999999999999',
         NULL, CURRENT_DATE, NULL,
@@ -382,6 +525,53 @@ SELECT is(
     ),
     1,
     'failed investment replacement rolls the account movement back'
+);
+
+SELECT lives_ok(
+    $$
+    SELECT public.buy_investment_transaction(
+        'gold', 'Replacement Gold', 1, 200,
+        '99999999-9999-4999-8999-999999999999',
+        NULL, CURRENT_DATE,
+        'storage://motto_assets/93333333-3333-4333-8333-333333333333/investment-receipt/90000000-0000-4000-8000-000000000005.pdf',
+        '93333333-3333-4333-8333-333333333333',
+        '9bbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    )
+    $$,
+    'a valid stable reference completes an atomic investment replacement'
+);
+
+SELECT is(
+    (
+        SELECT count(*)::integer
+        FROM public.investment_transactions
+        WHERE id = '9bbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+          AND organization_id = '93333333-3333-4333-8333-333333333333'
+    ),
+    0,
+    'successful replacement removes the original investment transaction'
+);
+
+SELECT is(
+    (
+        SELECT count(*)::integer
+        FROM public.investment_transactions
+        WHERE organization_id = '93333333-3333-4333-8333-333333333333'
+          AND document_url = 'storage://motto_assets/93333333-3333-4333-8333-333333333333/investment-receipt/90000000-0000-4000-8000-000000000005.pdf'
+    ),
+    1,
+    'successful replacement persists the new stable investment receipt reference'
+);
+
+SELECT is(
+    (
+        SELECT balance
+        FROM public.accounts
+        WHERE id = '99999999-9999-4999-8999-999999999999'
+          AND organization_id = '93333333-3333-4333-8333-333333333333'
+    ),
+    800::numeric,
+    'successful replacement refunds the original purchase and charges the replacement atomically'
 );
 
 SELECT * FROM finish();
