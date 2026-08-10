@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(37);
+SELECT plan(38);
 
 SELECT ok(
     NOT has_function_privilege(
@@ -417,6 +417,23 @@ SELECT throws_ok(
     'receipt replacement requires a non-empty valid item list before mutating the original receipt'
 );
 
+SELECT throws_ok(
+    $$
+    SELECT public.process_receipt_upload(
+        json_build_object(
+            'organization_id', '93333333-3333-4333-8333-333333333333',
+            'replace_batch_id', '96666666-6666-4666-8666-666666666666',
+            'batch_id', '90000000-0000-4000-8000-000000000008',
+            'image_url', 'storage://motto_assets/93333333-3333-4333-8333-333333333333/supplier-receipt/90000000-0000-4000-8000-000000000008.pdf',
+            'supplier', NULL
+        )
+    )
+    $$,
+    '22023',
+    'Geçerli fiş bilgileri gereklidir.',
+    'receipt replacement rejects an omitted item list before mutating the original receipt'
+);
+
 SELECT is(
     (
         SELECT count(*)::integer
@@ -468,7 +485,8 @@ SELECT is(
         WHERE organization_id = '93333333-3333-4333-8333-333333333333'
           AND details->>'batch_id' IN (
               '90000000-0000-4000-8000-000000000006',
-              '90000000-0000-4000-8000-000000000007'
+              '90000000-0000-4000-8000-000000000007',
+              '90000000-0000-4000-8000-000000000008'
           )
     ),
     0,
