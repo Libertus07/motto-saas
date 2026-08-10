@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(29);
+SELECT plan(37);
 
 SELECT ok(
     NOT has_function_privilege(
@@ -24,6 +24,19 @@ SELECT is(
     ),
     'f|search_path=pg_catalog, public',
     'receipt upload is invoker-rights with a controlled search path'
+);
+
+SELECT is(
+    (
+        SELECT count(*)::integer
+        FROM pg_proc AS procedure
+        INNER JOIN pg_namespace AS namespace
+            ON namespace.oid = procedure.pronamespace
+        WHERE namespace.nspname = 'public'
+          AND procedure.proname = 'process_receipt_upload'
+    ),
+    1,
+    'receipt upload exposes exactly one schema-cache-visible signature'
 );
 
 SELECT is(
@@ -366,6 +379,100 @@ SELECT throws_ok(
     '22023',
     'Geçerli bir tedarikçi fişi belge referansı gereklidir.',
     'receipt writes reject a stable reference for another document kind'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.process_receipt_upload(
+        json_build_object(
+            'organization_id', '93333333-3333-4333-8333-333333333333',
+            'replace_batch_id', '96666666-6666-4666-8666-666666666666',
+            'batch_id', '90000000-0000-4000-8000-000000000006',
+            'image_url', 'storage://motto_assets/92222222-2222-4222-8222-222222222222/supplier-receipt/90000000-0000-4000-8000-000000000006.pdf',
+            'supplier', NULL,
+            'items', json_build_array()
+        )
+    )
+    $$,
+    '22023',
+    'Geçerli bir tedarikçi fişi belge referansı gereklidir.',
+    'receipt replacement validates its tenant-scoped document before mutating the original receipt'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.process_receipt_upload(
+        json_build_object(
+            'organization_id', '93333333-3333-4333-8333-333333333333',
+            'replace_batch_id', '96666666-6666-4666-8666-666666666666',
+            'batch_id', '90000000-0000-4000-8000-000000000007',
+            'image_url', 'storage://motto_assets/93333333-3333-4333-8333-333333333333/supplier-receipt/90000000-0000-4000-8000-000000000007.pdf',
+            'supplier', NULL,
+            'items', json_build_array()
+        )
+    )
+    $$,
+    '22023',
+    'En az bir geçerli malzeme gereklidir.',
+    'receipt replacement requires a non-empty valid item list before mutating the original receipt'
+);
+
+SELECT is(
+    (
+        SELECT count(*)::integer
+        FROM public.supplier_transactions
+        WHERE batch_id = '96666666-6666-4666-8666-666666666666'
+          AND organization_id = '93333333-3333-4333-8333-333333333333'
+    ),
+    1,
+    'rejected empty receipt replacement preserves the original supplier transaction'
+);
+
+SELECT is(
+    (
+        SELECT total_debt
+        FROM public.suppliers
+        WHERE id = '94444444-4444-4444-8444-444444444444'
+          AND organization_id = '93333333-3333-4333-8333-333333333333'
+    ),
+    25::numeric,
+    'rejected empty receipt replacement preserves the supplier balance'
+);
+
+SELECT is(
+    (
+        SELECT stock_quantity
+        FROM public.materials
+        WHERE id = '9eeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
+          AND organization_id = '93333333-3333-4333-8333-333333333333'
+    ),
+    10::numeric,
+    'rejected empty receipt replacement preserves the material stock balance'
+);
+
+SELECT is(
+    (
+        SELECT count(*)::integer
+        FROM public.stock_movements
+        WHERE id = '9fffffff-ffff-4fff-8fff-ffffffffffff'
+          AND organization_id = '93333333-3333-4333-8333-333333333333'
+    ),
+    1,
+    'rejected empty receipt replacement preserves the original stock movement'
+);
+
+SELECT is(
+    (
+        SELECT count(*)::integer
+        FROM public.activity_logs
+        WHERE organization_id = '93333333-3333-4333-8333-333333333333'
+          AND details->>'batch_id' IN (
+              '90000000-0000-4000-8000-000000000006',
+              '90000000-0000-4000-8000-000000000007'
+          )
+    ),
+    0,
+    'rejected empty receipt replacement does not create a success audit record'
 );
 
 RESET ROLE;
