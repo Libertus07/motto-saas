@@ -431,7 +431,7 @@ npm test -- src/features/z-reports
 npx supabase@2.111.0 test db --local
 ```
 
-- [ ] Run the complete application quality gate and production build:
+- [x] Run the complete application quality gate and production build:
 
 ```text
 npm run format:check
@@ -446,8 +446,10 @@ npm run build
 - [x] Review `git diff --check`, `git status`, every changed migration, and generated TypeScript contracts if schema-visible types changed. Confirm no secret, `.env`, cache, unrelated watcher output, or accidental live URL is staged.
 - [ ] Perform a final mobile/desktop browser pass for upload progress, failed upload, signed preview, modal close, download/open, slow network, expired signed link reopened from the original action, and Turkish error copy.
 - [ ] Confirm Definition of Done: new objects are organization-scoped; both financial buckets are private; active same-tenant access works; anonymous/cross-tenant/suspended access fails; old public/data references remain viewable only through compatible resolution; failed business writes leave no newly uploaded orphan; branding remains public and unaffected.
-- [ ] Request code review with special attention to tenant leakage, SECURITY DEFINER grants/search path, legacy mapping ambiguity, policy deployment order, raw provider errors, and accidental deletion of shared historical documents.
-- [ ] Commit any verification-only documentation/graph updates with `git commit -m "chore: verify private document rollout"`.
+- [x] Request code review with special attention to tenant leakage, SECURITY DEFINER grants/search path, legacy mapping ambiguity, policy deployment order, raw provider errors, and accidental deletion of shared historical documents.
+- [x] Commit any verification-only documentation/graph updates with `git commit -m "chore: verify private document rollout"`.
+
+Task 9 local closure evidence (2026-08-10): clean replay through 32 migrations; pgTAP 168/168; application quality gate 201 tests with 3 existing environment-gated skips; production build 35/35 pages; Graphify and codebase-memory refreshed; final independent review APPROVE with no Critical/Important/Minor findings. The final real-device browser matrix and live rollout of the three post-enforcement hardening migrations remain separate open delivery gates.
 
 ---
 
