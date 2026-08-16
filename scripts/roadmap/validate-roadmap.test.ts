@@ -3,7 +3,9 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { validateRoadmap } from './validate-roadmap.mjs'
 
 const scriptPath = path.resolve('scripts/roadmap/validate-roadmap.mjs')
 const temporaryRoots: string[] = []
@@ -100,5 +102,25 @@ describe('roadmap validator', () => {
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('[DETAIL_OUTSIDE_REPOSITORY]')
+  })
+
+  it('fails closed when detail realpath resolution returns a non-ENOENT error', () => {
+    const root = createFixture([row()])
+    const originalRealpathSync = fs.realpathSync.bind(fs)
+    const realpathSync = vi.spyOn(fs, 'realpathSync')
+    realpathSync.mockImplementation((candidate, options) => {
+      if (String(candidate).endsWith(path.join('docs', 'superpowers', 'specs', 'example.md'))) {
+        throw Object.assign(new Error('permission denied'), { code: 'EACCES' })
+      }
+      return originalRealpathSync(candidate, options)
+    })
+
+    const result = validateRoadmap({
+      repositoryRoot: root,
+      roadmapPath: path.join(root, 'docs/superpowers/ROADMAP.md'),
+    })
+
+    realpathSync.mockRestore()
+    expect(result.issues.map(({ code }) => code)).toContain('DETAIL_PATH_UNRESOLVABLE')
   })
 })

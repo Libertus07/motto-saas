@@ -129,6 +129,8 @@ function validateRoadmap({ repositoryRoot, roadmapPath }) {
       }
       if (detailReadError?.code === 'ENOENT') {
         issues.push(issue('MISSING_DETAIL_FILE', `AyrÄ±ntÄ± dosyasÄ± bulunamadÄ±: ${detail}`, row.line))
+      } else if (detailReadError) {
+        issues.push(issue('DETAIL_PATH_UNRESOLVABLE', `Detail path could not be resolved: ${detail}`, row.line))
       } else if (realDetailPath && !isInsideRepository(realRepositoryRoot, realDetailPath)) {
         issues.push(issue('DETAIL_OUTSIDE_REPOSITORY', `AyrÄ±ntÄ± dosyasÄ± depo dÄ±ÅŸÄ±nda: ${detail}`, row.line))
       } else if (realDetailPath && !fs.statSync(realDetailPath, { throwIfNoEntry: false })?.isFile()) {
