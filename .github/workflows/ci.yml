@@ -6,16 +6,20 @@ on:
   pull_request:
     branches: ['master', 'main']
 
+permissions:
+  contents: read
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22.x'
           cache: 'npm'
@@ -32,23 +36,20 @@ jobs:
       - name: Run TypeScript check
         run: npm run typecheck
 
-      - name: Run Tests (including RLS integration)
+      - name: Run Tests (isolated; live RLS integration remains opt-in)
         run: npm run test
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   build:
     runs-on: ubuntu-latest
     needs: lint-and-test
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22.x'
           cache: 'npm'
@@ -62,3 +63,36 @@ jobs:
           # Builds must not require credentials for a live Supabase project.
           NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-build-placeholder
+
+  database-migrations:
+    name: Database migrations and pgTAP
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: 2.111.0
+
+      - name: Start isolated local database
+        run: supabase start --exclude vector
+
+      - name: Replay migrations from a clean database
+        run: supabase db reset --local --no-seed
+
+      - name: Run database contract tests
+        run: supabase test db --local
+
+      - name: Run security advisor gate
+        run: supabase db advisors --local --type security --level error --fail-on error
+
+      - name: Run performance advisor gate
+        run: supabase db advisors --local --type performance --level error --fail-on error
+
+      - name: Stop local Supabase services
+        if: always()
+        run: supabase stop --no-backup

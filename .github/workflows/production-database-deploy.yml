@@ -1,0 +1,210 @@
+name: Production Database Deployment
+
+run-name: Deploy database ${{ inputs.release_sha }} to production
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Full 40-character master commit SHA to deploy
+        required: true
+        type: string
+      target_project_ref:
+        description: Supabase production project reference
+        required: true
+        default: zahdmrvhxsmqpeesrfkt
+        type: string
+      backup_created_at_utc:
+        description: Verified encrypted backup creation time in ISO-8601 UTC
+        required: true
+        type: string
+      backup_sha256:
+        description: SHA-256 of the verified encrypted backup
+        required: true
+        type: string
+      backup_reference:
+        description: Encrypted backup filename from the verified manifest
+        required: true
+        type: string
+      backup_attestation:
+        description: HMAC-SHA256 attestation generated from the verified encrypted backup
+        required: true
+        type: string
+      confirmation:
+        description: Type DEPLOY followed by the production project reference
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-database-deployment
+  cancel-in-progress: false
+
+jobs:
+  validate-release:
+    name: Validate release evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout selected master commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.x'
+
+      - name: Validate immutable release and backup evidence
+        run: node scripts/ci/validate-production-deployment.mjs
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          TARGET_PROJECT_REF: ${{ inputs.target_project_ref }}
+          EXPECTED_PROJECT_REF: zahdmrvhxsmqpeesrfkt
+          BACKUP_CREATED_AT_UTC: ${{ inputs.backup_created_at_utc }}
+          BACKUP_SHA256: ${{ inputs.backup_sha256 }}
+          BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+          VALIDATION_PHASE: public
+          CONFIRMATION: ${{ inputs.confirmation }}
+
+  preflight-production:
+    name: Approve and preview production migrations
+    needs: validate-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: Production
+      url: https://supabase.com/dashboard/project/zahdmrvhxsmqpeesrfkt
+
+    steps:
+      - name: Checkout approved master commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.x'
+
+      - name: Revalidate release evidence before preflight
+        run: node scripts/ci/validate-production-deployment.mjs
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          TARGET_PROJECT_REF: ${{ inputs.target_project_ref }}
+          EXPECTED_PROJECT_REF: zahdmrvhxsmqpeesrfkt
+          BACKUP_CREATED_AT_UTC: ${{ inputs.backup_created_at_utc }}
+          BACKUP_SHA256: ${{ inputs.backup_sha256 }}
+          BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+          BACKUP_ATTESTATION: ${{ inputs.backup_attestation }}
+          BACKUP_ATTESTATION_KEY: ${{ secrets.PRODUCTION_BACKUP_ATTESTATION_KEY }}
+          VALIDATION_PHASE: trusted
+          CONFIRMATION: ${{ inputs.confirmation }}
+
+      - name: Setup pinned Supabase CLI
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: 2.111.0
+
+      - name: Link exact production project
+        run: supabase link --project-ref zahdmrvhxsmqpeesrfkt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Record migration state before deployment
+        run: supabase migration list --linked
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Preview pending production migrations
+        run: supabase db push --linked --dry-run
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Run pre-deployment security advisor gate
+        run: supabase db advisors --linked --type security --level error --fail-on error
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Run pre-deployment performance advisor gate
+        run: supabase db advisors --linked --type performance --level error --fail-on error
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+  deploy-production:
+    name: Approve and apply production migrations
+    needs: preflight-production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: Production
+      url: https://supabase.com/dashboard/project/zahdmrvhxsmqpeesrfkt
+
+    steps:
+      - name: Checkout approved master commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.x'
+
+      - name: Revalidate release evidence before deployment
+        run: node scripts/ci/validate-production-deployment.mjs
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          TARGET_PROJECT_REF: ${{ inputs.target_project_ref }}
+          EXPECTED_PROJECT_REF: zahdmrvhxsmqpeesrfkt
+          BACKUP_CREATED_AT_UTC: ${{ inputs.backup_created_at_utc }}
+          BACKUP_SHA256: ${{ inputs.backup_sha256 }}
+          BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+          BACKUP_ATTESTATION: ${{ inputs.backup_attestation }}
+          BACKUP_ATTESTATION_KEY: ${{ secrets.PRODUCTION_BACKUP_ATTESTATION_KEY }}
+          VALIDATION_PHASE: trusted
+          CONFIRMATION: ${{ inputs.confirmation }}
+
+      - name: Setup pinned Supabase CLI
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: 2.111.0
+
+      - name: Link exact production project
+        run: supabase link --project-ref zahdmrvhxsmqpeesrfkt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Reconfirm pending production migrations
+        run: supabase db push --linked --dry-run
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Apply pending production migrations
+        run: supabase db push --linked
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Verify migration state after deployment
+        run: supabase migration list --linked
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Run production security advisor gate
+        run: supabase db advisors --linked --type security --level error --fail-on error
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Run production performance advisor gate
+        run: supabase db advisors --linked --type performance --level error --fail-on error
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
