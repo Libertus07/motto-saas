@@ -54,10 +54,16 @@ atlanır. Bu nedenle değişiklik, güvenlik olayı olarak değerlendirilmelidir
 - Environment secrets:
   - `SUPABASE_ACCESS_TOKEN`
   - `SUPABASE_DB_PASSWORD`
+  - `PRODUCTION_BACKUP_ATTESTATION_KEY`
 
 Secret değerleri repository dosyalarına, workflow girdilerine, loglara veya
 artifact'lere yazılmaz. Project ref gizli değildir ve bu proje için
-`zahdmrvhxsmqpeesrfkt` olarak sabitlenmiştir.
+`zahdmrvhxsmqpeesrfkt` olarak sabitlenmiştir. Attestation anahtarının aynı değeri
+yalnız yetkili Windows kullanıcısının DPAPI korumalı yerel anahtar deposunda tutulur.
+İlk kurulumda güvenli üretilmiş en az 32 baytlık base64 anahtar GitHub secret'a
+kaydedilir; aynı değer yalnız o işlem için process environment üzerinden
+`Initialize-ProductionBackupAttestationKey.ps1` yardımcısına verilir. Yardımcı
+mevcut anahtarı sessizce ezmez; rotasyon ayrı ve denetlenebilir bir işlemdir.
 
 ## Pull request doğrulaması
 
@@ -71,6 +77,9 @@ artifact'lere yazılmaz. Project ref gizli değildir ve bu proje için
 - İş başarılı veya başarısız olsa da yerel servisleri kapatır.
 
 Bu iş canlı secret kullanmaz ve production veritabanına bağlanmaz.
+Normal uygulama testleri de pull request bağlamında repository Supabase secret'larını
+almaz. Canlı RLS entegrasyon testi yalnız ayrı, güvenilir ve elle yetkilendirilmiş bir
+ortamda opt-in çalıştırılır; PR güvenlik kanıtı temiz yerel replay ve pgTAP'tir.
 
 ## Production iş akışını başlatma
 
@@ -84,13 +93,17 @@ branch olarak `master` seçilir ve şu alanlar doldurulur:
 | `backup_created_at_utc` | Manifestteki ISO-8601 UTC zamanı; en fazla 24 saat eski olabilir |
 | `backup_sha256`         | Doğrulanmış şifreli `.zip.dpapi` dosyasının 64 haneli SHA-256'ı  |
 | `backup_reference`      | Manifestteki onaylı şifreli yedek dosya adı                      |
+| `backup_attestation`    | Gerçek şifreli dosya ve restore kanıtı için HMAC-SHA256 değeri   |
 | `confirmation`          | Tam olarak `DEPLOY zahdmrvhxsmqpeesrfkt`                         |
 
 İlk iş yalnız yerel release/yedek kanıtlarını doğrular. İkinci iş GitHub
 `Production` ortamında ilk insan onayını bekler ve salt okunur migration
 listesi, `dry-run` ve advisor kanıtını üretir. Üçüncü iş ikinci `Production`
 onayını bekler; onaylayan kişi preflight logundaki planı commit SHA ve yedek
-kanıtıyla karşılaştırdıktan sonra uygulamaya izin verir. Uygulama işi olası
+kanıtıyla karşılaştırdıktan sonra uygulamaya izin verir. İlk public kontrol yalnız
+girdi biçimini doğrular; attestation anahtarı ancak `Production` onayından sonra
+açılır ve gerçek dosyaya bağlı HMAC hem preflight hem uygulama işinde doğrulanır.
+Uygulama işi olası
 uzun bekleme veya uzak durum değişikliğine karşı kanıtları ve `dry-run`ı tekrar
 doğrular.
 
@@ -105,6 +118,24 @@ Kabul edilen yedek:
 - İzole bir veritabanına geri yüklenmiş; tablo sayıları ve finansal belge
   referans hash'leri kaynakla eşleşmiş olmalıdır.
 - Geri yükleme sorumlusu ve saklama süresi belirlenmiş olmalıdır.
+
+`backup_attestation` elle uydurulmaz. Yetkili operatör önce izole restore testini
+tamamlar, ardından aşağıdaki yardımcıyı çalıştırır:
+
+```powershell
+.\scripts\security\New-ProductionBackupAttestation.ps1 `
+  -BackupFile '<encrypted-backup>.zip.dpapi' `
+  -ReleaseSha '<40-character-master-sha>' `
+  -BackupCreatedAtUtc '<manifest-utc-time>' `
+  -RestoreVerified
+```
+
+Yardımcı gerçek şifreli dosyanın baytlarını okuyup SHA-256 hesaplar; project ref,
+release SHA, UTC zaman, dosya adı ve `restore_verified=true` değerini DPAPI korumalı
+anahtarla imzalar. JSON çıktısındaki alanlar workflow girdilerine aynen aktarılır.
+Dosya değişirse, farklı release seçilirse veya restore onayı yoksa GitHub kapısı
+fail-closed davranır. Yerel anahtar ile GitHub environment secret aynı rotasyonda
+yenilenir; anahtar hiçbir loga veya repository dosyasına yazılmaz.
 
 Veritabanı yedeğindeki `storage.objects` kayıtları fiziksel Storage nesne
 baytlarının yedeği değildir. Fiziksel fiş/fatura dosyaları ayrı Storage yedekleme

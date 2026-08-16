@@ -1,9 +1,13 @@
+import { createHmac, timingSafeEqual } from 'node:crypto'
+
 const MAX_BACKUP_AGE_MS = 24 * 60 * 60 * 1000
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000
 const SHA_PATTERN = /^[a-f0-9]{40}$/i
 const SHA256_PATTERN = /^[a-f0-9]{64}$/i
 const PROJECT_REF_PATTERN = /^[a-z0-9]{20}$/
 const BACKUP_REFERENCE_PATTERN = /^motto-saas-(?:enforcement|post-rollout|pre-deploy)-\d{8}T\d{6}Z\.zip\.dpapi$/
+const ATTESTATION_PATTERN = /^[a-f0-9]{64}$/i
+const ATTESTATION_VERSION = 'motto-saas-backup-v1'
 
 function fail(code, message) {
   process.stderr.write(`${JSON.stringify({ status: 'FAIL', code, message })}\n`)
@@ -18,6 +22,52 @@ function readRequired(name) {
   }
 
   return value
+}
+
+function createCanonicalBackupEvidence({ projectRef, releaseSha, backupCreatedAt, backupSha256, backupReference }) {
+  return [
+    ATTESTATION_VERSION,
+    projectRef,
+    releaseSha.toLowerCase(),
+    backupCreatedAt,
+    backupSha256.toLowerCase(),
+    backupReference,
+    'restore_verified=true',
+  ].join('\n')
+}
+
+function verifyBackupAttestation(evidence) {
+  const attestation = process.env.BACKUP_ATTESTATION?.trim()
+  if (!attestation) {
+    fail('backup_attestation_missing', 'A signed backup attestation is required.')
+    return false
+  }
+
+  if (!ATTESTATION_PATTERN.test(attestation)) {
+    fail('backup_attestation_invalid', 'Backup attestation must be a 64-character HMAC-SHA256 value.')
+    return false
+  }
+
+  const encodedKey = process.env.BACKUP_ATTESTATION_KEY?.trim()
+  if (!encodedKey) {
+    fail('backup_attestation_key_missing', 'The protected backup attestation key is unavailable.')
+    return false
+  }
+
+  const key = Buffer.from(encodedKey, 'base64')
+  if (key.length < 32 || key.toString('base64').replace(/=+$/, '') !== encodedKey.replace(/=+$/, '')) {
+    fail('backup_attestation_key_invalid', 'The protected backup attestation key is invalid.')
+    return false
+  }
+
+  const expected = createHmac('sha256', key).update(createCanonicalBackupEvidence(evidence)).digest()
+  const received = Buffer.from(attestation, 'hex')
+  if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
+    fail('backup_attestation_invalid', 'Backup attestation does not match the approved backup evidence.')
+    return false
+  }
+
+  return true
 }
 
 function validate() {
@@ -100,6 +150,26 @@ function validate() {
     return
   }
 
+  const validationPhase = process.env.VALIDATION_PHASE?.trim() || 'trusted'
+  if (!['public', 'trusted'].includes(validationPhase)) {
+    fail('validation_phase_invalid', 'Validation phase must be public or trusted.')
+    return
+  }
+
+  const normalizedBackupCreatedAt = new Date(backupTime).toISOString()
+  if (
+    validationPhase === 'trusted' &&
+    !verifyBackupAttestation({
+      projectRef: expectedProjectRef,
+      releaseSha,
+      backupCreatedAt: normalizedBackupCreatedAt,
+      backupSha256,
+      backupReference,
+    })
+  ) {
+    return
+  }
+
   process.stdout.write(
     `${JSON.stringify({
       status: 'PASS',
@@ -107,7 +177,8 @@ function validate() {
       release_sha: releaseSha.toLowerCase(),
       backup_sha256: backupSha256.toLowerCase(),
       backup_reference: backupReference,
-      backup_created_at_utc: new Date(backupTime).toISOString(),
+      backup_created_at_utc: normalizedBackupCreatedAt,
+      validation_phase: validationPhase,
     })}\n`,
   )
 }

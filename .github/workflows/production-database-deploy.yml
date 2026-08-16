@@ -26,6 +26,10 @@ on:
         description: Encrypted backup filename from the verified manifest
         required: true
         type: string
+      backup_attestation:
+        description: HMAC-SHA256 attestation generated from the verified encrypted backup
+        required: true
+        type: string
       confirmation:
         description: Type DEPLOY followed by the production project reference
         required: true
@@ -62,6 +66,7 @@ jobs:
           BACKUP_CREATED_AT_UTC: ${{ inputs.backup_created_at_utc }}
           BACKUP_SHA256: ${{ inputs.backup_sha256 }}
           BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+          VALIDATION_PHASE: public
           CONFIRMATION: ${{ inputs.confirmation }}
 
   preflight-production:
@@ -91,6 +96,9 @@ jobs:
           BACKUP_CREATED_AT_UTC: ${{ inputs.backup_created_at_utc }}
           BACKUP_SHA256: ${{ inputs.backup_sha256 }}
           BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+          BACKUP_ATTESTATION: ${{ inputs.backup_attestation }}
+          BACKUP_ATTESTATION_KEY: ${{ secrets.PRODUCTION_BACKUP_ATTESTATION_KEY }}
+          VALIDATION_PHASE: trusted
           CONFIRMATION: ${{ inputs.confirmation }}
 
       - name: Setup pinned Supabase CLI
@@ -155,6 +163,9 @@ jobs:
           BACKUP_CREATED_AT_UTC: ${{ inputs.backup_created_at_utc }}
           BACKUP_SHA256: ${{ inputs.backup_sha256 }}
           BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+          BACKUP_ATTESTATION: ${{ inputs.backup_attestation }}
+          BACKUP_ATTESTATION_KEY: ${{ secrets.PRODUCTION_BACKUP_ATTESTATION_KEY }}
+          VALIDATION_PHASE: trusted
           CONFIRMATION: ${{ inputs.confirmation }}
 
       - name: Setup pinned Supabase CLI
