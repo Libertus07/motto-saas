@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "078d4a4960fcb7e7ebede3cf76dcac0845bce2c5",
-    "indexed_at": "2026-08-16T15:49:40Z",
+    "commit": "d6c490eb69afaae65a307f7b3c1fefc2fa1a23c8",
+    "indexed_at": "2026-08-16T17:04:55Z",
     "project": "motto-saas-private-financial-documents",
-    "nodes": 2769,
-    "edges": 5043,
+    "nodes": 2776,
+    "edges": 4998,
     "original_size": 8257536,
-    "compressed_size": 1367076,
+    "compressed_size": 1351344,
     "compression_level": 3
 }
