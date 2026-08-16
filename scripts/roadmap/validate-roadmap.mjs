@@ -4,19 +4,19 @@ import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 
 const ALLOWED_STATUSES = new Set([
-  'TamamlandÄ±',
+  'Tamamlandı',
   'Yerelde tamam',
   'Devam ediyor',
-  'HazÄ±r',
+  'Hazır',
   'Bekliyor',
   'Engelli',
   'Ertelendi',
 ])
-const COMPLETION_STATUSES = new Set(['TamamlandÄ±', 'Yerelde tamam'])
+const COMPLETION_STATUSES = new Set(['Tamamlandı', 'Yerelde tamam'])
 const TASK_ID_PATTERN = /^[A-Z][A-Z0-9]*-\d{2}$/
-const WORKSTREAM_PATTERN = /^\*\*(?<workstream>.+)\*\*<br>SonuÃ§:\s*(?<outcome>.*)$/u
+const WORKSTREAM_PATTERN = /^\*\*(?<workstream>.+)\*\*<br>Sonuç:\s*(?<outcome>.*)$/u
 const DELIVERY_PATTERN =
-  /^Sonraki:\s*(?<nextGate>.*?)<br>Detay:\s*\[[^\]]+\]\((?<detail>[^)]+)\)<br>KanÄ±t:\s*(?<evidence>.*)$/u
+  /^Sonraki:\s*(?<nextGate>.*?)<br>Detay:\s*\[[^\]]+\]\((?<detail>[^)]+)\)<br>Kanıt:\s*(?<evidence>.*)$/u
 
 function issue(code, message, line) {
   return { code, message, line }
@@ -54,51 +54,51 @@ function validateRoadmap({ repositoryRoot, roadmapPath }) {
   try {
     markdown = fs.readFileSync(roadmapPath, 'utf8')
   } catch {
-    return { entries, issues: [issue('ROADMAP_UNREADABLE', `Roadmap okunamadÄ±: ${roadmapPath}`, 0)] }
+    return { entries, issues: [issue('ROADMAP_UNREADABLE', `Roadmap okunamadı: ${roadmapPath}`, 0)] }
   }
 
   const rows = parseTaskRows(markdown)
-  if (rows.length === 0) issues.push(issue('NO_TASKS', 'Roadmap iÃ§inde gÃ¶rev satÄ±rÄ± bulunamadÄ±.', 0))
+  if (rows.length === 0) issues.push(issue('NO_TASKS', 'Roadmap içinde görev satırı bulunamadı.', 0))
 
   for (const row of rows) {
     if (row.cells.length !== 4) {
-      issues.push(issue('WRONG_COLUMN_COUNT', 'GÃ¶rev satÄ±rÄ± tam olarak dÃ¶rt hÃ¼cre iÃ§ermelidir.', row.line))
+      issues.push(issue('WRONG_COLUMN_COUNT', 'Görev satırı tam olarak dört hücre içermelidir.', row.line))
       continue
     }
 
     const id = row.cells[0].replace(/^`|`$/gu, '')
-    if (!TASK_ID_PATTERN.test(id)) issues.push(issue('INVALID_ID', `GeÃ§ersiz gÃ¶rev kimliÄŸi: ${id}`, row.line))
+    if (!TASK_ID_PATTERN.test(id)) issues.push(issue('INVALID_ID', `Geçersiz görev kimliği: ${id}`, row.line))
 
     const workstreamMatch = row.cells[1].match(WORKSTREAM_PATTERN)
     if (!workstreamMatch) {
       const workstream = row.cells[1].match(/^\*\*(.*?)\*\*/u)?.[1]?.trim()
-      if (!workstream) issues.push(issue('MISSING_WORKSTREAM', 'Ã‡alÄ±ÅŸma alanÄ± zorunludur.', row.line))
-      const outcome = row.cells[1].match(/SonuÃ§:\s*(.*)$/u)?.[1]?.trim()
-      if (!outcome) issues.push(issue('MISSING_OUTCOME', 'SonuÃ§ zorunludur.', row.line))
+      if (!workstream) issues.push(issue('MISSING_WORKSTREAM', 'Çalışma alanı zorunludur.', row.line))
+      const outcome = row.cells[1].match(/Sonuç:\s*(.*)$/u)?.[1]?.trim()
+      if (!outcome) issues.push(issue('MISSING_OUTCOME', 'Sonuç zorunludur.', row.line))
       if (workstream && outcome)
-        issues.push(issue('MALFORMED_WORKSTREAM_CELL', 'Ã‡alÄ±ÅŸma alanÄ± hÃ¼cresi biÃ§imi geÃ§ersizdir.', row.line))
+        issues.push(issue('MALFORMED_WORKSTREAM_CELL', 'Çalışma alanı hücresi biçimi geçersizdir.', row.line))
     } else {
       if (!workstreamMatch.groups.workstream.trim())
-        issues.push(issue('MISSING_WORKSTREAM', 'Ã‡alÄ±ÅŸma alanÄ± zorunludur.', row.line))
-      if (!workstreamMatch.groups.outcome.trim()) issues.push(issue('MISSING_OUTCOME', 'SonuÃ§ zorunludur.', row.line))
+        issues.push(issue('MISSING_WORKSTREAM', 'Çalışma alanı zorunludur.', row.line))
+      if (!workstreamMatch.groups.outcome.trim()) issues.push(issue('MISSING_OUTCOME', 'Sonuç zorunludur.', row.line))
     }
 
     const status = row.cells[2]
-    if (!ALLOWED_STATUSES.has(status)) issues.push(issue('INVALID_STATUS', `GeÃ§ersiz durum: ${status}`, row.line))
+    if (!ALLOWED_STATUSES.has(status)) issues.push(issue('INVALID_STATUS', `Geçersiz durum: ${status}`, row.line))
 
     const deliveryMatch = row.cells[3].match(DELIVERY_PATTERN)
     if (!deliveryMatch) {
       if (!hasLabel(row.cells[3], 'Sonraki'))
-        issues.push(issue('MISSING_NEXT_GATE', 'Sonraki kapÄ± zorunludur.', row.line))
-      if (!hasLabel(row.cells[3], 'KanÄ±t')) issues.push(issue('MISSING_EVIDENCE', 'KanÄ±t zorunludur.', row.line))
-      if (hasLabel(row.cells[3], 'Sonraki') && hasLabel(row.cells[3], 'KanÄ±t'))
-        issues.push(issue('MALFORMED_DELIVERY_CELL', 'Teslimat bilgisi hÃ¼cresi biÃ§imi geÃ§ersizdir.', row.line))
+        issues.push(issue('MISSING_NEXT_GATE', 'Sonraki kapısı zorunludur.', row.line))
+      if (!hasLabel(row.cells[3], 'Kanıt')) issues.push(issue('MISSING_EVIDENCE', 'Kanıt zorunludur.', row.line))
+      if (hasLabel(row.cells[3], 'Sonraki') && hasLabel(row.cells[3], 'Kanıt'))
+        issues.push(issue('MALFORMED_DELIVERY_CELL', 'Teslimat bilgisi hücresi biçimi geçersizdir.', row.line))
       continue
     }
 
     const { nextGate, detail, evidence } = deliveryMatch.groups
-    if (!nextGate.trim()) issues.push(issue('MISSING_NEXT_GATE', 'Sonraki kapÄ± zorunludur.', row.line))
-    if (!evidence.trim()) issues.push(issue('MISSING_EVIDENCE', 'KanÄ±t zorunludur.', row.line))
+    if (!nextGate.trim()) issues.push(issue('MISSING_NEXT_GATE', 'Sonraki kapısı zorunludur.', row.line))
+    if (!evidence.trim()) issues.push(issue('MISSING_EVIDENCE', 'Kanıt zorunludur.', row.line))
 
     const externalTarget =
       /^[a-z][a-z\d+.-]*:/iu.test(detail) ||
@@ -108,16 +108,14 @@ function validateRoadmap({ repositoryRoot, roadmapPath }) {
       detail.startsWith('?')
     let detailPath
     if (externalTarget) {
-      issues.push(
-        issue('EXTERNAL_DETAIL_LINK', `AyrÄ±ntÄ± baÄŸlantÄ±sÄ± harici veya mutlak olamaz: ${detail}`, row.line),
-      )
+      issues.push(issue('EXTERNAL_DETAIL_LINK', `Ayrıntı bağlantısı harici veya mutlak olamaz: ${detail}`, row.line))
     } else {
       detailPath = path.resolve(path.dirname(roadmapPath), detail)
       let realRepositoryRoot
       let realDetailPath
       let detailReadError
       if (!isInsideRepository(repositoryRoot, detailPath)) {
-        issues.push(issue('DETAIL_OUTSIDE_REPOSITORY', `AyrÄ±ntÄ± dosyasÄ± depo dÄ±ÅŸÄ±nda: ${detail}`, row.line))
+        issues.push(issue('DETAIL_OUTSIDE_REPOSITORY', `Ayrıntı dosyası depo dışında: ${detail}`, row.line))
       } else {
         try {
           realRepositoryRoot = fs.realpathSync(repositoryRoot)
@@ -128,18 +126,18 @@ function validateRoadmap({ repositoryRoot, roadmapPath }) {
         }
       }
       if (detailReadError?.code === 'ENOENT') {
-        issues.push(issue('MISSING_DETAIL_FILE', `AyrÄ±ntÄ± dosyasÄ± bulunamadÄ±: ${detail}`, row.line))
+        issues.push(issue('MISSING_DETAIL_FILE', `Ayrıntı dosyası bulunamadı: ${detail}`, row.line))
       } else if (detailReadError) {
         issues.push(issue('DETAIL_PATH_UNRESOLVABLE', `Detail path could not be resolved: ${detail}`, row.line))
       } else if (realDetailPath && !isInsideRepository(realRepositoryRoot, realDetailPath)) {
-        issues.push(issue('DETAIL_OUTSIDE_REPOSITORY', `AyrÄ±ntÄ± dosyasÄ± depo dÄ±ÅŸÄ±nda: ${detail}`, row.line))
+        issues.push(issue('DETAIL_OUTSIDE_REPOSITORY', `Ayrıntı dosyası depo dışında: ${detail}`, row.line))
       } else if (realDetailPath && !fs.statSync(realDetailPath, { throwIfNoEntry: false })?.isFile()) {
-        issues.push(issue('MISSING_DETAIL_FILE', `AyrÄ±ntÄ± dosyasÄ± bulunamadÄ±: ${detail}`, row.line))
+        issues.push(issue('MISSING_DETAIL_FILE', `Ayrıntı dosyası bulunamadı: ${detail}`, row.line))
       }
     }
 
-    if (COMPLETION_STATUSES.has(status) && ['â€”', '-', 'Yok'].includes(evidence.trim())) {
-      issues.push(issue('MISSING_COMPLETION_EVIDENCE', 'Tamamlanan gÃ¶revler kanÄ±t iÃ§ermelidir.', row.line))
+    if (COMPLETION_STATUSES.has(status) && ['—', '-', 'Yok'].includes(evidence.trim())) {
+      issues.push(issue('MISSING_COMPLETION_EVIDENCE', 'Tamamlanan görevler kanıt içermelidir.', row.line))
     }
 
     entries.push({
@@ -161,7 +159,7 @@ function validateRoadmap({ repositoryRoot, roadmapPath }) {
   }
   const active = entries.filter((entry) => entry.status === 'Devam ediyor')
   if (active.length > 1)
-    issues.push(issue('MULTIPLE_ACTIVE_TASKS', 'AynÄ± anda birden fazla aktif gÃ¶rev olamaz.', active[1].line))
+    issues.push(issue('MULTIPLE_ACTIVE_TASKS', 'Aynı anda birden fazla aktif görev olamaz.', active[1].line))
 
   issues.sort((left, right) => left.line - right.line || left.code.localeCompare(right.code))
   return { entries, issues }

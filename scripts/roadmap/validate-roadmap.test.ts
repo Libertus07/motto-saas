@@ -23,16 +23,16 @@ type RowOverrides = {
 function row(overrides: RowOverrides = {}) {
   const values = {
     id: 'ROADMAP-01',
-    workstream: 'Merkezi yol haritasÄ±',
-    outcome: 'GÃ¶rev durumu tek kaynaktan izlenir.',
+    workstream: 'Merkezi yol haritası',
+    outcome: 'Görev durumu tek kaynaktan izlenir.',
     status: 'Devam ediyor',
-    nextGate: 'Yerel kalite kapÄ±larÄ±nÄ± tamamla.',
+    nextGate: 'Yerel kalite kapılarını tamamla.',
     detail: 'specs/example.md',
-    evidence: 'TasarÄ±m onayÄ± kaydedildi.',
+    evidence: 'Tasarım onayı kaydedildi.',
     ...overrides,
   }
 
-  return `| \`${values.id}\` | **${values.workstream}**<br>SonuÃ§: ${values.outcome} | ${values.status} | Sonraki: ${values.nextGate}<br>Detay: [AyrÄ±ntÄ±](${values.detail})<br>KanÄ±t: ${values.evidence} |`
+  return `| \`${values.id}\` | **${values.workstream}**<br>Sonuç: ${values.outcome} | ${values.status} | Sonraki: ${values.nextGate}<br>Detay: [Ayrıntı](${values.detail})<br>Kanıt: ${values.evidence} |`
 }
 
 function createFixture(rows: string[]) {
@@ -42,13 +42,9 @@ function createFixture(rows: string[]) {
   fs.writeFileSync(path.join(root, 'docs/superpowers/specs/example.md'), '# Example\n')
   fs.writeFileSync(
     path.join(root, 'docs/superpowers/ROADMAP.md'),
-    [
-      '# Roadmap',
-      '',
-      '| ID | GÃ¶rev ve sonuÃ§ | Durum | Teslimat bilgisi |',
-      '| --- | --- | --- | --- |',
-      ...rows,
-    ].join('\n'),
+    ['# Roadmap', '', '| ID | Görev ve sonuç | Durum | Teslimat bilgisi |', '| --- | --- | --- | --- |', ...rows].join(
+      '\n',
+    ),
   )
   return root
 }
@@ -65,6 +61,12 @@ afterEach(() => {
 })
 
 describe('roadmap validator', () => {
+  it('contains no common UTF-8 mojibake markers in the validator source', () => {
+    const source = fs.readFileSync(scriptPath, 'utf8')
+
+    expect(source).not.toMatch(/[ÃÄÅâ]/u)
+  })
+
   it('accepts a valid repository-local roadmap', () => {
     const result = runValidator(createFixture([row()]))
 
@@ -82,8 +84,8 @@ describe('roadmap validator', () => {
     ['MISSING_EVIDENCE', [row({ evidence: ' ' })]],
     ['MISSING_DETAIL_FILE', [row({ detail: 'specs/missing.md' })]],
     ['EXTERNAL_DETAIL_LINK', [row({ detail: 'https://example.com/plan.md' })]],
-    ['MISSING_COMPLETION_EVIDENCE', [row({ status: 'TamamlandÄ±', evidence: 'â€”' })]],
-    ['MULTIPLE_ACTIVE_TASKS', [row(), row({ id: 'SEC-02', workstream: 'GÃ¼venlik incelemesi' })]],
+    ['MISSING_COMPLETION_EVIDENCE', [row({ status: 'Tamamlandı', evidence: '—' })]],
+    ['MULTIPLE_ACTIVE_TASKS', [row(), row({ id: 'SEC-02', workstream: 'Güvenlik incelemesi' })]],
     ['DETAIL_OUTSIDE_REPOSITORY', [row({ detail: '../../../outside.md' })]],
   ])('rejects %s', (issueCode, rows) => {
     const result = runValidator(createFixture(rows))
