@@ -74,6 +74,13 @@ describe('roadmap validator', () => {
     expect(result.stdout).toContain('Roadmap validation passed (1 tasks).')
   })
 
+  it('accepts the checked-in authoritative roadmap', () => {
+    const result = runValidator(process.cwd())
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('Roadmap validation passed (18 tasks).')
+  })
+
   it.each([
     ['DUPLICATE_ID', [row(), row()]],
     ['INVALID_ID', [row({ id: 'roadmap-1' })]],

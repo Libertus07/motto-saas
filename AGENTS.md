@@ -110,6 +110,13 @@ migrations.
 - Use the existing design system and Tailwind tokens. Avoid isolated visual
   conventions, unnecessary inline styles, and arbitrary z-index escalation.
 
+## Roadmap Governance
+
+- Treat `docs/superpowers/ROADMAP.md` as the authoritative current delivery-state summary; detailed specs, plans, and security runbooks remain the implementation source.
+- Preserve stable roadmap IDs. Update the relevant roadmap row in the same cohesive commit when work changes status, next gate, detail link, or evidence.
+- Never infer current completion solely from historical checkboxes. Distinguish local completion from merged, deployed, migrated, or production-verified work.
+- Run `npm run roadmap:check` after roadmap changes. Do not record secrets, raw logs, or mutable external-state claims without a dated verification reference.
+
 ## Verification
 
 Run checks proportional to the risk, and run the full quality gate before
