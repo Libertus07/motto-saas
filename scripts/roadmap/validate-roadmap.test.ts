@@ -81,6 +81,19 @@ describe('roadmap validator', () => {
     expect(result.stdout).toContain('Roadmap validation passed (18 tasks).')
   })
 
+  it('keeps roadmap validation in local and GitHub quality gates', () => {
+    const packageJson = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8')) as {
+      scripts: Record<string, string>
+    }
+    const ciWorkflow = fs.readFileSync(path.resolve('.github/workflows/ci.yml'), 'utf8')
+
+    expect(packageJson.scripts['roadmap:check']).toBe('node scripts/roadmap/validate-roadmap.mjs')
+    expect(packageJson.scripts.check).toBe(
+      'npm run format:check && npm run roadmap:check && npm run lint && npm run typecheck && npm run test',
+    )
+    expect(ciWorkflow).toContain('- name: Validate project roadmap\n        run: npm run roadmap:check')
+  })
+
   it('does not record mutable advisor-warning counts in the authoritative roadmap', () => {
     const roadmap = fs.readFileSync(path.resolve('docs/superpowers/ROADMAP.md'), 'utf8')
 
