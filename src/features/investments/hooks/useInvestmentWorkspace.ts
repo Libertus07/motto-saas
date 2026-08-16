@@ -18,7 +18,18 @@ export function useInvestmentWorkspace() {
   const ui = useInvestmentsUI()
   const documentPreview = useDocumentPreview(data.activeOrganizationId ?? null)
   const { buyForm, setBuyForm } = ui
-  const documents = useInvestmentDocuments({ setBuyForm, showAlert, organizationId: data.activeOrganizationId })
+  const documents = useInvestmentDocuments({
+    setBuyForm,
+    showAlert,
+    organizationId: data.activeOrganizationId,
+    getCurrentOrganizationId: data.getCurrentOrganizationId,
+    getCurrentOrganizationVersion: data.getCurrentOrganizationVersion,
+  })
+
+  const closeBuyModal = useCallback(() => {
+    documents.cancelAnalysis()
+    ui.closeBuyModal()
+  }, [documents, ui])
 
   useAppTour('yatirimlar', investmentTourSteps, 800)
 
@@ -46,14 +57,14 @@ export function useInvestmentWorkspace() {
       event.preventDefault()
       if (!(await data.buyInvestment(ui.buyForm))) return
 
-      ui.closeBuyModal()
+      closeBuyModal()
       ui.resetForms()
       if (data.rates && ui.buyForm.asset_type !== 'real_estate') {
         const assetType = ui.buyForm.asset_type as 'gold' | 'usd' | 'eur'
         ui.setBuyForm((current) => ({ ...current, price_per_unit: data.rates?.[assetType].toString() || '' }))
       }
     },
-    [data, ui],
+    [closeBuyModal, data, ui],
   )
 
   const submitRent = useCallback(
@@ -143,7 +154,7 @@ export function useInvestmentWorkspace() {
       selectedInvestment: ui.selectedInvestment,
       buy: {
         isOpen: ui.isBuyModalOpen,
-        onClose: ui.closeBuyModal,
+        onClose: closeBuyModal,
         form: ui.buyForm,
         setForm: ui.setBuyForm,
         onSubmit: submitBuy,

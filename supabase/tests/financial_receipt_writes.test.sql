@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(38);
+SELECT plan(50);
 
 SELECT ok(
     NOT has_function_privilege(
@@ -152,6 +152,215 @@ VALUES (
     '91111111-1111-4111-8111-111111111111',
     '93333333-3333-4333-8333-333333333333'
 );
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '91111111-1111-4111-8111-111111111111', true);
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+
+SELECT throws_ok(
+    $$
+    SELECT public.process_receipt_upload(
+        json_build_object(
+            'organization_id', '92222222-2222-4222-8222-222222222222',
+            'batch_id', '90000000-0000-4000-8000-000000000010',
+            'image_url', 'storage://motto_assets/92222222-2222-4222-8222-222222222222/supplier-receipt/90000000-0000-4000-8000-000000000010.pdf',
+            'supplier', NULL,
+            'items', json_build_array(
+                json_build_object(
+                    'name', 'Stale Organization Receipt',
+                    'category', 'Test',
+                    'unit', 'Adet',
+                    'quantity', 1,
+                    'unitPrice', 2
+                )
+            )
+        )
+    )
+    $$,
+    '42501',
+    'Seçili işletme değişti. Lütfen işlemi yeniden başlatın.',
+    'receipt writes reject a member organization that is not currently selected'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.buy_investment_transaction(
+        'gold', 'Stale Direct Investment', 1, 1,
+        '90000000-0000-4000-8000-000000000011', NULL, CURRENT_DATE, NULL,
+        '92222222-2222-4222-8222-222222222222'
+    )
+    $$,
+    '42501',
+    'Seçili işletme değişti. Lütfen işlemi yeniden başlatın.',
+    'direct investment writes reject a member organization that is not currently selected'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.buy_investment_transaction(
+        'gold', 'Stale Receipt Investment', 1, 1,
+        '90000000-0000-4000-8000-000000000012', NULL, CURRENT_DATE, NULL,
+        '92222222-2222-4222-8222-222222222222', NULL
+    )
+    $$,
+    '42501',
+    'Seçili işletme değişti. Lütfen işlemi yeniden başlatın.',
+    'investment receipt writes reject a member organization that is not currently selected'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.update_investment(
+        '90000000-0000-4000-8000-000000000013',
+        '92222222-2222-4222-8222-222222222222',
+        'Stale Investment Update', 1, 1, NULL, CURRENT_DATE, NULL
+    )
+    $$,
+    '42501',
+    'Seçili işletme değişti. Lütfen işlemi yeniden başlatın.',
+    'investment updates reject a member organization that is not currently selected'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.process_z_report_atomic(
+        p_organization_id := '92222222-2222-4222-8222-222222222222',
+        p_report_date := CURRENT_DATE,
+        p_sales := '[]'::jsonb
+    )
+    $$,
+    '42501',
+    'Seçili işletme değişti. Lütfen işlemi yeniden başlatın.',
+    'Z-report writes reject a member organization that is not currently selected'
+);
+
+UPDATE public.profiles
+SET active_organization_id = NULL
+WHERE id = '91111111-1111-4111-8111-111111111111';
+
+SELECT throws_ok(
+    $$
+    SELECT public.process_receipt_upload(
+        json_build_object(
+            'organization_id', public.current_organization_id(),
+            'batch_id', '90000000-0000-4000-8000-000000000020',
+            'supplier', NULL,
+            'items', json_build_array(
+                json_build_object(
+                    'name', 'Missing Selection Receipt',
+                    'category', 'Test',
+                    'unit', 'Adet',
+                    'quantity', 1,
+                    'unitPrice', 2
+                )
+            )
+        )
+    )
+    $$,
+    '42501',
+    'Seçili işletme değişti. Lütfen işlemi yeniden başlatın.',
+    'receipt writes fail closed when no organization is selected'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.buy_investment_transaction(
+        'gold', 'Missing Selection Direct Investment', 1, 1,
+        '90000000-0000-4000-8000-000000000021', NULL, CURRENT_DATE, NULL,
+        public.current_organization_id()
+    )
+    $$,
+    '42501',
+    'Seçili işletme değişti. Lütfen işlemi yeniden başlatın.',
+    'direct investment writes fail closed when no organization is selected'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.buy_investment_transaction(
+        'gold', 'Missing Selection Receipt Investment', 1, 1,
+        '90000000-0000-4000-8000-000000000022', NULL, CURRENT_DATE, NULL,
+        public.current_organization_id(), NULL
+    )
+    $$,
+    '42501',
+    'Seçili işletme değişti. Lütfen işlemi yeniden başlatın.',
+    'investment receipt writes fail closed when no organization is selected'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.update_investment(
+        '90000000-0000-4000-8000-000000000023',
+        public.current_organization_id(),
+        'Missing Selection Investment Update', 1, 1, NULL, CURRENT_DATE, NULL
+    )
+    $$,
+    '42501',
+    'Seçili işletme değişti. Lütfen işlemi yeniden başlatın.',
+    'investment updates fail closed when no organization is selected'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.process_z_report_atomic(
+        p_organization_id := public.current_organization_id(),
+        p_report_date := CURRENT_DATE,
+        p_sales := '[]'::jsonb
+    )
+    $$,
+    '42501',
+    'Seçili işletme değişti. Lütfen işlemi yeniden başlatın.',
+    'Z-report writes fail closed when no organization is selected'
+);
+
+RESET ROLE;
+
+INSERT INTO public.organizations (id, name, slug, created_by)
+VALUES (
+    '98888888-8888-4888-8888-888888888888',
+    'Financial Writes Unavailable',
+    'financial-writes-unavailable',
+    '91111111-1111-4111-8111-111111111111'
+);
+
+UPDATE public.profiles
+SET active_organization_id = '98888888-8888-4888-8888-888888888888'
+WHERE id = '91111111-1111-4111-8111-111111111111';
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '91111111-1111-4111-8111-111111111111', true);
+SELECT set_config('request.jwt.claim.role', 'authenticated', true);
+
+SELECT throws_ok(
+    $$
+    SELECT public.process_receipt_upload(
+        json_build_object(
+            'organization_id', public.current_organization_id(),
+            'batch_id', '90000000-0000-4000-8000-000000000024',
+            'supplier', NULL,
+            'items', json_build_array(
+                json_build_object(
+                    'name', 'Invalid Selection Receipt',
+                    'category', 'Test',
+                    'unit', 'Adet',
+                    'quantity', 1,
+                    'unitPrice', 2
+                )
+            )
+        )
+    )
+    $$,
+    '42501',
+    'Seçili işletme değişti. Lütfen işlemi yeniden başlatın.',
+    'receipt writes fail closed when the selected organization is not an active membership'
+);
+
+RESET ROLE;
+
+UPDATE public.profiles
+SET active_organization_id = '93333333-3333-4333-8333-333333333333'
+WHERE id = '91111111-1111-4111-8111-111111111111';
 
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '91111111-1111-4111-8111-111111111111', true);
@@ -354,6 +563,31 @@ SELECT throws_ok(
     '22023',
     'Geçerli bir tedarikçi fişi belge referansı gereklidir.',
     'receipt writes reject a stable reference from another bucket'
+);
+
+SELECT throws_ok(
+    $$
+    SELECT public.process_receipt_upload(
+        json_build_object(
+            'organization_id', '93333333-3333-4333-8333-333333333333',
+            'batch_id', '90000000-0000-4000-8000-000000000009',
+            'image_url', 'storage://mottoXassets/93333333-3333-4333-8333-333333333333/supplier-receipt/90000000-0000-4000-8000-000000000009.pdf',
+            'supplier', NULL,
+            'items', json_build_array(
+                json_build_object(
+                    'name', 'Lookalike Bucket Reference Material',
+                    'category', 'Test',
+                    'unit', 'Adet',
+                    'quantity', 1,
+                    'unitPrice', 2
+                )
+            )
+        )
+    )
+    $$,
+    '22023',
+    'Geçerli bir tedarikçi fişi belge referansı gereklidir.',
+    'receipt writes reject a lookalike bucket reference'
 );
 
 SELECT throws_ok(

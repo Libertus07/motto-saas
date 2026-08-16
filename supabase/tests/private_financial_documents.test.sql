@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(64);
+SELECT plan(65);
 
 SELECT has_table(
     'private',
@@ -206,6 +206,16 @@ SELECT is(
     ),
     NULL,
     'the stable reference parser treats bucket underscores as literal characters'
+);
+
+SELECT ok(
+    private.is_valid_stable_financial_document_reference(
+        'storage://mottoXassets/11111111-1111-4111-8111-111111111111/investment-document/15151515-1515-4151-8151-151515151515.pdf',
+        '11111111-1111-4111-8111-111111111111',
+        'motto_assets',
+        ARRAY['investment-document']
+    ) IS NOT TRUE,
+    'stable financial references treat bucket underscores as literal characters'
 );
 
 SELECT is(
@@ -554,6 +564,14 @@ SELECT ok(
     ),
     'an active member can read a mapped legacy document'
 );
+
+INSERT INTO public.profiles (id, active_organization_id)
+VALUES (
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    '11111111-1111-4111-8111-111111111111'
+)
+ON CONFLICT (id) DO UPDATE
+SET active_organization_id = EXCLUDED.active_organization_id;
 
 SELECT throws_ok(
     $$

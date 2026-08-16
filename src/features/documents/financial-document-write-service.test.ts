@@ -26,6 +26,10 @@ function createSupabase(uploadError: unknown = null) {
   }
 }
 
+function currentOrganization(getOrganizationId = () => organizationId) {
+  return getOrganizationId
+}
+
 describe('financial document write service', () => {
   beforeEach(() => {
     vi.stubGlobal('crypto', { randomUUID: () => '22222222-2222-4222-8222-222222222222' })
@@ -44,6 +48,7 @@ describe('financial document write service', () => {
       'old-batch',
       { batch_id: 'new-batch' },
       organizationId,
+      currentOrganization(),
     )
 
     expect(rpc).toHaveBeenCalledWith('process_receipt_upload', {
@@ -68,6 +73,7 @@ describe('financial document write service', () => {
         p_name: 'Altın',
       },
       organizationId,
+      currentOrganization(),
     )
 
     expect(rpc).toHaveBeenCalledWith('buy_investment_transaction', {
@@ -81,7 +87,7 @@ describe('financial document write service', () => {
   it('forwards the stable Z-report reference to the atomic report callback', async () => {
     const { supabase } = createSupabase()
     const persist = vi.fn().mockResolvedValue({ ok: true })
-    await persistZReportWrite(supabase, organizationId, file, persist, organizationId)
+    await persistZReportWrite(supabase, organizationId, file, persist, organizationId, currentOrganization())
     expect(persist).toHaveBeenCalledWith(
       `storage://receipts/${organizationId}/z-report/22222222-2222-4222-8222-222222222222.pdf`,
     )
@@ -94,10 +100,18 @@ describe('financial document write service', () => {
       const persist = vi.fn()
       const operation =
         flow === 'supplier'
-          ? persistSupplierReceiptWrite(supabase, organizationId, file, null, {}, organizationId)
+          ? persistSupplierReceiptWrite(supabase, organizationId, file, null, {}, organizationId, currentOrganization())
           : flow === 'investment'
-            ? persistInvestmentReceiptWrite(supabase, organizationId, file, null, {}, organizationId)
-            : persistZReportWrite(supabase, organizationId, file, persist, organizationId)
+            ? persistInvestmentReceiptWrite(
+                supabase,
+                organizationId,
+                file,
+                null,
+                {},
+                organizationId,
+                currentOrganization(),
+              )
+            : persistZReportWrite(supabase, organizationId, file, persist, organizationId, currentOrganization())
 
       await expect(operation).rejects.toThrow('Belge yüklenemedi. Lütfen tekrar deneyin.')
       expect(rpc).not.toHaveBeenCalled()
@@ -111,9 +125,9 @@ describe('financial document write service', () => {
       data: null,
       error: { message: 'database internals' },
     } as never)
-    await expect(persistSupplierReceiptWrite(supabase, organizationId, null, null, {}, organizationId)).rejects.toThrow(
-      'Fiş kaydedilemedi. Lütfen tekrar deneyin.',
-    )
+    await expect(
+      persistSupplierReceiptWrite(supabase, organizationId, null, null, {}, organizationId, currentOrganization()),
+    ).rejects.toThrow('Fiş kaydedilemedi. Lütfen tekrar deneyin.')
   })
 
   it.each(['supplier', 'investment', 'z-report'] as const)(
@@ -124,14 +138,78 @@ describe('financial document write service', () => {
       const staleOrganizationId = '33333333-3333-4333-8333-333333333333'
       const operation =
         flow === 'supplier'
-          ? persistSupplierReceiptWrite(supabase, organizationId, file, null, {}, staleOrganizationId)
+          ? persistSupplierReceiptWrite(
+              supabase,
+              organizationId,
+              file,
+              null,
+              {},
+              staleOrganizationId,
+              currentOrganization(),
+            )
           : flow === 'investment'
-            ? persistInvestmentReceiptWrite(supabase, organizationId, file, null, {}, staleOrganizationId)
-            : persistZReportWrite(supabase, organizationId, file, persist, staleOrganizationId)
+            ? persistInvestmentReceiptWrite(
+                supabase,
+                organizationId,
+                file,
+                null,
+                {},
+                staleOrganizationId,
+                currentOrganization(),
+              )
+            : persistZReportWrite(supabase, organizationId, file, persist, staleOrganizationId, currentOrganization())
 
       await expect(operation).rejects.toThrow('Belge farklı bir işletme için hazırlandı. Lütfen yeniden seçin.')
       expect(rpc).not.toHaveBeenCalled()
       expect(persist).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(['supplier', 'investment', 'z-report'] as const)(
+    'compensates the uploaded %s document and skips the business write when the organization changes in flight',
+    async (flow) => {
+      let liveOrganizationId = organizationId
+      const { supabase, rpc } = createSupabase()
+      const persist = vi.fn().mockResolvedValue({ ok: true })
+      const upload = vi.mocked(supabase.storage.from('unused').upload)
+      upload.mockImplementationOnce(async (path) => {
+        liveOrganizationId = '33333333-3333-4333-8333-333333333333'
+        return { data: { path }, error: null } as never
+      })
+      const operation =
+        flow === 'supplier'
+          ? persistSupplierReceiptWrite(
+              supabase,
+              organizationId,
+              file,
+              null,
+              {},
+              organizationId,
+              currentOrganization(() => liveOrganizationId),
+            )
+          : flow === 'investment'
+            ? persistInvestmentReceiptWrite(
+                supabase,
+                organizationId,
+                file,
+                null,
+                {},
+                organizationId,
+                currentOrganization(() => liveOrganizationId),
+              )
+            : persistZReportWrite(
+                supabase,
+                organizationId,
+                file,
+                persist,
+                organizationId,
+                currentOrganization(() => liveOrganizationId),
+              )
+
+      await expect(operation).rejects.toThrow('Belge farklı bir işletme için hazırlandı. Lütfen yeniden seçin.')
+      expect(rpc).not.toHaveBeenCalled()
+      expect(persist).not.toHaveBeenCalled()
+      expect(supabase.storage.from('unused').remove).toHaveBeenCalled()
     },
   )
 })

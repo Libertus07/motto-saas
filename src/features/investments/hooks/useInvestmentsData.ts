@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useNotification } from '@/components/NotificationProvider'
 import { devError } from '@/lib/debug'
 import { Investment, InvestmentTransaction } from '@/types/database'
 import { Account, Rates, BuyFormState, EditFormState, RentFormState, ValueFormState } from '../types'
 import { useOrganization } from '@/context/OrganizationContext'
+import { assertFinancialDocumentOrganizationScope } from '../../documents/financial-document-write-contracts'
 import { persistWithOrganizationDocument } from '../../documents/document-storage-service'
 
 const getErrorMessage = (error: unknown) =>
@@ -16,16 +17,16 @@ const getErrorMessage = (error: unknown) =>
 
 export function useInvestmentsData() {
   const { showAlert, showConfirm } = useNotification()
-  const { activeOrg } = useOrganization()
+  const { activeOrg, getActiveOrganizationSnapshot } = useOrganization()
   const supabase = useMemo(() => createClient(), [])
-  const activeOrganizationIdRef = useRef(activeOrg?.id)
-
-  useEffect(() => {
-    activeOrganizationIdRef.current = activeOrg?.id
-    return () => {
-      activeOrganizationIdRef.current = undefined
-    }
-  }, [activeOrg?.id])
+  const getCurrentOrganizationId = useCallback(
+    () => getActiveOrganizationSnapshot().organizationId ?? undefined,
+    [getActiveOrganizationSnapshot],
+  )
+  const getCurrentOrganizationVersion = useCallback(
+    () => getActiveOrganizationSnapshot().version,
+    [getActiveOrganizationSnapshot],
+  )
 
   const [accounts, setAccounts] = useState<Account[]>([])
   const [investments, setInvestments] = useState<Investment[]>([])
@@ -55,7 +56,7 @@ export function useInvestmentsData() {
       .select('*')
       .eq('organization_id', activeOrg.id)
       .order('created_at')
-    if (activeOrganizationIdRef.current !== requestedOrganizationId) return
+    if (getCurrentOrganizationId() !== requestedOrganizationId) return
     setInvestments(invData || [])
 
     const { data: txData } = await supabase
@@ -63,7 +64,7 @@ export function useInvestmentsData() {
       .select('*')
       .eq('organization_id', activeOrg.id)
       .order('created_at', { ascending: false })
-    if (activeOrganizationIdRef.current !== requestedOrganizationId) return
+    if (getCurrentOrganizationId() !== requestedOrganizationId) return
     setTransactions(txData || [])
 
     const { data: accData } = await supabase
@@ -71,12 +72,12 @@ export function useInvestmentsData() {
       .select('*')
       .eq('organization_id', activeOrg.id)
       .order('created_at')
-    if (activeOrganizationIdRef.current !== requestedOrganizationId) return
+    if (getCurrentOrganizationId() !== requestedOrganizationId) return
     if (accData) {
       setAccounts(accData)
     }
     setLoading(false)
-  }, [supabase, activeOrg])
+  }, [supabase, activeOrg, getCurrentOrganizationId])
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -122,11 +123,17 @@ export function useInvestmentsData() {
 
     try {
       if (!activeOrg?.id) throw new Error('Aktif organizasyon bulunamadı.')
+      const organizationId = activeOrg.id
       if (form.document_file && form.document_organization_id !== activeOrg.id) {
         throw new Error('Belge farklı bir işletme için hazırlandı.')
       }
       const selectedAcc = accounts.find((a) => a.id === form.account_id)
       if (!selectedAcc) throw new Error('Hesap bulunamadı.')
+      assertFinancialDocumentOrganizationScope(
+        organizationId,
+        form.document_file ? form.document_organization_id : organizationId,
+        getCurrentOrganizationId,
+      )
 
       let invName = 'Yatırım'
       if (form.asset_type === 'gold') invName = 'Gram Altın'
@@ -138,7 +145,7 @@ export function useInvestmentsData() {
         supabase,
         form.document_file
           ? {
-              organizationId: activeOrg.id,
+              organizationId,
               bucket: 'motto_assets',
               kind: 'investment-document',
               file: form.document_file,
@@ -146,6 +153,11 @@ export function useInvestmentsData() {
           : null,
         form.document_url || null,
         async (documentReference) => {
+          assertFinancialDocumentOrganizationScope(
+            organizationId,
+            form.document_file ? form.document_organization_id : organizationId,
+            getCurrentOrganizationId,
+          )
           const { error: rpcError } = await supabase.rpc('buy_investment_transaction', {
             p_asset_type: form.asset_type,
             p_name: invName,
@@ -155,7 +167,7 @@ export function useInvestmentsData() {
             p_notes: form.notes || null,
             p_purchase_date: form.purchase_date || new Date().toISOString().split('T')[0],
             p_document_url: documentReference,
-            p_organization_id: activeOrg.id,
+            p_organization_id: organizationId,
           })
 
           if (rpcError) throw rpcError
@@ -181,14 +193,20 @@ export function useInvestmentsData() {
       const cost = parseFloat(form.average_cost)
 
       if (!activeOrg?.id) throw new Error('Aktif organizasyon bulunamadı.')
+      const organizationId = activeOrg.id
       if (form.document_file && form.document_organization_id !== activeOrg.id) {
         throw new Error('Belge farklı bir işletme için hazırlandı.')
       }
+      assertFinancialDocumentOrganizationScope(
+        organizationId,
+        form.document_file ? form.document_organization_id : organizationId,
+        getCurrentOrganizationId,
+      )
       await persistWithOrganizationDocument(
         supabase,
         form.document_file
           ? {
-              organizationId: activeOrg.id,
+              organizationId,
               bucket: 'motto_assets',
               kind: 'investment-document',
               file: form.document_file,
@@ -196,9 +214,14 @@ export function useInvestmentsData() {
           : null,
         form.document_url || null,
         async (documentReference) => {
+          assertFinancialDocumentOrganizationScope(
+            organizationId,
+            form.document_file ? form.document_organization_id : organizationId,
+            getCurrentOrganizationId,
+          )
           const { error: updateError } = await supabase.rpc('update_investment', {
             p_investment_id: investmentId,
-            p_organization_id: activeOrg.id,
+            p_organization_id: organizationId,
             p_name: form.name,
             p_quantity: qty,
             p_average_cost: cost,
@@ -277,6 +300,8 @@ export function useInvestmentsData() {
     transactions,
     rates,
     activeOrganizationId: activeOrg?.id,
+    getCurrentOrganizationId,
+    getCurrentOrganizationVersion,
     loading,
     saving,
     fetchData,

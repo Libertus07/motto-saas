@@ -1,5 +1,5 @@
 import type { ChangeEvent, Dispatch, SetStateAction } from 'react'
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import type { NotificationSeverity } from '@/components/NotificationProvider'
 import { devError } from '@/lib/debug'
@@ -36,20 +36,47 @@ export function useInvestmentDocuments({
   setBuyForm,
   showAlert,
   organizationId,
+  getCurrentOrganizationId,
+  getCurrentOrganizationVersion,
 }: {
   setBuyForm: Dispatch<SetStateAction<BuyFormState>>
   showAlert: ShowAlert
   organizationId: string | undefined
+  getCurrentOrganizationId: () => string | undefined
+  getCurrentOrganizationVersion: () => number
 }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const analysisGenerationRef = useRef(0)
+
+  const cancelAnalysis = useCallback(() => {
+    analysisGenerationRef.current += 1
+    setIsAnalyzing(false)
+  }, [])
 
   const analyzeReceipt = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0]
       if (!file) return
 
+      const requestGeneration = analysisGenerationRef.current + 1
+      analysisGenerationRef.current = requestGeneration
+
+      const requestedOrganizationId = organizationId
+      if (!requestedOrganizationId) {
+        event.target.value = ''
+        setIsAnalyzing(false)
+        await showAlert('Aktif organizasyon bulunamadı.', 'error')
+        return
+      }
+      const requestedOrganizationVersion = getCurrentOrganizationVersion()
+      const isRequestCurrent = () =>
+        analysisGenerationRef.current === requestGeneration &&
+        getCurrentOrganizationId() === requestedOrganizationId &&
+        getCurrentOrganizationVersion() === requestedOrganizationVersion
+
       if (file.size > 3 * 1024 * 1024) {
         event.target.value = ''
+        setIsAnalyzing(false)
         await showAlert(
           'Seçilen dosya çok büyük. Lütfen 3 MB altı bir dosya seçin veya kırparak tekrar deneyin.',
           'warning',
@@ -70,6 +97,7 @@ export function useInvestmentDocuments({
         })
         const data = (await response.json()) as InvestmentAnalysisResponse
         if (!response.ok || data.error) throw new Error(data.error || 'Yatırım belgesi analiz edilemedi.')
+        if (!isRequestCurrent()) return
 
         setBuyForm((current) => ({
           ...current,
@@ -81,14 +109,15 @@ export function useInvestmentDocuments({
         }))
         await showAlert('Fiş başarıyla okundu ve form dolduruldu.', 'success')
       } catch (error) {
+        if (!isRequestCurrent()) return
         devError('Yatırım belgesi analiz edilemedi.', error)
         await showAlert('Yatırım belgesi analiz edilemedi. Lütfen tekrar deneyin.', 'error')
       } finally {
-        setIsAnalyzing(false)
+        if (isRequestCurrent()) setIsAnalyzing(false)
         event.target.value = ''
       }
     },
-    [setBuyForm, showAlert],
+    [getCurrentOrganizationId, getCurrentOrganizationVersion, organizationId, setBuyForm, showAlert],
   )
 
   const uploadDocument = useCallback(
@@ -124,5 +153,5 @@ export function useInvestmentDocuments({
     [organizationId, showAlert],
   )
 
-  return { isAnalyzing, analyzeReceipt, uploadDocument }
+  return { isAnalyzing, analyzeReceipt, cancelAnalysis, uploadDocument }
 }

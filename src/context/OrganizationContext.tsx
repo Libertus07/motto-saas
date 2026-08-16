@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
+import { createOrganizationSelectionTracker, type OrganizationSelectionSnapshot } from './organization-selection'
 
 export interface OrganizationItem {
   id: string
@@ -21,6 +22,7 @@ interface OrganizationContextType {
   organizations: OrganizationItem[]
   loading: boolean
   setActiveOrg: (org: OrganizationItem) => Promise<void>
+  getActiveOrganizationSnapshot: () => OrganizationSelectionSnapshot
 }
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined)
@@ -30,6 +32,15 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [organizations, setOrganizations] = useState<OrganizationItem[]>([])
   const [activeOrg, setActiveOrgState] = useState<OrganizationItem | null>(null)
   const [loading, setLoading] = useState(true)
+  const [organizationSelection] = useState(() => createOrganizationSelectionTracker())
+  const getActiveOrganizationSnapshot = organizationSelection.getSnapshot
+  const publishActiveOrganization = useCallback(
+    (organization: OrganizationItem | null) => {
+      organizationSelection.publish(organization?.id ?? null)
+      setActiveOrgState(organization)
+    },
+    [organizationSelection],
+  )
 
   useEffect(() => {
     async function loadOrganizations() {
@@ -77,12 +88,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             if (selectionError) throw selectionError
           }
 
-          setActiveOrgState(found)
+          publishActiveOrganization(found)
           localStorage.setItem('motto_active_org_id', found.id)
           localStorage.setItem('motto_login_org_slug', found.slug)
         } else {
           setOrganizations([])
-          setActiveOrgState(null)
+          publishActiveOrganization(null)
         }
       } catch (err) {
         console.error('Organization fetch error:', err)
@@ -91,7 +102,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       }
     }
     loadOrganizations()
-  }, [supabase])
+  }, [publishActiveOrganization, supabase])
 
   const setActiveOrg = useCallback(
     async (org: OrganizationItem) => {
@@ -105,15 +116,17 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       })
       if (error) throw error
 
-      setActiveOrgState(org)
+      publishActiveOrganization(org)
       localStorage.setItem('motto_active_org_id', org.id)
       localStorage.setItem('motto_login_org_slug', org.slug)
     },
-    [organizations, supabase],
+    [organizations, publishActiveOrganization, supabase],
   )
 
   return (
-    <OrganizationContext.Provider value={{ activeOrg, organizations, loading, setActiveOrg }}>
+    <OrganizationContext.Provider
+      value={{ activeOrg, organizations, loading, setActiveOrg, getActiveOrganizationSnapshot }}
+    >
       {children}
     </OrganizationContext.Provider>
   )

@@ -6,6 +6,7 @@ const organizationId = '11111111-1111-4111-8111-111111111111'
 
 vi.mock('react', () => ({
   useCallback: <T>(callback: T) => callback,
+  useRef: <T>(initialValue: T) => ({ current: initialValue }),
   useState: (initialValue: unknown) => [initialValue, vi.fn()],
 }))
 vi.mock('@/lib/debug', () => ({ devError: mocks.devError }))
@@ -30,6 +31,8 @@ function createForm(): BuyFormState {
 describe('investment document selection', () => {
   const showAlert = vi.fn().mockResolvedValue(undefined)
   const setBuyForm = vi.fn()
+  const getCurrentOrganizationId = () => organizationId
+  const getCurrentOrganizationVersion = () => 0
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -76,6 +79,8 @@ describe('investment document selection', () => {
       setBuyForm: updateBuyForm,
       showAlert,
       organizationId,
+      getCurrentOrganizationId,
+      getCurrentOrganizationVersion,
     })
 
     await analyzeReceipt(event)
@@ -85,6 +90,155 @@ describe('investment document selection', () => {
     expect(updatedForm.document_url).toBe('storage://motto_assets/old/document.pdf')
     expect(updatedForm.document_file).toBeNull()
     expect(JSON.stringify(updatedForm)).not.toContain(dataUrl)
+  })
+
+  it('does not publish an analysis result after the active organization changes in flight', async () => {
+    vi.stubGlobal(
+      'FileReader',
+      class {
+        result = 'data:image/png;base64,aGVsbG8='
+        error = null
+        onerror: (() => void) | null = null
+        onload: (() => void) | null = null
+        readAsDataURL() {
+          this.onload?.()
+        }
+      },
+    )
+    let resolveAnalysis: ((response: Response) => void) | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveAnalysis = resolve
+          }),
+      ),
+    )
+    let currentOrganizationId = organizationId
+    const event = {
+      target: { files: [new File(['image'], 'dekont.png', { type: 'image/png' })], value: 'selected' },
+    } as unknown as React.ChangeEvent<HTMLInputElement>
+    const { analyzeReceipt } = useInvestmentDocuments({
+      setBuyForm,
+      showAlert,
+      organizationId,
+      getCurrentOrganizationId: () => currentOrganizationId,
+      getCurrentOrganizationVersion,
+    })
+
+    const analysis = analyzeReceipt(event)
+    await vi.waitFor(() => expect(resolveAnalysis).toBeTypeOf('function'))
+    currentOrganizationId = '33333333-3333-4333-8333-333333333333'
+    resolveAnalysis!(
+      new Response(JSON.stringify({ asset_type: 'usd', quantity: 10, price_per_unit: 42 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    await analysis
+
+    expect(setBuyForm).not.toHaveBeenCalled()
+    expect(showAlert).not.toHaveBeenCalledWith('Fiş başarıyla okundu ve form dolduruldu.', 'success')
+  })
+
+  it('does not publish an analysis result after the organization changes away and back', async () => {
+    vi.stubGlobal(
+      'FileReader',
+      class {
+        result = 'data:image/png;base64,aGVsbG8='
+        error = null
+        onerror: (() => void) | null = null
+        onload: (() => void) | null = null
+        readAsDataURL() {
+          this.onload?.()
+        }
+      },
+    )
+    let resolveAnalysis: ((response: Response) => void) | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveAnalysis = resolve
+          }),
+      ),
+    )
+    let organizationVersion = 0
+    const event = {
+      target: { files: [new File(['image'], 'dekont.png', { type: 'image/png' })], value: 'selected' },
+    } as unknown as React.ChangeEvent<HTMLInputElement>
+    const { analyzeReceipt } = useInvestmentDocuments({
+      setBuyForm,
+      showAlert,
+      organizationId,
+      getCurrentOrganizationId,
+      getCurrentOrganizationVersion: () => organizationVersion,
+    })
+
+    const analysis = analyzeReceipt(event)
+    await vi.waitFor(() => expect(resolveAnalysis).toBeTypeOf('function'))
+    organizationVersion = 2
+    resolveAnalysis!(
+      new Response(JSON.stringify({ asset_type: 'usd', quantity: 10, price_per_unit: 42 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    await analysis
+
+    expect(setBuyForm).not.toHaveBeenCalled()
+    expect(showAlert).not.toHaveBeenCalledWith('Fiş başarıyla okundu ve form dolduruldu.', 'success')
+  })
+
+  it('does not publish a pending analysis after the modal closes', async () => {
+    vi.stubGlobal(
+      'FileReader',
+      class {
+        result = 'data:image/png;base64,aGVsbG8='
+        error = null
+        onerror: (() => void) | null = null
+        onload: (() => void) | null = null
+        readAsDataURL() {
+          this.onload?.()
+        }
+      },
+    )
+    let resolveAnalysis: ((response: Response) => void) | undefined
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveAnalysis = resolve
+          }),
+      ),
+    )
+    const event = {
+      target: { files: [new File(['image'], 'dekont.png', { type: 'image/png' })], value: 'selected' },
+    } as unknown as React.ChangeEvent<HTMLInputElement>
+    const { analyzeReceipt, cancelAnalysis } = useInvestmentDocuments({
+      setBuyForm,
+      showAlert,
+      organizationId,
+      getCurrentOrganizationId,
+      getCurrentOrganizationVersion,
+    })
+
+    const analysis = analyzeReceipt(event)
+    await vi.waitFor(() => expect(resolveAnalysis).toBeTypeOf('function'))
+    cancelAnalysis()
+    resolveAnalysis!(
+      new Response(JSON.stringify({ asset_type: 'usd', quantity: 10, price_per_unit: 42 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    await analysis
+
+    expect(setBuyForm).not.toHaveBeenCalled()
+    expect(showAlert).not.toHaveBeenCalledWith('Fiş başarıyla okundu ve form dolduruldu.', 'success')
   })
 
   it('masks analysis provider errors while logging technical details', async () => {
@@ -113,7 +267,13 @@ describe('investment document selection', () => {
     const event = {
       target: { files: [new File(['image'], 'dekont.png', { type: 'image/png' })], value: 'selected' },
     } as unknown as React.ChangeEvent<HTMLInputElement>
-    const { analyzeReceipt } = useInvestmentDocuments({ setBuyForm, showAlert, organizationId })
+    const { analyzeReceipt } = useInvestmentDocuments({
+      setBuyForm,
+      showAlert,
+      organizationId,
+      getCurrentOrganizationId,
+      getCurrentOrganizationVersion,
+    })
 
     await analyzeReceipt(event)
 
@@ -129,7 +289,13 @@ describe('investment document selection', () => {
         value: 'selected',
       },
     } as unknown as React.ChangeEvent<HTMLInputElement>
-    const { analyzeReceipt } = useInvestmentDocuments({ setBuyForm, showAlert, organizationId })
+    const { analyzeReceipt } = useInvestmentDocuments({
+      setBuyForm,
+      showAlert,
+      organizationId,
+      getCurrentOrganizationId,
+      getCurrentOrganizationVersion,
+    })
 
     await analyzeReceipt(event)
 
@@ -141,7 +307,13 @@ describe('investment document selection', () => {
     const form = createForm()
     const setForm = vi.fn()
     const event = { target: { files: [file], value: 'selected' } } as unknown as React.ChangeEvent<HTMLInputElement>
-    const { uploadDocument } = useInvestmentDocuments({ setBuyForm, showAlert, organizationId })
+    const { uploadDocument } = useInvestmentDocuments({
+      setBuyForm,
+      showAlert,
+      organizationId,
+      getCurrentOrganizationId,
+      getCurrentOrganizationVersion,
+    })
 
     await uploadDocument(event, setForm, form)
 
@@ -159,7 +331,13 @@ describe('investment document selection', () => {
     })
     const setForm = vi.fn()
     const event = { target: { files: [file], value: 'selected' } } as unknown as React.ChangeEvent<HTMLInputElement>
-    const { uploadDocument } = useInvestmentDocuments({ setBuyForm, showAlert, organizationId })
+    const { uploadDocument } = useInvestmentDocuments({
+      setBuyForm,
+      showAlert,
+      organizationId,
+      getCurrentOrganizationId,
+      getCurrentOrganizationVersion,
+    })
 
     await uploadDocument(event, setForm, createForm())
 
@@ -172,7 +350,13 @@ describe('investment document selection', () => {
     const file = new File(['document'], 'alım-belgesi.pdf', { type: 'application/pdf' })
     const event = { target: { files: [file], value: 'selected' } } as unknown as React.ChangeEvent<HTMLInputElement>
     const setForm = vi.fn()
-    const { uploadDocument } = useInvestmentDocuments({ setBuyForm, showAlert, organizationId: undefined })
+    const { uploadDocument } = useInvestmentDocuments({
+      setBuyForm,
+      showAlert,
+      organizationId: undefined,
+      getCurrentOrganizationId: () => undefined,
+      getCurrentOrganizationVersion,
+    })
 
     await uploadDocument(event, setForm, createForm())
 

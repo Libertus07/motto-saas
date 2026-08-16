@@ -11,8 +11,13 @@ const flowStorage = {
 export function assertFinancialDocumentOrganizationScope(
   organizationId: string,
   pendingOrganizationId: string | null,
+  getCurrentOrganizationId: () => string | null | undefined,
 ): void {
-  if (!pendingOrganizationId || pendingOrganizationId !== organizationId) {
+  if (
+    !pendingOrganizationId ||
+    pendingOrganizationId !== organizationId ||
+    getCurrentOrganizationId() !== organizationId
+  ) {
     throw new Error('Belge farklı bir işletme için hazırlandı. Lütfen yeniden seçin.')
   }
 }

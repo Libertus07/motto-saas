@@ -13,6 +13,7 @@ const { organizationId, objectId, mocks } = vi.hoisted(() => {
       devError: vi.fn(),
       setCollection: vi.fn(),
       organizationRef: { current: organizationId },
+      organizationSnapshot: { organizationId, version: 0 },
       supabase: null as unknown,
     },
   }
@@ -22,7 +23,8 @@ vi.mock('react', () => ({
   useCallback: <T>(callback: T) => callback,
   useEffect: vi.fn(),
   useMemo: <T>(factory: () => T) => factory(),
-  useRef: () => mocks.organizationRef,
+  useRef: <T>(initialValue: T) =>
+    typeof initialValue === 'string' ? mocks.organizationRef : { current: initialValue },
   useState: (initialValue: unknown) => [
     Array.isArray(initialValue) ? mocks.accounts : initialValue,
     Array.isArray(initialValue) ? mocks.setCollection : vi.fn(),
@@ -33,7 +35,12 @@ vi.mock('@/lib/supabase', () => ({ createClient: () => mocks.supabase }))
 vi.mock('@/components/NotificationProvider', () => ({
   useNotification: () => ({ showAlert: mocks.showAlert, showConfirm: mocks.showConfirm }),
 }))
-vi.mock('@/context/OrganizationContext', () => ({ useOrganization: () => ({ activeOrg: mocks.activeOrg }) }))
+vi.mock('@/context/OrganizationContext', () => ({
+  useOrganization: () => ({
+    activeOrg: mocks.activeOrg,
+    getActiveOrganizationSnapshot: () => mocks.organizationSnapshot,
+  }),
+}))
 vi.mock('@/lib/debug', () => ({ devError: mocks.devError }))
 
 import { useInvestmentsData } from './useInvestmentsData'
@@ -84,6 +91,7 @@ describe('investment document submissions', () => {
     vi.clearAllMocks()
     mocks.activeOrg.id = organizationId
     mocks.organizationRef.current = organizationId
+    mocks.organizationSnapshot = { organizationId, version: 0 }
     vi.stubGlobal('crypto', { randomUUID: () => objectId })
   })
 
@@ -148,6 +156,44 @@ describe('investment document submissions', () => {
     expect(remove).toHaveBeenCalledWith([`${organizationId}/investment-document/${objectId}.pdf`])
   })
 
+  it('compensates a newly uploaded buy document and skips the RPC when the organization changes in flight', async () => {
+    const { supabase, upload, remove, rpc } = createSupabase()
+    mocks.supabase = supabase
+    upload.mockImplementationOnce(async () => {
+      mocks.organizationRef.current = '33333333-3333-4333-8333-333333333333'
+      mocks.organizationSnapshot = {
+        organizationId: '33333333-3333-4333-8333-333333333333',
+        version: 1,
+      }
+      return { data: { path: `${organizationId}/investment-document/${objectId}.pdf` }, error: null }
+    })
+    const file = new File(['document'], 'alım-belgesi.pdf', { type: 'application/pdf' })
+
+    await expect(useInvestmentsData().buyInvestment(createBuyForm(file))).resolves.toBe(false)
+
+    expect(rpc).not.toHaveBeenCalled()
+    expect(remove).toHaveBeenCalledWith([`${organizationId}/investment-document/${objectId}.pdf`])
+  })
+
+  it('compensates a newly uploaded edit document and skips the RPC when the organization changes in flight', async () => {
+    const { supabase, upload, remove, rpc } = createSupabase()
+    mocks.supabase = supabase
+    upload.mockImplementationOnce(async () => {
+      mocks.organizationRef.current = '33333333-3333-4333-8333-333333333333'
+      mocks.organizationSnapshot = {
+        organizationId: '33333333-3333-4333-8333-333333333333',
+        version: 1,
+      }
+      return { data: { path: `${organizationId}/investment-document/${objectId}.pdf` }, error: null }
+    })
+    const file = new File(['document'], 'güncel-belge.pdf', { type: 'application/pdf' })
+
+    await expect(useInvestmentsData().editInvestment('investment-1', createEditForm(file))).resolves.toBe(false)
+
+    expect(rpc).not.toHaveBeenCalled()
+    expect(remove).toHaveBeenCalledWith([`${organizationId}/investment-document/${objectId}.pdf`])
+  })
+
   it('rejects a pending investment document selected for a different organization before upload', async () => {
     const { supabase, upload, rpc } = createSupabase()
     mocks.supabase = supabase
@@ -186,10 +232,26 @@ describe('investment document submissions', () => {
     const request = useInvestmentsData().fetchData()
 
     mocks.organizationRef.current = '33333333-3333-4333-8333-333333333333'
+    mocks.organizationSnapshot = {
+      organizationId: '33333333-3333-4333-8333-333333333333',
+      version: 1,
+    }
     resolveInvestments?.({ data: [{ id: 'stale-investment' }] })
     await request
 
     expect(mocks.setCollection).not.toHaveBeenCalled()
+  })
+
+  it('reads organization invalidation synchronously from the selection source without waiting for an effect', () => {
+    const data = useInvestmentsData()
+
+    mocks.organizationSnapshot = {
+      organizationId: '33333333-3333-4333-8333-333333333333',
+      version: 1,
+    }
+
+    expect(data.getCurrentOrganizationId()).toBe('33333333-3333-4333-8333-333333333333')
+    expect(data.getCurrentOrganizationVersion()).toBe(1)
   })
 
   it('never forwards the temporary analysis data URL to the buy RPC document argument', async () => {
@@ -226,6 +288,8 @@ describe('investment document submissions', () => {
       setBuyForm: updateBuyForm,
       showAlert: mocks.showAlert,
       organizationId,
+      getCurrentOrganizationId: () => organizationId,
+      getCurrentOrganizationVersion: () => 0,
     })
 
     await analyzeReceipt(event)

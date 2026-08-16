@@ -269,6 +269,7 @@ function YatirimFisiYukle() {
           p_organization_id: activeOrg.id,
         },
         pendingOrganizationId,
+        () => activeOrganizationIdRef.current,
       )
 
       await showAlert('Yatırım fişi başarıyla kaydedildi!', 'success')

@@ -143,6 +143,10 @@ export function useZReportWorkspace() {
       })
       const data = (await response.json()) as ParsedZReport & { error?: string }
       if (activeOrganizationIdRef.current !== organizationId) return
+      if (response.status === 429) {
+        await showAlert('Günlük limit doldu, yarın tekrar deneyin.', 'warning')
+        return
+      }
       if (data.error) throw new Error(data.error)
       setParsedData({
         ...data,
@@ -266,6 +270,7 @@ export function useZReportWorkspace() {
             replaceExisting,
           }),
         pendingOrganizationId,
+        () => activeOrganizationIdRef.current,
       )
       await showAlert('Z Raporu başarıyla işlendi ve stoklar düşüldü!', 'success')
       router.push('/dashboard/raporlar')

@@ -62,4 +62,22 @@ describe('Z-report analysis errors', () => {
     expect(mocks.devError).toHaveBeenCalledWith('Z Raporu analiz edilemedi.', expect.any(Error))
     vi.unstubAllGlobals()
   })
+
+  it('preserves the safe daily quota message returned with HTTP 429', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: 'Günlük limit doldu, yarın tekrar deneyin.' }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    )
+
+    await useZReportWorkspace().analyze()
+
+    expect(mocks.showAlert).toHaveBeenCalledWith('Günlük limit doldu, yarın tekrar deneyin.', 'warning')
+    expect(mocks.devError).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+  })
 })

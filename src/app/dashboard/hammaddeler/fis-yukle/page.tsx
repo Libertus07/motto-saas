@@ -422,6 +422,7 @@ function FisYukle() {
           })),
         },
         pendingOrganizationId,
+        () => activeOrganizationIdRef.current,
       )
     } catch (error) {
       devError('Fiş yükleme atomic işlem hatası:', error)
