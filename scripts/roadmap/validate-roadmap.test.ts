@@ -89,4 +89,16 @@ describe('roadmap validator', () => {
     expect(result.status).toBe(1)
     expect(result.stderr).toContain(`[${issueCode}]`)
   })
+
+  it('rejects a detail symlink that resolves outside the repository', () => {
+    const root = createFixture([row({ detail: 'specs/outside-link.md' })])
+    const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'motto-roadmap-outside-'))
+    temporaryRoots.push(outsideRoot)
+    fs.symlinkSync(outsideRoot, path.join(root, 'docs/superpowers/specs/outside-link.md'), 'junction')
+
+    const result = runValidator(root)
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('[DETAIL_OUTSIDE_REPOSITORY]')
+  })
 })

@@ -113,9 +113,25 @@ function validateRoadmap({ repositoryRoot, roadmapPath }) {
       )
     } else {
       detailPath = path.resolve(path.dirname(roadmapPath), detail)
+      let realRepositoryRoot
+      let realDetailPath
+      let detailReadError
       if (!isInsideRepository(repositoryRoot, detailPath)) {
         issues.push(issue('DETAIL_OUTSIDE_REPOSITORY', `AyrÄ±ntÄ± dosyasÄ± depo dÄ±ÅŸÄ±nda: ${detail}`, row.line))
-      } else if (!fs.statSync(detailPath, { throwIfNoEntry: false })?.isFile()) {
+      } else {
+        try {
+          realRepositoryRoot = fs.realpathSync(repositoryRoot)
+          realDetailPath = fs.realpathSync(detailPath)
+        } catch (error) {
+          realRepositoryRoot = repositoryRoot
+          detailReadError = error
+        }
+      }
+      if (detailReadError?.code === 'ENOENT') {
+        issues.push(issue('MISSING_DETAIL_FILE', `AyrÄ±ntÄ± dosyasÄ± bulunamadÄ±: ${detail}`, row.line))
+      } else if (realDetailPath && !isInsideRepository(realRepositoryRoot, realDetailPath)) {
+        issues.push(issue('DETAIL_OUTSIDE_REPOSITORY', `AyrÄ±ntÄ± dosyasÄ± depo dÄ±ÅŸÄ±nda: ${detail}`, row.line))
+      } else if (realDetailPath && !fs.statSync(realDetailPath, { throwIfNoEntry: false })?.isFile()) {
         issues.push(issue('MISSING_DETAIL_FILE', `AyrÄ±ntÄ± dosyasÄ± bulunamadÄ±: ${detail}`, row.line))
       }
     }
