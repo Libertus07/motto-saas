@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react'
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
+import { openSupplierDocument, useDocumentPreview } from '@/features/documents'
 import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
@@ -90,7 +91,9 @@ export default function Tedarikciler() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [groupedReceipts, setGroupedReceipts] = useState<GroupedReceipt[]>([])
   const [expandedBatch, setExpandedBatch] = useState<string | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [viewingDocument, setViewingDocument] = useState<{ batchId: string | null; organizationId: string } | null>(
+    null,
+  )
   const [activeTab, setActiveTab] = useState<'hareketler' | 'urunler' | 'bilgiler'>('hareketler')
   const [supplierSearch, setSupplierSearch] = useState('')
 
@@ -107,6 +110,25 @@ export default function Tedarikciler() {
   const [paymentAccountId, setPaymentAccountId] = useState<string>('')
 
   const supabase = useMemo(() => createClient(), [])
+  const documentRequestPending = useRef(false)
+  const documentRequestGeneration = useRef(0)
+  const documentRequestMounted = useRef(false)
+  const documentScope = useRef<string | null>(null)
+  const organizationId = activeOrg?.id ?? null
+  const viewingDocumentBatchId = viewingDocument?.organizationId === organizationId ? viewingDocument.batchId : null
+  const { previewUrl, openDocument, closeDocument } = useDocumentPreview(activeOrg?.id ?? null)
+
+  useLayoutEffect(() => {
+    documentRequestMounted.current = true
+    documentScope.current = organizationId
+    documentRequestGeneration.current += 1
+    documentRequestPending.current = false
+    return () => {
+      documentRequestMounted.current = false
+      documentRequestGeneration.current += 1
+      documentRequestPending.current = false
+    }
+  }, [organizationId])
 
   const fetchAccounts = useCallback(async () => {
     if (!activeOrg) return
@@ -184,25 +206,30 @@ export default function Tedarikciler() {
   }
 
   const viewDocument = async (batchId: string | null) => {
-    if (!batchId) {
-      await showAlert('Bu işlem için ekli belge bulunamadı.', 'error')
-      return
-    }
-    setLoading(true)
-    const { data } = await supabase
-      .from('stock_movements')
-      .select('document_url')
-      .eq('batch_id', batchId)
-      .eq('organization_id', activeOrg?.id)
-      .not('document_url', 'is', null)
-      .limit(1)
-      .single()
+    if (documentRequestPending.current) return
 
-    setLoading(false)
-    if (data?.document_url) {
-      setPreviewUrl(data.document_url)
-    } else {
-      await showAlert('Veritabanında bu kayıt için herhangi bir fatura/fiş görseli bulunamadı.', 'error')
+    const requestOrganizationId = organizationId
+    const requestGeneration = ++documentRequestGeneration.current
+    const isRequestCurrent = () =>
+      documentRequestMounted.current &&
+      documentScope.current === requestOrganizationId &&
+      documentRequestGeneration.current === requestGeneration
+    documentRequestPending.current = true
+    if (requestOrganizationId) setViewingDocument({ batchId, organizationId: requestOrganizationId })
+    try {
+      await openSupplierDocument({
+        batchId,
+        isRequestCurrent,
+        openDocument,
+        organizationId: requestOrganizationId,
+        showAlert,
+        supabase,
+      })
+    } finally {
+      if (isRequestCurrent()) {
+        documentRequestPending.current = false
+        setViewingDocument(null)
+      }
     }
   }
 
@@ -759,11 +786,15 @@ export default function Tedarikciler() {
 
                                 {group.batchId && (
                                   <button
+                                    type="button"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      viewDocument(group.batchId)
+                                      void viewDocument(group.batchId)
                                     }}
-                                    className="p-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white rounded-xl border border-stone-700 text-xs transition-colors"
+                                    disabled={viewingDocumentBatchId === group.batchId}
+                                    aria-busy={viewingDocumentBatchId === group.batchId}
+                                    aria-label="Tedarikçi belgesini görüntüle"
+                                    className="p-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white rounded-xl border border-stone-700 text-xs transition-colors disabled:cursor-wait disabled:opacity-60"
                                     title="Belgeyi Gör"
                                   >
                                     🖼️ Belge
@@ -1061,7 +1092,7 @@ export default function Tedarikciler() {
       {/* Belge Önizleme Modalı */}
       <DocumentPreviewModal
         isOpen={!!previewUrl}
-        onClose={() => setPreviewUrl(null)}
+        onClose={closeDocument}
         url={previewUrl}
         title="Tedarikçi Belgesi Önizleme"
       />

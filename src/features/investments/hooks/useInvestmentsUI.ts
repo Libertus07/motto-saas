@@ -22,6 +22,8 @@ export function useInvestmentsUI() {
     notes: '',
     purchase_date: new Date().toISOString().split('T')[0],
     document_url: '',
+    document_file: null,
+    document_organization_id: null,
   })
 
   // Rent Modal
@@ -46,11 +48,9 @@ export function useInvestmentsUI() {
     notes: '',
     purchase_date: '',
     document_url: '',
+    document_file: null,
+    document_organization_id: null,
   })
-
-  // Doc Preview
-  const [isDocModalOpen, setIsDocModalOpen] = useState(false)
-  const [docPreviewUrl, setDocPreviewUrl] = useState('')
 
   // Note Preview
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
@@ -65,6 +65,8 @@ export function useInvestmentsUI() {
       notes: inv.notes || '',
       purchase_date: inv.purchase_date || new Date().toISOString().split('T')[0],
       document_url: inv.document_url || '',
+      document_file: null,
+      document_organization_id: null,
     })
     setIsEditModalOpen(true)
   }
@@ -78,9 +80,21 @@ export function useInvestmentsUI() {
       notes: '',
       purchase_date: new Date().toISOString().split('T')[0],
       document_url: '',
+      document_file: null,
+      document_organization_id: null,
     })
     setRentForm({ amount: '', account_id: '' })
     setValueForm({ current_value: '' })
+  }
+
+  const closeBuyModal = () => {
+    setIsBuyModalOpen(false)
+    setBuyForm((current) => ({ ...current, document_file: null, document_organization_id: null }))
+  }
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false)
+    setEditForm((current) => ({ ...current, document_file: null, document_organization_id: null }))
   }
 
   return {
@@ -115,11 +129,6 @@ export function useInvestmentsUI() {
     editForm,
     setEditForm,
 
-    isDocModalOpen,
-    setIsDocModalOpen,
-    docPreviewUrl,
-    setDocPreviewUrl,
-
     isNoteModalOpen,
     setIsNoteModalOpen,
     notePreviewText,
@@ -127,5 +136,7 @@ export function useInvestmentsUI() {
 
     openEditModal,
     resetForms,
+    closeBuyModal,
+    closeEditModal,
   }
 }

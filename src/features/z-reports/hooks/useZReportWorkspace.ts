@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
+import { persistZReportWrite, validateOrganizationDocument } from '@/features/documents'
+import { devError } from '@/lib/debug'
 import { saveProductWithRecipe } from '@/features/products/services/product-service'
 import type { NewZReportProduct, ParsedExpenseItem, ParsedSaleItem, ParsedZReport, ZReportProduct } from '../types'
 import { findBestProductMatch, matchExpenseCategory } from '../z-report-utils'
@@ -19,6 +21,7 @@ export function useZReportWorkspace() {
   const { activeOrg } = useOrganization()
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const activeOrganizationIdRef = useRef(activeOrg?.id)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [fileText, setFileText] = useState<string | null>(null)
@@ -31,6 +34,14 @@ export function useZReportWorkspace() {
   const [savingProduct, setSavingProduct] = useState(false)
   const [isPreprocessOpen, setIsPreprocessOpen] = useState(false)
   const [preprocessFiles, setPreprocessFiles] = useState<File[] | File | null>(null)
+  const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null)
+
+  useEffect(() => {
+    activeOrganizationIdRef.current = activeOrg?.id
+    return () => {
+      activeOrganizationIdRef.current = undefined
+    }
+  }, [activeOrg?.id])
 
   useEffect(() => {
     if (!activeOrg?.id) return
@@ -58,7 +69,23 @@ export function useZReportWorkspace() {
     if (!files.length) return
 
     const file = files[0]
+    const organizationId = activeOrg?.id
+    if (!organizationId) {
+      void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
+      return
+    }
+    const validationError = validateOrganizationDocument({
+      organizationId,
+      bucket: 'receipts',
+      kind: 'z-report',
+      file,
+    })
+    if (validationError) {
+      void showAlert(validationError, 'warning')
+      return
+    }
     setSelectedFile(file)
+    setPendingOrganizationId(organizationId)
     const extension = file.name.split('.').pop()?.toLowerCase()
     if (extension === 'xml' || extension === 'json') {
       const reader = new FileReader()
@@ -102,6 +129,11 @@ export function useZReportWorkspace() {
 
   const analyze = async () => {
     if (!imageUrl && !fileText) return
+    const organizationId = pendingOrganizationId
+    if (!organizationId || activeOrganizationIdRef.current !== organizationId) {
+      await showAlert('Belge farklı bir işletme için hazırlandı. Lütfen yeniden seçin.', 'warning')
+      return
+    }
     setAnalyzing(true)
     try {
       const response = await fetch('/api/analyze-z-report', {
@@ -110,6 +142,11 @@ export function useZReportWorkspace() {
         body: JSON.stringify({ image: imageUrl, fileText, fileType }),
       })
       const data = (await response.json()) as ParsedZReport & { error?: string }
+      if (activeOrganizationIdRef.current !== organizationId) return
+      if (response.status === 429) {
+        await showAlert('Günlük limit doldu, yarın tekrar deneyin.', 'warning')
+        return
+      }
       if (data.error) throw new Error(data.error)
       setParsedData({
         ...data,
@@ -123,15 +160,14 @@ export function useZReportWorkspace() {
         })),
       })
     } catch (error: unknown) {
-      let message = getErrorMessage(error)
-      if (message === 'The string did not match the expected pattern.') {
-        message = 'Tarayıcı kaynaklı bir hata oluştu. Görsel formatını veya boyutunu değiştirip tekrar deneyin.'
-      } else if (message.includes('Failed to fetch')) {
-        message = 'Sunucuya bağlanılamadı. Belgeyi küçültüp tekrar deneyin.'
+      if (activeOrganizationIdRef.current === organizationId) {
+        devError('Z Raporu analiz edilemedi.', error)
+        await showAlert('Z Raporu analiz edilemedi. Lütfen tekrar deneyin.', 'error')
       }
-      await showAlert(message, 'error')
     } finally {
-      setAnalyzing(false)
+      if (activeOrganizationIdRef.current === organizationId) {
+        setAnalyzing(false)
+      }
     }
   }
 
@@ -172,7 +208,13 @@ export function useZReportWorkspace() {
     }
   }
 
-  const startManualMode = () =>
+  const startManualMode = () => {
+    if (!activeOrg?.id) {
+      void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
+      return
+    }
+    setPendingOrganizationId(activeOrg.id)
+    setSelectedFile(null)
     setParsedData({
       date: new Date().toISOString().split('T')[0],
       total_revenue: 0,
@@ -180,6 +222,7 @@ export function useZReportWorkspace() {
       items: [{ product_name: '', quantity: 1, total_price: 0 }],
       expenses: [],
     })
+  }
 
   const addManualExpense = () =>
     setParsedData((current) =>
@@ -215,24 +258,25 @@ export function useZReportWorkspace() {
         : false
       if (existingBatchId && !replaceExisting) return
 
-      let documentUrl: string | null = null
-      if (selectedFile) {
-        const extension = selectedFile.name.split('.').pop()
-        const fileName = `z-report-${crypto.randomUUID()}.${extension}`
-        const { data, error } = await supabase.storage.from('receipts').upload(fileName, selectedFile)
-        if (error) throw new Error(`Belge yüklenemedi: ${error.message}`)
-        documentUrl = supabase.storage.from('receipts').getPublicUrl(data.path).data.publicUrl
-      }
-      await processZReport(supabase, {
-        organizationId: activeOrg.id,
-        report: { ...parsedData, date: reportDate },
-        documentUrl,
-        replaceExisting,
-      })
+      await persistZReportWrite(
+        supabase,
+        activeOrg.id,
+        selectedFile,
+        (documentUrl) =>
+          processZReport(supabase, {
+            organizationId: activeOrg.id,
+            report: { ...parsedData, date: reportDate },
+            documentUrl,
+            replaceExisting,
+          }),
+        pendingOrganizationId,
+        () => activeOrganizationIdRef.current,
+      )
       await showAlert('Z Raporu başarıyla işlendi ve stoklar düşüldü!', 'success')
       router.push('/dashboard/raporlar')
     } catch (error: unknown) {
-      await showAlert(`Kayıt sırasında hata oluştu: ${getErrorMessage(error)}`, 'error')
+      devError('Z Raporu kaydedilemedi.', error)
+      await showAlert('Z Raporu kaydedilemedi. Lütfen tekrar deneyin.', 'error')
     } finally {
       setLoading(false)
     }
@@ -244,6 +288,7 @@ export function useZReportWorkspace() {
     setFileText(null)
     setFileType(null)
     setSelectedFile(null)
+    setPendingOrganizationId(null)
   }
   const closePreprocess = () => {
     setIsPreprocessOpen(false)
@@ -252,10 +297,15 @@ export function useZReportWorkspace() {
   const confirmPreprocess = (results: { dataUrl: string }[]) => {
     closePreprocess()
     if (!results.length) return
+    if (!activeOrg?.id) {
+      void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
+      return
+    }
     setFileText(null)
     setImageUrl(results[0].dataUrl)
     setFileType('image')
     setSelectedFile(dataUrlToFile(results[0].dataUrl, `processed-zreport-${Date.now()}.jpg`))
+    setPendingOrganizationId(activeOrg.id)
   }
 
   return {

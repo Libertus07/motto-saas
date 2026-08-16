@@ -178,13 +178,6 @@ Yanıtı SADECE aşağıdaki JSON formatında ver, ekstra hiçbir markdown (\`\`
     return NextResponse.json(validated)
   } catch (error: unknown) {
     devError('Z-Report parsing error:', error)
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Yapay zeka Z Raporunu okudu ancak veri formatı hatalı (' + error.issues[0]?.message + ')' },
-        { status: 500 },
-      )
-    }
-    const message = error instanceof Error ? error.message : 'Bilinmeyen hata'
-    return NextResponse.json({ error: 'Yapay zeka Z Raporunu okurken bir hata oluştu: ' + message }, { status: 500 })
+    return NextResponse.json({ error: 'Z Raporu analiz edilemedi. Lütfen tekrar deneyin.' }, { status: 500 })
   }
 }

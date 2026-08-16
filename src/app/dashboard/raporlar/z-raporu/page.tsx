@@ -5,8 +5,15 @@ import { ZReportEditor } from '@/features/z-reports/components/ZReportEditor'
 import { ZReportModals } from '@/features/z-reports/components/ZReportModals'
 import { ZReportUploadPanel } from '@/features/z-reports/components/ZReportUploadPanel'
 import { useZReportWorkspace } from '@/features/z-reports/hooks/useZReportWorkspace'
+import { useOrganization } from '@/context/OrganizationContext'
 
 export default function ZRaporuYukle() {
+  const { activeOrg } = useOrganization()
+
+  return <ZReportWorkspace key={activeOrg?.id ?? 'no-active-organization'} />
+}
+
+function ZReportWorkspace() {
   const router = useRouter()
   const workspace = useZReportWorkspace()
 

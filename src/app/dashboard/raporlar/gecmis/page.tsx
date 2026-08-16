@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
+import { useDocumentPreview } from '@/features/documents'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
@@ -48,9 +49,9 @@ export default function GecmisRaporlar() {
   const [loading, setLoading] = useState(true)
   const [deletingDate, setDeletingDate] = useState<string | null>(null)
   const [expandedDate, setExpandedDate] = useState<string | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const { showAlert, showConfirm } = useNotification()
   const { activeOrg } = useOrganization()
+  const { previewUrl, previewReference, openDocument, closeDocument } = useDocumentPreview(activeOrg?.id ?? null)
 
   // Filters & Sorting
   const [selectedMonth, setSelectedMonth] = useState<string>('all')
@@ -362,11 +363,15 @@ export default function GecmisRaporlar() {
                           <div className="flex items-center gap-1">
                             {day.documentUrl && (
                               <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  setPreviewUrl(day.documentUrl!)
+                                  void openDocument(day.documentUrl!)
                                 }}
-                                className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg text-sm flex items-center justify-center transition-colors border border-stone-700 active:scale-95"
+                                disabled={previewReference === day.documentUrl}
+                                aria-busy={previewReference === day.documentUrl}
+                                aria-label="Z raporu belgesini görüntüle"
+                                className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg text-sm flex items-center justify-center transition-colors border border-stone-700 active:scale-95 disabled:cursor-wait disabled:opacity-60"
                                 title="Z-Raporu Belgesini Gör"
                               >
                                 🖼️
@@ -439,7 +444,7 @@ export default function GecmisRaporlar() {
       {/* Belge Önizleme Modalı */}
       <DocumentPreviewModal
         isOpen={!!previewUrl}
-        onClose={() => setPreviewUrl(null)}
+        onClose={closeDocument}
         url={previewUrl}
         title="Fiş / Fatura Belgesi Önizleme"
       />

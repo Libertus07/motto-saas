@@ -2,6 +2,7 @@ import type { FormEvent } from 'react'
 import { useCallback, useEffect, useMemo } from 'react'
 
 import { useNotification } from '@/components/NotificationProvider'
+import { useDocumentPreview } from '@/features/documents'
 import { useAppTour } from '@/hooks/useAppTour'
 
 import type { EnhancedInvestment } from '../types'
@@ -15,8 +16,20 @@ export function useInvestmentWorkspace() {
   const { showAlert } = useNotification()
   const data = useInvestmentsData()
   const ui = useInvestmentsUI()
+  const documentPreview = useDocumentPreview(data.activeOrganizationId ?? null)
   const { buyForm, setBuyForm } = ui
-  const documents = useInvestmentDocuments({ setBuyForm, showAlert })
+  const documents = useInvestmentDocuments({
+    setBuyForm,
+    showAlert,
+    organizationId: data.activeOrganizationId,
+    getCurrentOrganizationId: data.getCurrentOrganizationId,
+    getCurrentOrganizationVersion: data.getCurrentOrganizationVersion,
+  })
+
+  const closeBuyModal = useCallback(() => {
+    documents.cancelAnalysis()
+    ui.closeBuyModal()
+  }, [documents, ui])
 
   useAppTour('yatirimlar', investmentTourSteps, 800)
 
@@ -44,14 +57,14 @@ export function useInvestmentWorkspace() {
       event.preventDefault()
       if (!(await data.buyInvestment(ui.buyForm))) return
 
-      ui.setIsBuyModalOpen(false)
+      closeBuyModal()
       ui.resetForms()
       if (data.rates && ui.buyForm.asset_type !== 'real_estate') {
         const assetType = ui.buyForm.asset_type as 'gold' | 'usd' | 'eur'
         ui.setBuyForm((current) => ({ ...current, price_per_unit: data.rates?.[assetType].toString() || '' }))
       }
     },
-    [data, ui],
+    [closeBuyModal, data, ui],
   )
 
   const submitRent = useCallback(
@@ -78,7 +91,7 @@ export function useInvestmentWorkspace() {
     async (event: FormEvent) => {
       event.preventDefault()
       if (!ui.selectedInvestment || !(await data.editInvestment(ui.selectedInvestment.id, ui.editForm))) return
-      ui.setIsEditModalOpen(false)
+      ui.closeEditModal()
     },
     [data, ui],
   )
@@ -130,10 +143,8 @@ export function useInvestmentWorkspace() {
         ui.setNotePreviewText(note)
         ui.setIsNoteModalOpen(true)
       },
-      onDoc: (url: string) => {
-        ui.setDocPreviewUrl(url)
-        ui.setIsDocModalOpen(true)
-      },
+      onDoc: documentPreview.openDocument,
+      documentPreviewLoadingReference: documentPreview.previewReference,
       onEdit: ui.openEditModal,
       onDelete: data.deleteInvestment,
     },
@@ -143,7 +154,7 @@ export function useInvestmentWorkspace() {
       selectedInvestment: ui.selectedInvestment,
       buy: {
         isOpen: ui.isBuyModalOpen,
-        onClose: () => ui.setIsBuyModalOpen(false),
+        onClose: closeBuyModal,
         form: ui.buyForm,
         setForm: ui.setBuyForm,
         onSubmit: submitBuy,
@@ -166,15 +177,15 @@ export function useInvestmentWorkspace() {
       },
       edit: {
         isOpen: ui.isEditModalOpen,
-        onClose: () => ui.setIsEditModalOpen(false),
+        onClose: ui.closeEditModal,
         form: ui.editForm,
         setForm: ui.setEditForm,
         onSubmit: submitEdit,
       },
       documentPreview: {
-        isOpen: ui.isDocModalOpen,
-        onClose: () => ui.setIsDocModalOpen(false),
-        url: ui.docPreviewUrl,
+        isOpen: !!documentPreview.previewUrl,
+        onClose: documentPreview.closeDocument,
+        url: documentPreview.previewUrl ?? '',
       },
       notePreview: {
         isOpen: ui.isNoteModalOpen,

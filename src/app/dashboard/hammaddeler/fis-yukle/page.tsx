@@ -1,16 +1,17 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
-import { logActivity } from '@/lib/logger'
 import { devError } from '@/lib/debug'
 import { formatCurrency } from '@/lib/format'
 import { useNotification } from '@/components/NotificationProvider'
+import { useOrganization } from '@/context/OrganizationContext'
 import dynamic from 'next/dynamic'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
+import { persistSupplierReceiptWrite, validateOrganizationDocument } from '@/features/documents'
 
 const ImagePreprocessModal = dynamic(
   () => import('@/components/ui/ImagePreprocessModal').then((mod) => mod.ImagePreprocessModal),
@@ -39,11 +40,18 @@ type Material = {
   stock_quantity: number
 }
 
-export default function FisYukle() {
+export default function FisYuklePage() {
+  const { activeOrg } = useOrganization()
+
+  return <FisYukle key={activeOrg?.id ?? 'no-active-organization'} />
+}
+
+function FisYukle() {
   const [image, setImage] = useState<string | null>(null)
   const [fileText, setFileText] = useState<string | null>(null)
   const [fileType, setFileType] = useState<'image' | 'pdf' | 'xml' | 'json' | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([])
   const [parsedSupplier, setParsedSupplier] = useState<{
@@ -65,19 +73,31 @@ export default function FisYukle() {
   const [isPreprocessOpen, setIsPreprocessOpen] = useState(false)
   const [preprocessFiles, setPreprocessFiles] = useState<File[] | File | null>(null)
   const { showAlert, showConfirm } = useNotification()
+  const { activeOrg } = useOrganization()
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
+  const activeOrganizationIdRef = useRef(activeOrg?.id)
+
+  useEffect(() => {
+    activeOrganizationIdRef.current = activeOrg?.id
+    return () => {
+      activeOrganizationIdRef.current = undefined
+    }
+  }, [activeOrg?.id])
 
   // Tedarikçi adı değiştiğinde borcunu getir
   useEffect(() => {
-    if (step === 'review' && parsedSupplier?.name) {
+    if (step === 'review' && parsedSupplier?.name && activeOrg?.id) {
       const checkDebt = async () => {
+        const requestedOrganizationId = activeOrg.id
         const { data } = await supabase
           .from('suppliers')
           .select('total_debt')
+          .eq('organization_id', requestedOrganizationId)
           .ilike('name', `%${parsedSupplier.name}%`)
           .limit(1)
 
+        if (activeOrganizationIdRef.current !== requestedOrganizationId) return
         if (data && data.length > 0) {
           setSupplierDebt(parseFloat(data[0].total_debt) || 0)
         } else {
@@ -88,7 +108,7 @@ export default function FisYukle() {
       const timer = setTimeout(checkDebt, 500)
       return () => clearTimeout(timer)
     }
-  }, [parsedSupplier?.name, step, supabase])
+  }, [activeOrg?.id, parsedSupplier?.name, step, supabase])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = Array.from(e.target.files || [])
@@ -96,12 +116,29 @@ export default function FisYukle() {
     e.target.value = ''
 
     const file = fileList[0]
+    const organizationId = activeOrg?.id
+    if (!organizationId) {
+      void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
+      return
+    }
+    const validationError = validateOrganizationDocument({
+      organizationId,
+      bucket: 'motto_assets',
+      kind: 'supplier-receipt',
+      file,
+    })
+    if (validationError) {
+      void showAlert(validationError, 'warning')
+      return
+    }
     setSelectedFile(file)
+    setPendingOrganizationId(organizationId)
 
     const fileExt = file.name.split('.').pop()?.toLowerCase()
     if (fileExt === 'xml' || fileExt === 'json') {
       const reader = new FileReader()
       reader.onload = () => {
+        if (activeOrganizationIdRef.current !== organizationId) return
         setImage(null)
         setFileText(reader.result as string)
         setFileType(fileExt as 'xml' | 'json')
@@ -110,6 +147,7 @@ export default function FisYukle() {
     } else if (fileExt === 'xlsx' || fileExt === 'xls') {
       const reader = new FileReader()
       reader.onload = (evt) => {
+        if (activeOrganizationIdRef.current !== organizationId) return
         const data = new Uint8Array(evt.target?.result as ArrayBuffer)
         const workbook = XLSX.read(data, { type: 'array' })
         const firstSheetName = workbook.SheetNames[0]
@@ -128,6 +166,7 @@ export default function FisYukle() {
       }
       const reader = new FileReader()
       reader.onload = () => {
+        if (activeOrganizationIdRef.current !== organizationId) return
         setFileText(null)
         setImage(reader.result as string)
         setFileType('pdf')
@@ -142,14 +181,26 @@ export default function FisYukle() {
 
   const analyzeReceipt = async () => {
     if (!image && !fileText) return
+    if (!activeOrg?.id) {
+      await showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
+      return
+    }
+    const requestedOrganizationId = activeOrg.id
+    if (pendingOrganizationId && pendingOrganizationId !== requestedOrganizationId) {
+      await showAlert('Belge farklı bir işletme için hazırlandı. Lütfen yeniden seçin.', 'warning')
+      return
+    }
+    setPendingOrganizationId(requestedOrganizationId)
     setLoading(true)
     setError('')
 
     try {
       const [{ data: existingMaterials }, { data: existingSuppliers }] = await Promise.all([
-        supabase.from('materials').select('*'),
-        supabase.from('suppliers').select('id, name'),
+        supabase.from('materials').select('*').eq('organization_id', requestedOrganizationId),
+        supabase.from('suppliers').select('id, name').eq('organization_id', requestedOrganizationId),
       ])
+
+      if (activeOrganizationIdRef.current !== requestedOrganizationId) return
 
       setMaterials(existingMaterials || [])
       setSuppliers(existingSuppliers || [])
@@ -166,9 +217,10 @@ export default function FisYukle() {
 
       const data = await response.json()
 
+      if (activeOrganizationIdRef.current !== requestedOrganizationId) return
+
       if (data.error) {
         setError(data.error)
-        setLoading(false)
         return
       }
 
@@ -207,18 +259,30 @@ export default function FisYukle() {
       setParsedItems(itemsWithMatch)
       setStep('review')
     } catch {
-      setError('Fiş okunamadı, bağlantıyı kontrol edin veya tekrar deneyin.')
+      if (activeOrganizationIdRef.current === requestedOrganizationId) {
+        setError('Fiş okunamadı, bağlantıyı kontrol edin veya tekrar deneyin.')
+      }
+    } finally {
+      if (activeOrganizationIdRef.current === requestedOrganizationId) {
+        setLoading(false)
+      }
     }
-
-    setLoading(false)
   }
 
   const startManualMode = async () => {
+    if (!activeOrg?.id) {
+      await showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
+      return
+    }
+    const requestedOrganizationId = activeOrg.id
     setLoading(true)
+    setPendingOrganizationId(requestedOrganizationId)
     const [{ data: existingMaterials }, { data: existingSuppliers }] = await Promise.all([
-      supabase.from('materials').select('*'),
-      supabase.from('suppliers').select('id, name'),
+      supabase.from('materials').select('*').eq('organization_id', requestedOrganizationId),
+      supabase.from('suppliers').select('id, name').eq('organization_id', requestedOrganizationId),
     ])
+
+    if (activeOrganizationIdRef.current !== requestedOrganizationId) return
 
     setMaterials(existingMaterials || [])
     setSuppliers(existingSuppliers || [])
@@ -282,11 +346,19 @@ export default function FisYukle() {
   const applyChanges = async () => {
     setLoading(true)
 
+    if (!activeOrg?.id) {
+      setError('Fiş kaydedilemedi. Aktif işletme bilgisi bulunamadı.')
+      setLoading(false)
+      return
+    }
+
     // --- ÇİFT KAYIT KONTROLÜ BAŞLANGIÇ ---
+    let duplicateBatchId: string | null = null
     if (parsedSupplier && parsedSupplier.id && parsedSupplier.date && parsedSupplier.totalAmount) {
       const { data: dupData } = await supabase
         .from('supplier_transactions')
         .select('batch_id, id')
+        .eq('organization_id', activeOrg.id)
         .eq('supplier_id', parsedSupplier.id)
         .eq('transaction_date', parsedSupplier.date)
         .eq('amount', parsedSupplier.totalAmount)
@@ -302,16 +374,7 @@ export default function FisYukle() {
           setLoading(false)
           return // İptal edildi
         }
-
-        // Kullanıcı onayladı, eski fişi sil (Rollback)
-        const { error: delError } = await supabase.rpc('delete_receipt_transaction', {
-          p_batch_id: dupData[0].batch_id,
-        })
-        if (delError) {
-          setError('Eski fiş silinirken hata oluştu: ' + delError.message)
-          setLoading(false)
-          return
-        }
+        duplicateBatchId = dupData[0].batch_id
       }
     }
     // --- ÇİFT KAYIT KONTROLÜ BİTİŞ ---
@@ -322,72 +385,52 @@ export default function FisYukle() {
     const selectedItems = parsedItems.filter((i) => i.selected)
     const batchId = crypto.randomUUID()
 
-    let uploadedUrl = null
-    if (selectedFile) {
-      const fileExt = selectedFile.name.split('.').pop()
-      const fileName = `receipt-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('motto_assets')
-        .upload(fileName, selectedFile)
-      if (!uploadError && uploadData) {
-        const { data: urlData } = supabase.storage.from('motto_assets').getPublicUrl(fileName)
-        uploadedUrl = urlData.publicUrl
-      } else if (uploadError) {
-        console.error('Storage upload error:', uploadError)
-      }
-    }
-
     const parseNum = (value: unknown) => {
       if (typeof value === 'number') return value
       if (typeof value === 'string') return parseFloat(value.replace(/,/g, '.')) || 0
       return 0
     }
 
-    const payload = {
-      user_id: user?.id,
-      batch_id: batchId,
-      image_url: uploadedUrl,
-      supplier: parsedSupplier
-        ? {
-            id: parsedSupplier.id || null,
-            name: parsedSupplier.name,
-            phone: parsedSupplier.phone || null,
-            iban: parsedSupplier.iban || null,
-            address: parsedSupplier.address || null,
-            date: parsedSupplier.date,
-            totalAmount: parsedSupplier.totalAmount,
-            paidAmount: parsedSupplier.paidAmount,
-          }
-        : null,
-      items: selectedItems.map((item) => ({
-        matchedMaterialId: item.matchedMaterialId || null,
-        name: item.name || 'İsimsiz Ürün',
-        category: item.category || 'Diğer',
-        unit: item.unit || 'Adet',
-        quantity: parseNum(item.quantity),
-        unitPrice: parseNum(item.unitPrice),
-      })),
-    }
-
-    const { data: rpcResult, error: rpcError } = await supabase.rpc('process_receipt_upload', { payload })
-
-    if (rpcError) {
-      console.error('RPC ERROR DETAILS:', rpcError)
-      devError('Fiş yükleme atomic işlem hatası:', rpcError?.message, rpcError?.details, rpcError?.hint, rpcError?.code)
-      setError(
-        'Kayıt sırasında kritik bir hata oluştu. İşlem geri alındı: ' + (rpcError?.message || JSON.stringify(rpcError)),
+    try {
+      await persistSupplierReceiptWrite(
+        supabase,
+        activeOrg.id,
+        selectedFile,
+        duplicateBatchId,
+        {
+          user_id: user?.id,
+          batch_id: batchId,
+          supplier: parsedSupplier
+            ? {
+                id: parsedSupplier.id || null,
+                name: parsedSupplier.name,
+                phone: parsedSupplier.phone || null,
+                iban: parsedSupplier.iban || null,
+                address: parsedSupplier.address || null,
+                date: parsedSupplier.date,
+                totalAmount: parsedSupplier.totalAmount,
+                paidAmount: parsedSupplier.paidAmount,
+              }
+            : null,
+          items: selectedItems.map((item) => ({
+            matchedMaterialId: item.matchedMaterialId || null,
+            name: item.name || 'İsimsiz Ürün',
+            category: item.category || 'Diğer',
+            unit: item.unit || 'Adet',
+            quantity: parseNum(item.quantity),
+            unitPrice: parseNum(item.unitPrice),
+          })),
+        },
+        pendingOrganizationId,
+        () => activeOrganizationIdRef.current,
       )
+    } catch (error) {
+      devError('Fiş yükleme atomic işlem hatası:', error)
+      setError('Fiş ve finansal kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.')
       setLoading(false)
       return
     }
 
-    const auditDetailsText = rpcResult?.audit_details || ''
-    await logActivity(
-      'Stok',
-      'EKLEME',
-      `Yapay zeka ile fiş okunarak ${selectedItems.length} kalem ürün/stok sisteme eklendi.`,
-      { batchId, detay: auditDetailsText },
-    )
     setStep('done')
     setLoading(false)
   }
@@ -469,7 +512,10 @@ export default function FisYukle() {
                 type="url"
                 placeholder="Fiş resmi URL'sini yapıştırın (https://...)"
                 value={image && image.startsWith('http') ? image : ''}
-                onChange={(e) => setImage(e.target.value || null)}
+                onChange={(e) => {
+                  setImage(e.target.value || null)
+                  setPendingOrganizationId(e.target.value ? (activeOrg?.id ?? null) : null)
+                }}
                 className="w-full bg-stone-950 border border-stone-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-400"
               />
 
@@ -862,6 +908,7 @@ export default function FisYukle() {
                   setFileText(null)
                   setFileType(null)
                   setSelectedFile(null)
+                  setPendingOrganizationId(null)
                   setParsedItems([])
                 }}
                 className="bg-stone-800 hover:bg-stone-700 text-white px-6 py-3 rounded-xl transition-colors"
@@ -890,6 +937,7 @@ export default function FisYukle() {
                   setStep('upload')
                   setImage(null)
                   setSelectedFile(null)
+                  setPendingOrganizationId(null)
                   setParsedItems([])
                 }}
                 className="bg-stone-800 hover:bg-stone-700 text-white px-6 py-3 rounded-xl transition-colors"
@@ -918,6 +966,7 @@ export default function FisYukle() {
             setFileType('image')
             const processedFileObj = dataUrlToFile(firstRes.dataUrl, `processed-receipt-${Date.now()}.jpg`)
             setSelectedFile(processedFileObj)
+            setPendingOrganizationId(activeOrg?.id ?? null)
           }
         }}
       />

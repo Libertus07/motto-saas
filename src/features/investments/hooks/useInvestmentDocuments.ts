@@ -1,11 +1,17 @@
 import type { ChangeEvent, Dispatch, SetStateAction } from 'react'
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import type { NotificationSeverity } from '@/components/NotificationProvider'
+import { devError } from '@/lib/debug'
+import { validateOrganizationDocument } from '../../documents/document-reference'
 
 import type { BuyFormState } from '../types'
 
-type DocumentForm = { document_url?: string }
+type DocumentForm = {
+  document_file: File | null
+  document_url: string
+  document_organization_id: string | null
+}
 type ShowAlert = (message: string, severity?: NotificationSeverity, title?: string) => Promise<void>
 
 type InvestmentAnalysisResponse = {
@@ -16,13 +22,6 @@ type InvestmentAnalysisResponse = {
   notes?: string
   purchase_date?: string
 }
-
-const getErrorMessage = (error: unknown) =>
-  error instanceof Error
-    ? error.message
-    : typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
-      ? error.message
-      : 'Bilinmeyen hata'
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -36,18 +35,48 @@ function readFileAsDataUrl(file: File): Promise<string> {
 export function useInvestmentDocuments({
   setBuyForm,
   showAlert,
+  organizationId,
+  getCurrentOrganizationId,
+  getCurrentOrganizationVersion,
 }: {
   setBuyForm: Dispatch<SetStateAction<BuyFormState>>
   showAlert: ShowAlert
+  organizationId: string | undefined
+  getCurrentOrganizationId: () => string | undefined
+  getCurrentOrganizationVersion: () => number
 }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const analysisGenerationRef = useRef(0)
+
+  const cancelAnalysis = useCallback(() => {
+    analysisGenerationRef.current += 1
+    setIsAnalyzing(false)
+  }, [])
 
   const analyzeReceipt = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0]
       if (!file) return
 
+      const requestGeneration = analysisGenerationRef.current + 1
+      analysisGenerationRef.current = requestGeneration
+
+      const requestedOrganizationId = organizationId
+      if (!requestedOrganizationId) {
+        event.target.value = ''
+        setIsAnalyzing(false)
+        await showAlert('Aktif organizasyon bulunamadı.', 'error')
+        return
+      }
+      const requestedOrganizationVersion = getCurrentOrganizationVersion()
+      const isRequestCurrent = () =>
+        analysisGenerationRef.current === requestGeneration &&
+        getCurrentOrganizationId() === requestedOrganizationId &&
+        getCurrentOrganizationVersion() === requestedOrganizationVersion
+
       if (file.size > 3 * 1024 * 1024) {
+        event.target.value = ''
+        setIsAnalyzing(false)
         await showAlert(
           'Seçilen dosya çok büyük. Lütfen 3 MB altı bir dosya seçin veya kırparak tekrar deneyin.',
           'warning',
@@ -68,6 +97,7 @@ export function useInvestmentDocuments({
         })
         const data = (await response.json()) as InvestmentAnalysisResponse
         if (!response.ok || data.error) throw new Error(data.error || 'Yatırım belgesi analiz edilemedi.')
+        if (!isRequestCurrent()) return
 
         setBuyForm((current) => ({
           ...current,
@@ -79,17 +109,15 @@ export function useInvestmentDocuments({
         }))
         await showAlert('Fiş başarıyla okundu ve form dolduruldu.', 'success')
       } catch (error) {
-        let message = getErrorMessage(error)
-        if (message === 'The string did not match the expected pattern.') {
-          message = 'Tarayıcı kaynaklı bir hata oluştu. Fotoğraf formatı desteklenmiyor olabilir.'
-        }
-        await showAlert(message || 'Yapay zeka fişi okuyamadı.', 'error')
+        if (!isRequestCurrent()) return
+        devError('Yatırım belgesi analiz edilemedi.', error)
+        await showAlert('Yatırım belgesi analiz edilemedi. Lütfen tekrar deneyin.', 'error')
       } finally {
-        setIsAnalyzing(false)
+        if (isRequestCurrent()) setIsAnalyzing(false)
         event.target.value = ''
       }
     },
-    [setBuyForm, showAlert],
+    [getCurrentOrganizationId, getCurrentOrganizationVersion, organizationId, setBuyForm, showAlert],
   )
 
   const uploadDocument = useCallback(
@@ -101,22 +129,29 @@ export function useInvestmentDocuments({
       const file = event.target.files?.[0]
       if (!file) return
 
-      if (file.size > 2 * 1024 * 1024) {
-        await showAlert('Dosya boyutu çok büyük! Maksimum 2 MB yükleyebilirsiniz.', 'warning')
+      if (!organizationId) {
+        event.target.value = ''
+        await showAlert('Aktif organizasyon bulunamadı.', 'error')
         return
       }
 
-      try {
-        const documentUrl = await readFileAsDataUrl(file)
-        formSetter({ ...formState, document_url: documentUrl })
-      } catch (error) {
-        await showAlert(getErrorMessage(error), 'error')
-      } finally {
+      const validationError = validateOrganizationDocument({
+        organizationId,
+        bucket: 'motto_assets',
+        kind: 'investment-document',
+        file,
+      })
+      if (validationError) {
         event.target.value = ''
+        await showAlert(validationError, 'warning')
+        return
       }
+
+      formSetter({ ...formState, document_file: file, document_organization_id: organizationId })
+      event.target.value = ''
     },
-    [showAlert],
+    [organizationId, showAlert],
   )
 
-  return { isAnalyzing, analyzeReceipt, uploadDocument }
+  return { isAnalyzing, analyzeReceipt, cancelAnalysis, uploadDocument }
 }

@@ -134,13 +134,6 @@ Yanıtı SADECE aşağıdaki formatta saf JSON olarak dön (markdown kullanma). 
     return NextResponse.json(validated)
   } catch (error: unknown) {
     devError('Investment receipt parsing error:', error)
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Yapay zeka analiz yaparken veri formatı hatalı oldu (' + error.issues[0]?.message + ')' },
-        { status: 500 },
-      )
-    }
-    const message = error instanceof Error ? error.message : 'Bilinmeyen hata'
-    return NextResponse.json({ error: 'Yapay zeka analiz yaparken bir hata oluştu: ' + message }, { status: 500 })
+    return NextResponse.json({ error: 'Yatırım belgesi analiz edilemedi. Lütfen tekrar deneyin.' }, { status: 500 })
   }
 }

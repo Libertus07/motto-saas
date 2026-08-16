@@ -1,12 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
+import { persistInvestmentReceiptWrite, validateOrganizationDocument } from '@/features/documents'
+import {
+  getFirstInvestmentReceiptValidationError,
+  validateInvestmentReceiptPurchase,
+} from '@/features/investments/investment-receipt-validation'
+import { devError } from '@/lib/debug'
 import { formatCurrency } from '@/lib/format'
 
 type Account = {
@@ -28,57 +33,97 @@ type ParsedInvestment = {
 
 const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : 'Bilinmeyen hata')
 
-export default function YatirimFisiYukle() {
+export default function YatirimFisiYuklePage() {
+  const { activeOrg } = useOrganization()
+
+  return <YatirimFisiYukle key={activeOrg?.id ?? 'no-active-organization'} />
+}
+
+function YatirimFisiYukle() {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [fileType, setFileType] = useState<'image' | 'pdf' | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const { showAlert, showConfirm } = useNotification()
   const { activeOrg } = useOrganization()
+  const activeOrganizationId = activeOrg?.id
 
   const [parsedData, setParsedData] = useState<ParsedInvestment | null>(null)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [selectedAccount, setSelectedAccount] = useState<string>('')
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
+  const activeOrganizationIdRef = useRef(activeOrg?.id)
 
   useEffect(() => {
+    activeOrganizationIdRef.current = activeOrg?.id
+    return () => {
+      activeOrganizationIdRef.current = undefined
+    }
+  }, [activeOrg?.id])
+
+  const purchaseValidation = parsedData
+    ? validateInvestmentReceiptPurchase({
+        assetType: parsedData.asset_type,
+        name: parsedData.name,
+        quantity: parsedData.quantity,
+        pricePerUnit: parsedData.price_per_unit,
+        purchaseDate: parsedData.purchase_date,
+        accountId: selectedAccount,
+        availableAccountIds: accounts.map((account) => account.id),
+      })
+    : {}
+
+  useEffect(() => {
+    let active = true
     const fetchAccounts = async () => {
-      if (!activeOrg) return
+      if (!activeOrganizationId) return
       const { data } = await supabase
         .from('accounts')
         .select('id, name, type, balance')
-        .eq('organization_id', activeOrg.id)
+        .eq('organization_id', activeOrganizationId)
+      if (!active) return
       if (data) {
         setAccounts(data)
         if (data.length > 0) setSelectedAccount(data[0].id)
       }
     }
-    fetchAccounts()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeOrg?.id])
+    void fetchAccounts()
+    return () => {
+      active = false
+    }
+  }, [activeOrganizationId, supabase])
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
-    setSelectedFile(file)
-
-    // Vercel 4.5MB request body limit => ~3.3MB file size max.
-    if (file.size > 3 * 1024 * 1024) {
-      showAlert(
-        'Seçtiğiniz belge çok büyük (Max 3MB). Sunucu limitlerine takılmamak için lütfen dosya boyutunu küçültün.',
-        'warning',
-      )
+    const organizationId = activeOrg?.id
+    if (!organizationId) {
       e.target.value = ''
+      void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
       return
     }
+    const validationError = validateOrganizationDocument({
+      organizationId,
+      bucket: 'motto_assets',
+      kind: 'investment-receipt',
+      file,
+    })
+    if (validationError) {
+      e.target.value = ''
+      void showAlert(validationError, 'warning')
+      return
+    }
+    setSelectedFile(file)
+    setPendingOrganizationId(organizationId)
 
     if (file.type === 'application/pdf') {
       const reader = new FileReader()
       reader.onload = () => {
+        if (activeOrganizationIdRef.current !== organizationId) return
         setImageUrl(reader.result as string)
         setFileType('pdf')
       }
@@ -86,6 +131,7 @@ export default function YatirimFisiYukle() {
     } else {
       const reader = new FileReader()
       reader.onload = () => {
+        if (activeOrganizationIdRef.current !== organizationId) return
         setImageUrl(reader.result as string)
         setFileType('image')
       }
@@ -95,6 +141,11 @@ export default function YatirimFisiYukle() {
 
   const handleAnalyze = async () => {
     if (!imageUrl) return
+    const requestedOrganizationId = activeOrg?.id
+    if (!requestedOrganizationId || pendingOrganizationId !== requestedOrganizationId) {
+      await showAlert('Belge farklı bir işletme için hazırlandı. Lütfen yeniden seçin.', 'warning')
+      return
+    }
     setAnalyzing(true)
 
     try {
@@ -106,6 +157,7 @@ export default function YatirimFisiYukle() {
 
       const data = await res.json()
       if (data.error) throw new Error(data.error)
+      if (activeOrganizationIdRef.current !== requestedOrganizationId) return
 
       const qty = data.quantity || 1
       const price = data.price_per_unit || 0
@@ -128,13 +180,22 @@ export default function YatirimFisiYukle() {
         notes: data.notes || 'Yapay Zeka ile oluşturuldu',
       })
     } catch (error: unknown) {
-      await showAlert('Analiz Hatası: ' + getErrorMessage(error), 'error')
+      if (activeOrganizationIdRef.current === requestedOrganizationId) {
+        await showAlert('Analiz Hatası: ' + getErrorMessage(error), 'error')
+      }
     } finally {
-      setAnalyzing(false)
+      if (activeOrganizationIdRef.current === requestedOrganizationId) {
+        setAnalyzing(false)
+      }
     }
   }
 
   const startManualMode = () => {
+    if (!activeOrg?.id) {
+      void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
+      return
+    }
+    setPendingOrganizationId(activeOrg.id)
     setParsedData({
       asset_type: 'usd',
       name: '',
@@ -148,7 +209,14 @@ export default function YatirimFisiYukle() {
   }
 
   const handleApprove = async () => {
-    if (!parsedData || !selectedAccount) return
+    if (!parsedData) return
+
+    const validationError = getFirstInvestmentReceiptValidationError(purchaseValidation)
+    if (validationError) {
+      await showAlert(validationError, 'warning')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -159,15 +227,14 @@ export default function YatirimFisiYukle() {
         return
       }
 
-      const acc = Object.values(accounts).find((a) => a.id === selectedAccount)
-      if (!acc) throw new Error('Hesap bulunamadı')
-
       const investmentName = parsedData.name || `${parsedData.quantity} Birim ${parsedData.asset_type.toUpperCase()}`
 
       // --- ÇİFT KAYIT KONTROLÜ BAŞLANGIÇ ---
+      let duplicateTransactionId: string | null = null
       const { data: dupData } = await supabase
         .from('investment_transactions')
         .select('id')
+        .eq('organization_id', activeOrg.id)
         .eq('transaction_date', parsedData.purchase_date)
         .eq('total_amount', parsedData.total_amount)
         .eq('transaction_type', 'buy')
@@ -182,58 +249,34 @@ export default function YatirimFisiYukle() {
           setLoading(false)
           return // İptal edildi
         }
-
-        // Kullanıcı onayladı, eski Yatırımı sil (Rollback)
-        const { error: delError } = await supabase.rpc('delete_investment_transaction', {
-          p_transaction_id: dupData[0].id,
-          p_organization_id: activeOrg.id,
-        })
-        if (delError) {
-          await showAlert('Eski Yatırım fişi silinirken hata oluştu: ' + delError.message, 'error')
-          setLoading(false)
-          return
-        }
+        duplicateTransactionId = dupData[0].id
       }
       // --- ÇİFT KAYIT KONTROLÜ BİTİŞ ---
 
-      let uploadedUrl = null
-      if (selectedFile) {
-        const fileExt = selectedFile.name.split('.').pop()
-        const fileName = `investment-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('motto_assets')
-          .upload(fileName, selectedFile)
-        if (!uploadError && uploadData) {
-          const { data: urlData } = supabase.storage.from('motto_assets').getPublicUrl(fileName)
-          uploadedUrl = urlData.publicUrl
-        } else if (uploadError) {
-          console.error('Storage upload error:', uploadError)
-        }
-      }
-
-      const { error: rpcError } = await supabase.rpc('buy_investment_transaction', {
-        p_asset_type: parsedData.asset_type,
-        p_name: investmentName,
-        p_quantity: parsedData.quantity,
-        p_price: parsedData.price_per_unit,
-        p_account_id: selectedAccount,
-        p_notes: parsedData.notes || null,
-        p_purchase_date: parsedData.purchase_date,
-        p_document_url: uploadedUrl,
-        p_organization_id: activeOrg.id,
-      })
-
-      if (rpcError) throw rpcError
-
-      // 4. Log
-      await logActivity('Yatırım Fişi', 'EKLEME', `Yatırım eklendi: ${investmentName}`, {
-        detay: `Tutar (₺${parsedData.total_amount}) | Ödenen Hesap (${acc.name})`,
-      })
+      await persistInvestmentReceiptWrite(
+        supabase,
+        activeOrg.id,
+        selectedFile,
+        duplicateTransactionId,
+        {
+          p_asset_type: parsedData.asset_type,
+          p_name: investmentName,
+          p_quantity: parsedData.quantity,
+          p_price: parsedData.price_per_unit,
+          p_account_id: selectedAccount,
+          p_notes: parsedData.notes || null,
+          p_purchase_date: parsedData.purchase_date,
+          p_organization_id: activeOrg.id,
+        },
+        pendingOrganizationId,
+        () => activeOrganizationIdRef.current,
+      )
 
       await showAlert('Yatırım fişi başarıyla kaydedildi!', 'success')
       router.push('/dashboard/raporlar/yatirim-gecmisi')
     } catch (err: unknown) {
-      await showAlert('Kayıt sırasında hata oluştu: ' + getErrorMessage(err), 'error')
+      devError('Yatırım fişi kaydedilemedi.', err)
+      await showAlert('Yatırım fişi kaydedilemedi. Lütfen tekrar deneyin.', 'error')
     } finally {
       setLoading(false)
     }
@@ -320,6 +363,14 @@ export default function YatirimFisiYukle() {
           </div>
         ) : (
           <div className="space-y-6">
+            {Object.keys(purchaseValidation).length > 0 && (
+              <div
+                role="alert"
+                className="rounded-xl border border-amber-500/40 bg-amber-950/30 px-4 py-3 text-sm text-amber-200"
+              >
+                Kaydetmeden önce kırmızıyla işaretlenen alanları kontrol edip tamamlayın.
+              </div>
+            )}
             <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex-1">
                 <h2 className="font-bold text-purple-400 text-xl mb-2">Yatırım Detayları</h2>
@@ -343,21 +394,37 @@ export default function YatirimFisiYukle() {
                       type="text"
                       value={parsedData.name}
                       onChange={(e) => setParsedData({ ...parsedData, name: e.target.value })}
-                      className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400"
+                      maxLength={100}
+                      required
+                      aria-invalid={Boolean(purchaseValidation.name)}
+                      aria-describedby={purchaseValidation.name ? 'investment-name-error' : undefined}
+                      className="w-full bg-stone-800 border border-stone-700 aria-[invalid=true]:border-red-500 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400"
                     />
+                    {purchaseValidation.name && (
+                      <p id="investment-name-error" className="mt-1 text-sm text-red-400">
+                        {purchaseValidation.name}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="text-stone-400 text-sm mb-1 block">Varlık Türü</label>
                     <select
                       value={parsedData.asset_type}
                       onChange={(e) => setParsedData({ ...parsedData, asset_type: e.target.value })}
-                      className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400"
+                      aria-invalid={Boolean(purchaseValidation.assetType)}
+                      aria-describedby={purchaseValidation.assetType ? 'investment-asset-type-error' : undefined}
+                      className="w-full bg-stone-800 border border-stone-700 aria-[invalid=true]:border-red-500 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400"
                     >
                       <option value="usd">Dolar (USD)</option>
                       <option value="eur">Euro (EUR)</option>
                       <option value="gold">Altın</option>
                       <option value="real_estate">Gayrimenkul / Araç</option>
                     </select>
+                    {purchaseValidation.assetType && (
+                      <p id="investment-asset-type-error" className="mt-1 text-sm text-red-400">
+                        {purchaseValidation.assetType}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="text-stone-400 text-sm mb-1 block">Tarih</label>
@@ -365,8 +432,16 @@ export default function YatirimFisiYukle() {
                       type="date"
                       value={parsedData.purchase_date}
                       onChange={(e) => setParsedData({ ...parsedData, purchase_date: e.target.value })}
-                      className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400"
+                      required
+                      aria-invalid={Boolean(purchaseValidation.purchaseDate)}
+                      aria-describedby={purchaseValidation.purchaseDate ? 'investment-purchase-date-error' : undefined}
+                      className="w-full bg-stone-800 border border-stone-700 aria-[invalid=true]:border-red-500 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400"
                     />
+                    {purchaseValidation.purchaseDate && (
+                      <p id="investment-purchase-date-error" className="mt-1 text-sm text-red-400">
+                        {purchaseValidation.purchaseDate}
+                      </p>
+                    )}
                   </div>
                 </div>
                 {/* Form Sağ */}
@@ -377,18 +452,33 @@ export default function YatirimFisiYukle() {
                       <input
                         type="number"
                         value={parsedData.quantity}
+                        min="0.0001"
+                        max="99999999.9999"
+                        step="any"
+                        required
                         onChange={(e) => {
                           const qty = parseFloat(e.target.value) || 0
                           setParsedData({ ...parsedData, quantity: qty, total_amount: qty * parsedData.price_per_unit })
                         }}
-                        className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400 font-bold"
+                        aria-invalid={Boolean(purchaseValidation.quantity)}
+                        aria-describedby={purchaseValidation.quantity ? 'investment-quantity-error' : undefined}
+                        className="w-full bg-stone-800 border border-stone-700 aria-[invalid=true]:border-red-500 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400 font-bold"
                       />
+                      {purchaseValidation.quantity && (
+                        <p id="investment-quantity-error" className="mt-1 text-sm text-red-400">
+                          {purchaseValidation.quantity}
+                        </p>
+                      )}
                     </div>
                     <div className="flex-1">
                       <label className="text-stone-400 text-sm mb-1 block">Birim Fiyat (₺)</label>
                       <input
                         type="number"
                         value={parsedData.price_per_unit}
+                        min="0.01"
+                        max="99999999.9999"
+                        step="any"
+                        required
                         onChange={(e) => {
                           const price = parseFloat(e.target.value) || 0
                           setParsedData({
@@ -397,8 +487,15 @@ export default function YatirimFisiYukle() {
                             total_amount: parsedData.quantity * price,
                           })
                         }}
-                        className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400 font-bold"
+                        aria-invalid={Boolean(purchaseValidation.pricePerUnit)}
+                        aria-describedby={purchaseValidation.pricePerUnit ? 'investment-price-error' : undefined}
+                        className="w-full bg-stone-800 border border-stone-700 aria-[invalid=true]:border-red-500 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400 font-bold"
                       />
+                      {purchaseValidation.pricePerUnit && (
+                        <p id="investment-price-error" className="mt-1 text-sm text-red-400">
+                          {purchaseValidation.pricePerUnit}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -406,7 +503,10 @@ export default function YatirimFisiYukle() {
                     <select
                       value={selectedAccount}
                       onChange={(e) => setSelectedAccount(e.target.value)}
-                      className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400"
+                      required
+                      aria-invalid={Boolean(purchaseValidation.accountId)}
+                      aria-describedby={purchaseValidation.accountId ? 'investment-account-error' : undefined}
+                      className="w-full bg-stone-800 border border-stone-700 aria-[invalid=true]:border-red-500 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-400"
                     >
                       <option value="" disabled>
                         Hesap Seçin
@@ -417,6 +517,11 @@ export default function YatirimFisiYukle() {
                         </option>
                       ))}
                     </select>
+                    {purchaseValidation.accountId && (
+                      <p id="investment-account-error" className="mt-1 text-sm text-red-400">
+                        {purchaseValidation.accountId}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="text-stone-400 text-sm mb-1 block">Not / Açıklama</label>
@@ -445,6 +550,7 @@ export default function YatirimFisiYukle() {
                   setImageUrl(null)
                   setFileType(null)
                   setSelectedFile(null)
+                  setPendingOrganizationId(null)
                 }}
                 disabled={loading}
                 className="bg-stone-800 hover:bg-stone-700 text-white font-bold px-8 py-4 rounded-xl transition-colors disabled:opacity-50"

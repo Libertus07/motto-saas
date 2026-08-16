@@ -22,6 +22,8 @@ export type BuyFormState = {
   notes: string
   purchase_date: string
   document_url: string
+  document_file: File | null
+  document_organization_id: string | null
 }
 
 export type RentFormState = {
@@ -36,6 +38,8 @@ export type EditFormState = {
   notes: string
   purchase_date: string
   document_url: string
+  document_file: File | null
+  document_organization_id: string | null
 }
 
 export type ValueFormState = {
@@ -56,7 +60,8 @@ export type InvestmentListActions = {
   onRent: (investment: EnhancedInvestment) => void
   onUpdateValue: (investment: EnhancedInvestment) => void
   onNote: (note: string) => void
-  onDoc: (url: string) => void
+  onDoc: (reference: string) => Promise<void>
+  documentPreviewLoadingReference: string | null
   onEdit: (investment: EnhancedInvestment) => void
   onDelete: (id: string) => void
 }

@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "ebcf11223f9c1b00d182cc6ed94de8b1f4f8a7d4",
-    "indexed_at": "2026-08-07T18:04:31Z",
-    "project": "W-Projeler-ilk-motto-saas",
-    "nodes": 3172,
-    "edges": 5689,
-    "original_size": 8192000,
-    "compressed_size": 1548406,
+    "commit": "078d4a4960fcb7e7ebede3cf76dcac0845bce2c5",
+    "indexed_at": "2026-08-16T15:49:40Z",
+    "project": "motto-saas-private-financial-documents",
+    "nodes": 2769,
+    "edges": 5043,
+    "original_size": 8257536,
+    "compressed_size": 1367076,
     "compression_level": 3
 }

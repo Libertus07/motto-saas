@@ -34,7 +34,12 @@ export function BuyInvestmentModal({
       <div className="bg-stone-900 border border-stone-700 rounded-2xl p-6 w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh]">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold text-white">Yeni Yatırım Al</h3>
-          <button onClick={onClose} className="text-stone-500 hover:text-white text-xl">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Yatırım alım penceresini kapat"
+            className="min-h-11 min-w-11 text-stone-500 hover:text-white text-xl"
+          >
             ✕
           </button>
         </div>
@@ -186,14 +191,24 @@ export function BuyInvestmentModal({
             </div>
 
             <div>
-              <label className="text-stone-400 text-sm mb-1 block">Dekont / Belge Yükle (Opsiyonel)</label>
+              <label htmlFor="buy-investment-document" className="text-stone-400 text-sm mb-1 block">
+                Dekont / Belge Yükle (Opsiyonel)
+              </label>
               <input
+                id="buy-investment-document"
                 type="file"
                 accept="image/*,application/pdf"
                 onChange={(e) => onFileUpload(e, setForm, form)}
+                aria-describedby="buy-investment-document-status"
                 className="w-full bg-stone-950 border border-stone-800 rounded-xl px-4 py-3 text-stone-400 focus:outline-none focus:border-amber-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-stone-950 hover:file:bg-amber-400"
               />
-              {form.document_url && <p className="text-xs text-green-400 mt-2">✓ Belge eklendi</p>}
+              <p id="buy-investment-document-status" className="text-xs text-green-400 mt-2" aria-live="polite">
+                {form.document_file
+                  ? `Belge seçildi: ${form.document_file.name}`
+                  : form.document_url
+                    ? 'Mevcut bir belge yüklü.'
+                    : null}
+              </p>
             </div>
 
             <div>

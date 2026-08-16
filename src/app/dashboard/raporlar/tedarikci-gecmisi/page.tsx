@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react'
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
+import { openSupplierDocument, useDocumentPreview } from '@/features/documents'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { logActivity } from '@/lib/logger'
@@ -70,7 +71,9 @@ export default function TedarikciGecmisi() {
   const [allReceipts, setAllReceipts] = useState<GroupedReceipt[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [viewingDocument, setViewingDocument] = useState<{ batchId: string | null; organizationId: string } | null>(
+    null,
+  )
 
   const [, setExpandedMain] = useState<string | null>(null) // Ay veya Tedarikçi
   const [expandedReceipt, setExpandedReceipt] = useState<string | null>(null) // Fişin içi
@@ -81,7 +84,26 @@ export default function TedarikciGecmisi() {
   const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'amount_desc'>('date_desc')
 
   const supabase = useMemo(() => createClient(), [])
+  const documentRequestPending = useRef(false)
+  const documentRequestGeneration = useRef(0)
+  const documentRequestMounted = useRef(false)
+  const documentScope = useRef<string | null>(null)
+  const organizationId = activeOrg?.id ?? null
+  const viewingDocumentBatchId = viewingDocument?.organizationId === organizationId ? viewingDocument.batchId : null
+  const { previewUrl, openDocument, closeDocument } = useDocumentPreview(activeOrg?.id ?? null)
   const router = useRouter()
+
+  useLayoutEffect(() => {
+    documentRequestMounted.current = true
+    documentScope.current = organizationId
+    documentRequestGeneration.current += 1
+    documentRequestPending.current = false
+    return () => {
+      documentRequestMounted.current = false
+      documentRequestGeneration.current += 1
+      documentRequestPending.current = false
+    }
+  }, [organizationId])
 
   const fetchReceipts = useCallback(async () => {
     if (!activeOrg) return
@@ -155,25 +177,30 @@ export default function TedarikciGecmisi() {
   }, [fetchReceipts])
 
   const viewDocument = async (batchId: string | null) => {
-    if (!batchId) {
-      await showAlert('Bu işlem için ekli belge bulunamadı.', 'error')
-      return
-    }
-    setLoading(true)
-    const { data } = await supabase
-      .from('stock_movements')
-      .select('document_url')
-      .eq('batch_id', batchId)
-      .eq('organization_id', activeOrg?.id)
-      .not('document_url', 'is', null)
-      .limit(1)
-      .single()
+    if (documentRequestPending.current) return
 
-    setLoading(false)
-    if (data?.document_url) {
-      setPreviewUrl(data.document_url)
-    } else {
-      await showAlert('Veritabanında bu kayıt için herhangi bir fatura/fiş görseli bulunamadı.', 'error')
+    const requestOrganizationId = organizationId
+    const requestGeneration = ++documentRequestGeneration.current
+    const isRequestCurrent = () =>
+      documentRequestMounted.current &&
+      documentScope.current === requestOrganizationId &&
+      documentRequestGeneration.current === requestGeneration
+    documentRequestPending.current = true
+    if (requestOrganizationId) setViewingDocument({ batchId, organizationId: requestOrganizationId })
+    try {
+      await openSupplierDocument({
+        batchId,
+        isRequestCurrent,
+        openDocument,
+        organizationId: requestOrganizationId,
+        showAlert,
+        supabase,
+      })
+    } finally {
+      if (isRequestCurrent()) {
+        documentRequestPending.current = false
+        setViewingDocument(null)
+      }
     }
   }
 
@@ -450,11 +477,15 @@ export default function TedarikciGecmisi() {
                           <div className="flex items-center gap-1">
                             {receipt.batchId && (
                               <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  viewDocument(receipt.batchId)
+                                  void viewDocument(receipt.batchId)
                                 }}
-                                className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg flex items-center justify-center transition-colors border border-stone-700 active:scale-95"
+                                disabled={viewingDocumentBatchId === receipt.batchId}
+                                aria-busy={viewingDocumentBatchId === receipt.batchId}
+                                aria-label="Tedarikçi fiş belgesini görüntüle"
+                                className="bg-stone-800 hover:bg-stone-700 text-stone-300 p-2 rounded-lg flex items-center justify-center transition-colors border border-stone-700 active:scale-95 disabled:cursor-wait disabled:opacity-60"
                                 title="Fiş Belgesini Gör"
                               >
                                 🖼️
@@ -533,7 +564,7 @@ export default function TedarikciGecmisi() {
       {/* Belge Önizleme Modalı */}
       <DocumentPreviewModal
         isOpen={!!previewUrl}
-        onClose={() => setPreviewUrl(null)}
+        onClose={closeDocument}
         url={previewUrl}
         title="Tedarikçi Belgesi Önizleme"
       />

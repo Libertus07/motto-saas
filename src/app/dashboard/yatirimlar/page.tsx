@@ -6,8 +6,15 @@ import { InvestmentPageHeader } from '@/features/investments/components/Investme
 import { InvestmentsList } from '@/features/investments/components/InvestmentsList'
 import { InvestmentToolbar } from '@/features/investments/components/InvestmentToolbar'
 import { useInvestmentWorkspace } from '@/features/investments/hooks/useInvestmentWorkspace'
+import { useOrganization } from '@/context/OrganizationContext'
 
 export default function YatirimlarPage() {
+  const { activeOrg } = useOrganization()
+
+  return <InvestmentWorkspace key={activeOrg?.id ?? 'no-active-organization'} />
+}
+
+function InvestmentWorkspace() {
   const workspace = useInvestmentWorkspace()
 
   return (
