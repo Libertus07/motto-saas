@@ -81,6 +81,12 @@ describe('roadmap validator', () => {
     expect(result.stdout).toContain('Roadmap validation passed (18 tasks).')
   })
 
+  it('does not record mutable advisor-warning counts in the authoritative roadmap', () => {
+    const roadmap = fs.readFileSync(path.resolve('docs/superpowers/ROADMAP.md'), 'utf8')
+
+    expect(roadmap).not.toMatch(/\b\d+\s+(?:callable-surface\s+)?warnings\b/iu)
+  })
+
   it.each([
     ['DUPLICATE_ID', [row(), row()]],
     ['INVALID_ID', [row({ id: 'roadmap-1' })]],
