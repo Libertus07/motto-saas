@@ -35,6 +35,12 @@ function row(overrides: RowOverrides = {}) {
   return `| \`${values.id}\` | **${values.workstream}**<br>Sonuç: ${values.outcome} | ${values.status} | Sonraki: ${values.nextGate}<br>Detay: [Ayrıntı](${values.detail})<br>Kanıt: ${values.evidence} |`
 }
 
+function runGit(root: string, args: string[]) {
+  const result = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' })
+  if (result.status !== 0)
+    throw new Error(`Git fixture setup failed: ${result.stderr || result.stdout || result.error?.message}`)
+}
+
 function createFixture(rows: string[]) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'motto-roadmap-'))
   temporaryRoots.push(root)
@@ -42,10 +48,18 @@ function createFixture(rows: string[]) {
   fs.writeFileSync(path.join(root, 'docs/superpowers/specs/example.md'), '# Example\n')
   fs.writeFileSync(
     path.join(root, 'docs/superpowers/ROADMAP.md'),
-    ['# Roadmap', '', '| ID | Görev ve sonuç | Durum | Teslimat bilgisi |', '| --- | --- | --- | --- |', ...rows].join(
-      '\n',
-    ),
+    [
+      '# Roadmap',
+      '',
+      '| ID | Çalışma alanı ve sonuç | Durum | Teslimat bilgisi |',
+      '| --- | --- | --- | --- |',
+      ...rows,
+    ].join('\n'),
   )
+  const init = spawnSync('git', ['init', '--quiet', root], { encoding: 'utf8' })
+  if (init.status !== 0)
+    throw new Error(`Git fixture setup failed: ${init.stderr || init.stdout || init.error?.message}`)
+  runGit(root, ['add', '--', 'docs/superpowers/specs/example.md'])
   return root
 }
 
@@ -98,6 +112,47 @@ describe('roadmap validator', () => {
     const roadmap = fs.readFileSync(path.resolve('docs/superpowers/ROADMAP.md'), 'utf8')
 
     expect(roadmap).not.toMatch(/\b\d+\s+(?:callable-surface\s+)?warnings\b/iu)
+  })
+
+  it('rejects a malformed visible ID cell in the authoritative task table', () => {
+    const result = runValidator(createFixture([row().replace('`ROADMAP-01`', 'ROADMAP-01')]))
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('[INVALID_ID]')
+  })
+
+  it('ignores valid-looking rows in unrelated four-column tables', () => {
+    const root = createFixture([row()])
+    fs.appendFileSync(
+      path.join(root, 'docs/superpowers/ROADMAP.md'),
+      '\n\n| Başlık | Açıklama | Durum | Not |\n| --- | --- | --- | --- |\n| `NOT-A-TASK` | Sadece belge tablosu | Bilgi | Ayrıntı |\n',
+    )
+
+    const result = runValidator(root)
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain('Roadmap validation passed (1 tasks).')
+  })
+
+  it('rejects an existing untracked detail file', () => {
+    const root = createFixture([row({ detail: 'specs/untracked detail.md' })])
+    fs.writeFileSync(path.join(root, 'docs/superpowers/specs/untracked detail.md'), '# Untracked\n')
+
+    const result = runValidator(root)
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('[UNTRACKED_DETAIL_FILE]')
+  })
+
+  it('rejects an existing ignored detail file', () => {
+    const root = createFixture([row({ detail: 'specs/ignored-detail.md' })])
+    fs.writeFileSync(path.join(root, '.gitignore'), 'docs/superpowers/specs/ignored-detail.md\n')
+    fs.writeFileSync(path.join(root, 'docs/superpowers/specs/ignored-detail.md'), '# Ignored\n')
+
+    const result = runValidator(root)
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('[UNTRACKED_DETAIL_FILE]')
   })
 
   it.each([

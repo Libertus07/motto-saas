@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -27,19 +28,66 @@ function isInsideRepository(repositoryRoot, candidate) {
   return relative !== '' && !relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative)
 }
 
+function getGitTrackingState(repositoryRoot, resolvedRepositoryRoot, resolvedDetailPath) {
+  const relativeDetailPath = path.relative(resolvedRepositoryRoot, resolvedDetailPath).split(path.sep).join('/')
+
+  try {
+    const result = spawnSync('git', ['-C', repositoryRoot, 'ls-files', '--error-unmatch', '--', relativeDetailPath], {
+      encoding: 'utf8',
+    })
+    if (result.error || result.status === null) return 'unverifiable'
+    if (result.status === 0) return 'tracked'
+    if (result.status === 1) return 'untracked'
+  } catch {
+    return 'unverifiable'
+  }
+
+  return 'unverifiable'
+}
+
+const TASK_TABLE_HEADER = ['ID', 'Çalışma alanı ve sonuç', 'Durum', 'Teslimat bilgisi']
+
+function parseTableCells(source) {
+  const trimmed = source.trim()
+  if (!trimmed.startsWith('|')) return null
+  const content = trimmed.slice(1, trimmed.endsWith('|') ? -1 : undefined)
+  return content.split('|').map((cell) => cell.trim())
+}
+
+function isTaskTableHeader(cells) {
+  return cells.length === TASK_TABLE_HEADER.length && cells.every((cell, index) => cell === TASK_TABLE_HEADER[index])
+}
+
+function isTableSeparator(cells) {
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/u.test(cell))
+}
+
 function parseTaskRows(markdown) {
-  return markdown
-    .split(/\r?\n/u)
-    .map((source, index) => ({ source, line: index + 1 }))
-    .filter(({ source }) => /^\|\s*`[^`]+`\s*\|/u.test(source))
-    .map(({ source, line }) => ({
-      line,
-      cells: source
-        .trim()
-        .slice(1, -1)
-        .split('|')
-        .map((cell) => cell.trim()),
-    }))
+  const lines = markdown.split(/\r?\n/u)
+  const rows = []
+  let inTaskTable = false
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const cells = parseTableCells(lines[index])
+
+    if (!inTaskTable) {
+      const nextCells = parseTableCells(lines[index + 1] ?? '')
+      if (cells && isTaskTableHeader(cells) && nextCells && isTableSeparator(nextCells)) {
+        inTaskTable = true
+        index += 1
+      }
+      continue
+    }
+
+    if (!cells) {
+      inTaskTable = false
+      continue
+    }
+
+    rows.push({ line: index + 1, cells })
+  }
+
+  return rows
 }
 
 function hasLabel(cell, label) {
@@ -66,8 +114,10 @@ function validateRoadmap({ repositoryRoot, roadmapPath }) {
       continue
     }
 
-    const id = row.cells[0].replace(/^`|`$/gu, '')
-    if (!TASK_ID_PATTERN.test(id)) issues.push(issue('INVALID_ID', `Geçersiz görev kimliği: ${id}`, row.line))
+    const rawId = row.cells[0]
+    const id = rawId.replace(/^`|`$/gu, '')
+    if (!/^`[^`]+`$/u.test(rawId) || !TASK_ID_PATTERN.test(id))
+      issues.push(issue('INVALID_ID', `Geçersiz görev kimliği: ${id}`, row.line))
 
     const workstreamMatch = row.cells[1].match(WORKSTREAM_PATTERN)
     if (!workstreamMatch) {
@@ -133,6 +183,14 @@ function validateRoadmap({ repositoryRoot, roadmapPath }) {
         issues.push(issue('DETAIL_OUTSIDE_REPOSITORY', `Ayrıntı dosyası depo dışında: ${detail}`, row.line))
       } else if (realDetailPath && !fs.statSync(realDetailPath, { throwIfNoEntry: false })?.isFile()) {
         issues.push(issue('MISSING_DETAIL_FILE', `Ayrıntı dosyası bulunamadı: ${detail}`, row.line))
+      } else if (realDetailPath && realRepositoryRoot) {
+        const trackingState = getGitTrackingState(repositoryRoot, realRepositoryRoot, realDetailPath)
+        if (trackingState === 'untracked')
+          issues.push(issue('UNTRACKED_DETAIL_FILE', `Ayrıntı dosyası Git tarafından izlenmiyor: ${detail}`, row.line))
+        if (trackingState === 'unverifiable')
+          issues.push(
+            issue('DETAIL_TRACKING_UNVERIFIABLE', `Ayrıntı dosyasının Git takibi doğrulanamadı: ${detail}`, row.line),
+          )
       }
     }
 
