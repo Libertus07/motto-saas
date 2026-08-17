@@ -89,6 +89,15 @@ VALUES (
 
 INSERT INTO public.suppliers (id, name, total_debt, user_id, organization_id)
 VALUES (
+    'c3000000-0000-4000-8000-000000000003',
+    'Anonymous denial supplier',
+    1,
+    'c1000000-0000-4000-8000-000000000001',
+    'c2000000-0000-4000-8000-000000000001'
+);
+
+INSERT INTO public.suppliers (id, name, total_debt, user_id, organization_id)
+VALUES (
     'c3000000-0000-4000-8000-000000000002',
     'Cross-tenant denial supplier',
     1,
@@ -115,6 +124,20 @@ VALUES (
     1,
     'invoice',
     'Cross-tenant supplier denial target',
+    'c1000000-0000-4000-8000-000000000001',
+    'c2000000-0000-4000-8000-000000000001'
+);
+
+INSERT INTO public.supplier_transactions (
+    id, supplier_id, transaction_date, amount, transaction_type, note, user_id, organization_id
+)
+VALUES (
+    'c5000000-0000-4000-8000-000000000004',
+    'c3000000-0000-4000-8000-000000000003',
+    CURRENT_DATE,
+    1,
+    'invoice',
+    'Anonymous supplier denial target',
     'c1000000-0000-4000-8000-000000000001',
     'c2000000-0000-4000-8000-000000000001'
 );
@@ -182,6 +205,16 @@ VALUES (
     40,
     40,
     'c9000000-0000-4000-8000-000000000001',
+    'c2000000-0000-4000-8000-000000000001'
+);
+
+INSERT INTO public.sales (id, quantity, unit_price, total_price, batch_id, organization_id)
+VALUES (
+    'c8000000-0000-4000-8000-000000000006',
+    1,
+    1,
+    1,
+    'c9000000-0000-4000-8000-000000000004',
     'c2000000-0000-4000-8000-000000000001'
 );
 
@@ -257,7 +290,7 @@ SELECT set_config('request.jwt.claim.role', 'anon', true);
 SELECT set_config('request.jwt.claims', '{}', true);
 SET LOCAL ROLE anon;
 SELECT throws_ok(
-    $$ SELECT public.delete_supplier_transaction('c5000000-0000-4000-8000-000000000003', 'c2000000-0000-4000-8000-000000000001') $$,
+    $$ SELECT public.delete_supplier_transaction('c5000000-0000-4000-8000-000000000004', 'c2000000-0000-4000-8000-000000000001') $$,
     '42501',
     NULL,
     'unauthenticated supplier deletion is denied by ACL'
@@ -286,7 +319,7 @@ SELECT set_config('request.jwt.claim.role', 'anon', true);
 SELECT set_config('request.jwt.claims', '{}', true);
 SET LOCAL ROLE anon;
 SELECT throws_ok(
-    $$ SELECT public.delete_z_report_transaction('c9000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000001') $$,
+    $$ SELECT public.delete_z_report_transaction('c9000000-0000-4000-8000-000000000004', 'c2000000-0000-4000-8000-000000000001') $$,
     '42501',
     NULL,
     'unauthenticated Z deletion is denied by ACL'
