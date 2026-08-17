@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
-SELECT plan(34);
+SELECT plan(30);
 
 INSERT INTO auth.users (id, email)
 VALUES
@@ -26,43 +26,146 @@ SET active_organization_id = EXCLUDED.active_organization_id;
 INSERT INTO public.organization_members (organization_id, user_id, role, status)
 VALUES
     ('a2000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000001', 'owner', 'active'),
+    ('a2000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000002', 'owner', 'active'),
     ('b2000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000002', 'owner', 'active')
 ON CONFLICT (organization_id, user_id) DO UPDATE
 SET role = EXCLUDED.role, status = EXCLUDED.status;
 
-SELECT has_function('private', 'current_organization_id', ARRAY[]::text[], 'private current organization helper exists');
-SELECT has_function('private', 'active_organization_ids', ARRAY[]::text[], 'private active organizations helper exists');
-SELECT has_function('private', 'current_user_organization_role', ARRAY['uuid'], 'private role helper exists');
-SELECT has_function('private', 'is_current_user_organization_member', ARRAY['uuid'], 'private membership helper exists');
-SELECT has_function('private', 'current_user_has_organization_role', ARRAY['uuid', 'text[]'], 'private role allowlist helper exists');
+SELECT is(to_regprocedure('private.current_organization_id()')::text, 'private.current_organization_id()', 'private current organization helper has its exact signature');
+SELECT is(to_regprocedure('private.active_organization_ids()')::text, 'private.active_organization_ids()', 'private active organizations helper has its exact signature');
+SELECT is(to_regprocedure('private.current_user_organization_role(uuid)')::text, 'private.current_user_organization_role(uuid)', 'private role helper has its exact signature');
+SELECT is(to_regprocedure('private.is_current_user_organization_member(uuid)')::text, 'private.is_current_user_organization_member(uuid)', 'private membership helper has its exact signature');
+SELECT is(to_regprocedure('private.current_user_has_organization_role(uuid,text[])')::text, 'private.current_user_has_organization_role(uuid,text[])', 'private role allowlist helper has its exact signature');
 
 SELECT results_eq(
     $$
-        SELECT procedure.proname::text
+        SELECT procedure.oid::regprocedure::text
         FROM pg_catalog.pg_proc AS procedure
         INNER JOIN pg_catalog.pg_namespace AS namespace
             ON namespace.oid = procedure.pronamespace
         WHERE namespace.nspname = 'private'
           AND procedure.proname IN (
-              'current_organization_id',
               'active_organization_ids',
+              'current_organization_id',
+              'current_user_has_organization_role',
               'current_user_organization_role',
-              'is_current_user_organization_member',
-              'current_user_has_organization_role'
+              'get_user_organizations',
+              'is_current_user_organization_member'
           )
-          AND procedure.prosecdef
-          AND procedure.proconfig = ARRAY['search_path=""']::text[]
-        ORDER BY procedure.proname
+        ORDER BY 1
     $$,
     $$ VALUES
-        ('active_organization_ids'::text),
-        ('current_organization_id'::text),
-        ('current_user_has_organization_role'::text),
-        ('current_user_organization_role'::text),
-        ('is_current_user_organization_member'::text)
+        ('private.active_organization_ids()'::text),
+        ('private.current_organization_id()'::text),
+        ('private.current_user_has_organization_role(uuid,text[])'::text),
+        ('private.current_user_organization_role(uuid)'::text),
+        ('private.get_user_organizations()'::text),
+        ('private.is_current_user_organization_member(uuid)'::text)
     $$,
-    'all private helpers are fixed-path definers'
+    'private helper family has no unexpected overloads'
 );
+
+SELECT results_eq(
+    $$
+        WITH expected(signature) AS (
+            VALUES
+                ('private.active_organization_ids()'::text),
+                ('private.current_organization_id()'::text),
+                ('private.current_user_has_organization_role(uuid,text[])'::text),
+                ('private.current_user_organization_role(uuid)'::text),
+                ('private.is_current_user_organization_member(uuid)'::text)
+        )
+        SELECT expected.signature
+        FROM expected
+        INNER JOIN pg_catalog.pg_proc AS procedure
+            ON procedure.oid = to_regprocedure(expected.signature)
+        WHERE procedure.prosecdef
+          AND procedure.proconfig = ARRAY['search_path=""']::text[]
+          AND procedure.proowner = 'postgres'::regrole
+        ORDER BY 1
+    $$,
+    $$ VALUES
+        ('private.active_organization_ids()'::text),
+        ('private.current_organization_id()'::text),
+        ('private.current_user_has_organization_role(uuid,text[])'::text),
+        ('private.current_user_organization_role(uuid)'::text),
+        ('private.is_current_user_organization_member(uuid)'::text)
+    $$,
+    'private helpers are exact-OID fixed-path definers owned by postgres'
+);
+
+SELECT results_eq(
+    $$
+        WITH expected(signature) AS (
+            VALUES
+                ('private.active_organization_ids()'::text),
+                ('private.current_organization_id()'::text),
+                ('private.current_user_has_organization_role(uuid,text[])'::text),
+                ('private.current_user_organization_role(uuid)'::text),
+                ('private.is_current_user_organization_member(uuid)'::text)
+        )
+        SELECT (format(
+            '%s|%s|%s|%s',
+            expected.signature,
+            procedure.proowner::regrole::text,
+            coalesce(grantee.rolname, 'PUBLIC'),
+            acl.privilege_type
+        ) COLLATE "default")::text
+        FROM expected
+        INNER JOIN pg_catalog.pg_proc AS procedure
+            ON procedure.oid = to_regprocedure(expected.signature)
+        CROSS JOIN LATERAL aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
+        LEFT JOIN pg_catalog.pg_roles AS grantee
+            ON grantee.oid = acl.grantee
+        ORDER BY 1
+    $$,
+    $$ VALUES
+        ('private.active_organization_ids()|postgres|authenticated|EXECUTE'::text),
+        ('private.active_organization_ids()|postgres|postgres|EXECUTE'::text),
+        ('private.active_organization_ids()|postgres|service_role|EXECUTE'::text),
+        ('private.current_organization_id()|postgres|authenticated|EXECUTE'::text),
+        ('private.current_organization_id()|postgres|postgres|EXECUTE'::text),
+        ('private.current_organization_id()|postgres|service_role|EXECUTE'::text),
+        ('private.current_user_has_organization_role(uuid,text[])|postgres|authenticated|EXECUTE'::text),
+        ('private.current_user_has_organization_role(uuid,text[])|postgres|postgres|EXECUTE'::text),
+        ('private.current_user_has_organization_role(uuid,text[])|postgres|service_role|EXECUTE'::text),
+        ('private.current_user_organization_role(uuid)|postgres|authenticated|EXECUTE'::text),
+        ('private.current_user_organization_role(uuid)|postgres|postgres|EXECUTE'::text),
+        ('private.current_user_organization_role(uuid)|postgres|service_role|EXECUTE'::text),
+        ('private.is_current_user_organization_member(uuid)|postgres|authenticated|EXECUTE'::text),
+        ('private.is_current_user_organization_member(uuid)|postgres|postgres|EXECUTE'::text),
+        ('private.is_current_user_organization_member(uuid)|postgres|service_role|EXECUTE'::text)
+    $$,
+    'private helper ACLs have only normalized postgres, authenticated, and service role execute entries'
+);
+
+SELECT results_eq(
+    $$
+        SELECT (format(
+            '%s|%s|%s|%s',
+            procedure.oid::regprocedure::text,
+            procedure.proowner::regrole::text,
+            coalesce(grantee.rolname, 'PUBLIC'),
+            acl.privilege_type
+        ) COLLATE "default")::text
+        FROM pg_catalog.pg_proc AS procedure
+        CROSS JOIN LATERAL aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
+        LEFT JOIN pg_catalog.pg_roles AS grantee
+            ON grantee.oid = acl.grantee
+        WHERE procedure.oid = to_regprocedure('private.get_user_organizations()')
+        ORDER BY 1
+    $$,
+    $$ VALUES
+        ('private.get_user_organizations()|postgres|postgres|EXECUTE'::text)
+    $$,
+    'legacy private helper has only its owner execute privilege'
+);
+
+SELECT is(to_regprocedure('public.current_organization_id()')::text, 'current_organization_id()', 'public current organization wrapper has its exact signature');
+SELECT is(to_regprocedure('public.get_user_organizations()')::text, 'get_user_organizations()', 'public active organizations wrapper has its exact signature');
+SELECT is(to_regprocedure('public.get_user_org_role(uuid)')::text, 'get_user_org_role(uuid)', 'public role wrapper has its exact signature');
+SELECT is(to_regprocedure('public.is_organization_member(uuid,uuid)')::text, 'is_organization_member(uuid,uuid)', 'public membership wrapper has its exact signature');
+SELECT is(to_regprocedure('public.has_organization_role(uuid,text[],uuid)')::text, 'has_organization_role(uuid,text[],uuid)', 'public role allowlist wrapper has its exact signature');
 
 SELECT results_eq(
     $$
@@ -71,15 +174,13 @@ SELECT results_eq(
         INNER JOIN pg_catalog.pg_namespace AS namespace
             ON namespace.oid = procedure.pronamespace
         WHERE namespace.nspname = 'public'
-          AND procedure.oid::regprocedure::text IN (
-              'current_organization_id()',
-              'get_user_organizations()',
-              'get_user_org_role(uuid)',
-              'is_organization_member(uuid,uuid)',
-              'has_organization_role(uuid,text[],uuid)'
+          AND procedure.proname IN (
+              'current_organization_id',
+              'get_user_organizations',
+              'get_user_org_role',
+              'has_organization_role',
+              'is_organization_member'
           )
-          AND NOT procedure.prosecdef
-          AND procedure.proconfig = ARRAY['search_path=""']::text[]
         ORDER BY 1
     $$,
     $$ VALUES
@@ -89,234 +190,145 @@ SELECT results_eq(
         ('has_organization_role(uuid,text[],uuid)'::text),
         ('is_organization_member(uuid,uuid)'::text)
     $$,
-    'all public compatibility helpers are fixed-path invokers'
+    'public compatibility helper family has no unexpected overloads'
 );
 
-SELECT ok(
-    EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_proc AS procedure
-        INNER JOIN pg_catalog.pg_namespace AS namespace
-            ON namespace.oid = procedure.pronamespace
-        WHERE namespace.nspname = 'private'
-          AND procedure.proname = 'current_organization_id'
-          AND NOT EXISTS (
-              SELECT 1
-              FROM aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
-              WHERE acl.grantee = 0
-                AND acl.privilege_type = 'EXECUTE'
-          )
-    ),
-    'PUBLIC cannot execute private current organization helper'
-);
-SELECT ok(
-    EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_proc AS procedure
-        INNER JOIN pg_catalog.pg_namespace AS namespace
-            ON namespace.oid = procedure.pronamespace
-        WHERE namespace.nspname = 'private'
-          AND procedure.proname = 'active_organization_ids'
-          AND NOT EXISTS (
-              SELECT 1
-              FROM aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
-              WHERE acl.grantee = 0
-                AND acl.privilege_type = 'EXECUTE'
-          )
-    ),
-    'PUBLIC cannot execute private active organizations helper'
-);
-SELECT ok(
-    EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_proc AS procedure
-        INNER JOIN pg_catalog.pg_namespace AS namespace
-            ON namespace.oid = procedure.pronamespace
-        WHERE namespace.nspname = 'private'
-          AND procedure.proname = 'current_user_organization_role'
-          AND NOT EXISTS (
-              SELECT 1
-              FROM aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
-              WHERE acl.grantee = 0
-                AND acl.privilege_type = 'EXECUTE'
-          )
-    ),
-    'PUBLIC cannot execute private role helper'
-);
-SELECT ok(
-    EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_proc AS procedure
-        INNER JOIN pg_catalog.pg_namespace AS namespace
-            ON namespace.oid = procedure.pronamespace
-        WHERE namespace.nspname = 'private'
-          AND procedure.proname = 'is_current_user_organization_member'
-          AND NOT EXISTS (
-              SELECT 1
-              FROM aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
-              WHERE acl.grantee = 0
-                AND acl.privilege_type = 'EXECUTE'
-          )
-    ),
-    'PUBLIC cannot execute private membership helper'
-);
-SELECT ok(
-    EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_proc AS procedure
-        INNER JOIN pg_catalog.pg_namespace AS namespace
-            ON namespace.oid = procedure.pronamespace
-        WHERE namespace.nspname = 'private'
-          AND procedure.proname = 'current_user_has_organization_role'
-          AND NOT EXISTS (
-              SELECT 1
-              FROM aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
-              WHERE acl.grantee = 0
-                AND acl.privilege_type = 'EXECUTE'
-          )
-    ),
-    'PUBLIC cannot execute private role allowlist helper'
-);
-
-SELECT ok(
-    EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_proc AS procedure
-        INNER JOIN pg_catalog.pg_namespace AS namespace
-            ON namespace.oid = procedure.pronamespace
-        WHERE namespace.nspname = 'private'
-          AND procedure.proname = 'current_organization_id'
-          AND NOT has_function_privilege('anon', procedure.oid, 'EXECUTE')
-    ),
-    'anon cannot execute private current organization helper'
-);
-SELECT ok(
-    EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_proc AS procedure
-        INNER JOIN pg_catalog.pg_namespace AS namespace
-            ON namespace.oid = procedure.pronamespace
-        WHERE namespace.nspname = 'private'
-          AND procedure.proname = 'active_organization_ids'
-          AND NOT has_function_privilege('anon', procedure.oid, 'EXECUTE')
-    ),
-    'anon cannot execute private active organizations helper'
-);
-SELECT ok(
-    EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_proc AS procedure
-        INNER JOIN pg_catalog.pg_namespace AS namespace
-            ON namespace.oid = procedure.pronamespace
-        WHERE namespace.nspname = 'private'
-          AND procedure.proname = 'current_user_organization_role'
-          AND NOT has_function_privilege('anon', procedure.oid, 'EXECUTE')
-    ),
-    'anon cannot execute private role helper'
-);
-SELECT ok(
-    EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_proc AS procedure
-        INNER JOIN pg_catalog.pg_namespace AS namespace
-            ON namespace.oid = procedure.pronamespace
-        WHERE namespace.nspname = 'private'
-          AND procedure.proname = 'is_current_user_organization_member'
-          AND NOT has_function_privilege('anon', procedure.oid, 'EXECUTE')
-    ),
-    'anon cannot execute private membership helper'
-);
-SELECT ok(
-    EXISTS (
-        SELECT 1
-        FROM pg_catalog.pg_proc AS procedure
-        INNER JOIN pg_catalog.pg_namespace AS namespace
-            ON namespace.oid = procedure.pronamespace
-        WHERE namespace.nspname = 'private'
-          AND procedure.proname = 'current_user_has_organization_role'
-          AND NOT has_function_privilege('anon', procedure.oid, 'EXECUTE')
-    ),
-    'anon cannot execute private role allowlist helper'
-);
-
-SELECT is(
-    (
-        SELECT count(*)::integer
-        FROM pg_catalog.pg_proc AS procedure
-        CROSS JOIN LATERAL aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
-        WHERE procedure.oid IN (
-            'public.current_organization_id()'::regprocedure,
-            'public.get_user_organizations()'::regprocedure,
-            'public.get_user_org_role(uuid)'::regprocedure,
-            'public.is_organization_member(uuid,uuid)'::regprocedure,
-            'public.has_organization_role(uuid,text[],uuid)'::regprocedure
+SELECT results_eq(
+    $$
+        WITH expected(signature) AS (
+            VALUES
+                ('public.current_organization_id()'::text),
+                ('public.get_user_organizations()'::text),
+                ('public.get_user_org_role(uuid)'::text),
+                ('public.has_organization_role(uuid,text[],uuid)'::text),
+                ('public.is_organization_member(uuid,uuid)'::text)
         )
-          AND acl.grantee = 0
-          AND acl.privilege_type = 'EXECUTE'
-    ),
-    0,
-    'PUBLIC cannot execute public compatibility helpers'
+        SELECT replace(expected.signature, 'public.', '')
+        FROM expected
+        INNER JOIN pg_catalog.pg_proc AS procedure
+            ON procedure.oid = to_regprocedure(expected.signature)
+        WHERE NOT procedure.prosecdef
+          AND procedure.proconfig = ARRAY['search_path=""']::text[]
+          AND procedure.proowner = 'postgres'::regrole
+        ORDER BY 1
+    $$,
+    $$ VALUES
+        ('current_organization_id()'::text),
+        ('get_user_org_role(uuid)'::text),
+        ('get_user_organizations()'::text),
+        ('has_organization_role(uuid,text[],uuid)'::text),
+        ('is_organization_member(uuid,uuid)'::text)
+    $$,
+    'public wrappers are exact-OID fixed-path invokers owned by postgres'
 );
-SELECT is(
-    (
-        SELECT count(*)::integer
-        FROM pg_catalog.pg_proc AS procedure
-        WHERE procedure.oid IN (
-            'public.current_organization_id()'::regprocedure,
-            'public.get_user_organizations()'::regprocedure,
-            'public.get_user_org_role(uuid)'::regprocedure,
-            'public.is_organization_member(uuid,uuid)'::regprocedure,
-            'public.has_organization_role(uuid,text[],uuid)'::regprocedure
+
+SELECT results_eq(
+    $$
+        WITH expected(signature) AS (
+            VALUES
+                ('public.current_organization_id()'::text),
+                ('public.get_user_organizations()'::text),
+                ('public.get_user_org_role(uuid)'::text),
+                ('public.has_organization_role(uuid,text[],uuid)'::text),
+                ('public.is_organization_member(uuid,uuid)'::text)
         )
-          AND has_function_privilege('anon', procedure.oid, 'EXECUTE')
-    ),
-    0,
-    'anon cannot execute public compatibility helpers'
+        SELECT (format(
+            '%s|%s|%s|%s',
+            replace(expected.signature, 'public.', ''),
+            procedure.proowner::regrole::text,
+            coalesce(grantee.rolname, 'PUBLIC'),
+            acl.privilege_type
+        ) COLLATE "default")::text
+        FROM expected
+        INNER JOIN pg_catalog.pg_proc AS procedure
+            ON procedure.oid = to_regprocedure(expected.signature)
+        CROSS JOIN LATERAL aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
+        LEFT JOIN pg_catalog.pg_roles AS grantee
+            ON grantee.oid = acl.grantee
+        ORDER BY 1
+    $$,
+    $$ VALUES
+        ('current_organization_id()|postgres|authenticated|EXECUTE'::text),
+        ('current_organization_id()|postgres|postgres|EXECUTE'::text),
+        ('current_organization_id()|postgres|service_role|EXECUTE'::text),
+        ('get_user_org_role(uuid)|postgres|authenticated|EXECUTE'::text),
+        ('get_user_org_role(uuid)|postgres|postgres|EXECUTE'::text),
+        ('get_user_org_role(uuid)|postgres|service_role|EXECUTE'::text),
+        ('get_user_organizations()|postgres|authenticated|EXECUTE'::text),
+        ('get_user_organizations()|postgres|postgres|EXECUTE'::text),
+        ('get_user_organizations()|postgres|service_role|EXECUTE'::text),
+        ('has_organization_role(uuid,text[],uuid)|postgres|authenticated|EXECUTE'::text),
+        ('has_organization_role(uuid,text[],uuid)|postgres|postgres|EXECUTE'::text),
+        ('has_organization_role(uuid,text[],uuid)|postgres|service_role|EXECUTE'::text),
+        ('is_organization_member(uuid,uuid)|postgres|authenticated|EXECUTE'::text),
+        ('is_organization_member(uuid,uuid)|postgres|postgres|EXECUTE'::text),
+        ('is_organization_member(uuid,uuid)|postgres|service_role|EXECUTE'::text)
+    $$,
+    'public wrapper ACLs have only normalized postgres, authenticated, and service role execute entries'
 );
 
-SELECT is(
-    (
-        SELECT count(*)::integer
+SELECT is(to_regprocedure('public.get_users_info(uuid[])')::text, 'get_users_info(uuid[])', 'directory RPC has its exact signature');
+
+SELECT results_eq(
+    $$
+        SELECT procedure.oid::regprocedure::text
+        FROM pg_catalog.pg_proc AS procedure
+        INNER JOIN pg_catalog.pg_namespace AS namespace
+            ON namespace.oid = procedure.pronamespace
+        WHERE namespace.nspname = 'public'
+          AND procedure.proname = 'get_users_info'
+        ORDER BY 1
+    $$,
+    $$ VALUES ('get_users_info(uuid[])'::text) $$,
+    'directory RPC has no unexpected overloads'
+);
+
+SELECT results_eq(
+    $$
+        SELECT (format(
+            '%s|%s|%s|%s|%s',
+            procedure.oid::regprocedure::text,
+            procedure.prosecdef,
+            array_to_string(procedure.proconfig, ','),
+            procedure.proowner::regrole::text,
+            coalesce(grantee.rolname, 'PUBLIC') || ':' || acl.privilege_type
+        ) COLLATE "default")::text
         FROM pg_catalog.pg_proc AS procedure
         CROSS JOIN LATERAL aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
-        WHERE procedure.oid = 'private.get_user_organizations()'::regprocedure
-          AND acl.grantee = 0
-          AND acl.privilege_type = 'EXECUTE'
-    ),
-    0,
-    'PUBLIC cannot execute legacy private helper'
-);
-SELECT ok(NOT has_function_privilege('anon', 'private.get_user_organizations()', 'EXECUTE'), 'anon cannot execute legacy private helper');
-SELECT ok(NOT has_function_privilege('authenticated', 'private.get_user_organizations()', 'EXECUTE'), 'legacy private helper is revoked from authenticated');
-SELECT ok(NOT has_function_privilege('service_role', 'private.get_user_organizations()', 'EXECUTE'), 'legacy private helper is revoked from service role');
-
-SELECT ok(NOT has_function_privilege('anon', 'public.get_users_info(uuid[])', 'EXECUTE'), 'anon cannot execute unused directory RPC');
-SELECT ok(NOT has_function_privilege('authenticated', 'public.get_users_info(uuid[])', 'EXECUTE'), 'unused directory RPC is revoked from authenticated');
-SELECT ok(has_function_privilege('service_role', 'public.get_users_info(uuid[])', 'EXECUTE'), 'service role retains the reviewed directory RPC');
-SELECT is(
-    (
-        SELECT count(*)::integer
-        FROM pg_catalog.pg_proc AS procedure
-        CROSS JOIN LATERAL aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
-        WHERE procedure.oid = 'public.get_users_info(uuid[])'::regprocedure
-          AND acl.grantee = 0
-          AND acl.privilege_type = 'EXECUTE'
-    ),
-    0,
-    'PUBLIC cannot execute unused directory RPC'
+        LEFT JOIN pg_catalog.pg_roles AS grantee
+            ON grantee.oid = acl.grantee
+        WHERE procedure.oid = to_regprocedure('public.get_users_info(uuid[])')
+        ORDER BY 1
+    $$,
+    $$ VALUES
+        ('get_users_info(uuid[])|t|search_path=""|postgres|postgres:EXECUTE'::text),
+        ('get_users_info(uuid[])|t|search_path=""|postgres|service_role:EXECUTE'::text)
+    $$,
+    'directory RPC remains a fixed-path postgres definer executable only by service role'
 );
 
-SELECT is(
-    (
-        SELECT count(*)::integer
+SELECT results_eq(
+    $$
+        SELECT (format(
+            '%s|%s|%s',
+            namespace.nspowner::regrole::text,
+            coalesce(grantee.rolname, 'PUBLIC'),
+            acl.privilege_type
+        ) COLLATE "default")::text
         FROM pg_catalog.pg_namespace AS namespace
         CROSS JOIN LATERAL aclexplode(coalesce(namespace.nspacl, acldefault('n', namespace.nspowner))) AS acl
+        LEFT JOIN pg_catalog.pg_roles AS grantee
+            ON grantee.oid = acl.grantee
         WHERE namespace.nspname = 'private'
-          AND acl.grantee = 0
-          AND acl.privilege_type = 'USAGE'
-    ),
-    0,
-    'PUBLIC cannot use private schema'
+        ORDER BY 1
+    $$,
+    $$ VALUES
+        ('postgres|authenticated|USAGE'::text),
+        ('postgres|postgres|CREATE'::text),
+        ('postgres|postgres|USAGE'::text),
+        ('postgres|service_role|USAGE'::text)
+    $$,
+    'private schema ACL has only normalized owner, authenticated, and service role entries'
 );
 
 SET LOCAL ROLE authenticated;
@@ -329,8 +341,10 @@ SELECT results_eq(
     'wrapper returns caller active organizations only'
 );
 SELECT is(public.get_user_org_role('a2000000-0000-4000-8000-000000000001'), 'owner', 'wrapper returns caller role');
-SELECT is(public.is_organization_member('a2000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000002'), false, 'legacy membership wrapper rejects another user id');
-SELECT is(public.has_organization_role('a2000000-0000-4000-8000-000000000001', ARRAY['owner'], 'b1000000-0000-4000-8000-000000000002'), false, 'legacy role wrapper rejects another user id');
+SELECT is(public.is_organization_member('a2000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000001'), true, 'membership wrapper accepts the caller own qualifying identity');
+SELECT is(public.has_organization_role('a2000000-0000-4000-8000-000000000001', ARRAY['owner'], 'a1000000-0000-4000-8000-000000000001'), true, 'role wrapper accepts the caller own qualifying identity');
+SELECT is(public.is_organization_member('a2000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000002'), false, 'membership wrapper rejects another qualifying user identity');
+SELECT is(public.has_organization_role('a2000000-0000-4000-8000-000000000001', ARRAY['owner'], 'b1000000-0000-4000-8000-000000000002'), false, 'role wrapper rejects another qualifying user identity');
 
 RESET ROLE;
 
@@ -342,6 +356,11 @@ WHERE organization_id = 'a2000000-0000-4000-8000-000000000001'
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', 'a1000000-0000-4000-8000-000000000001', true);
 SELECT is(public.current_organization_id(), NULL::uuid, 'suspended membership cannot resolve tenant context');
+SELECT results_eq(
+    $$ SELECT * FROM public.get_user_organizations() ORDER BY 1 $$,
+    $$ SELECT NULL::uuid WHERE false $$,
+    'suspended membership cannot resolve an active organization list'
+);
 
 RESET ROLE;
 
