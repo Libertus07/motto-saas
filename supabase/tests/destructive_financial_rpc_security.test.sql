@@ -87,12 +87,35 @@ VALUES (
     'c2000000-0000-4000-8000-000000000001'
 );
 
+INSERT INTO public.suppliers (id, name, total_debt, user_id, organization_id)
+VALUES (
+    'c3000000-0000-4000-8000-000000000002',
+    'Cross-tenant denial supplier',
+    1,
+    'c1000000-0000-4000-8000-000000000001',
+    'c2000000-0000-4000-8000-000000000001'
+);
+
 INSERT INTO public.accounts (id, name, type, balance, organization_id)
 VALUES (
     'c4000000-0000-4000-8000-000000000001',
     'Org A cash account',
     'cash',
     75,
+    'c2000000-0000-4000-8000-000000000001'
+);
+
+INSERT INTO public.supplier_transactions (
+    id, supplier_id, transaction_date, amount, transaction_type, note, user_id, organization_id
+)
+VALUES (
+    'c5000000-0000-4000-8000-000000000003',
+    'c3000000-0000-4000-8000-000000000002',
+    CURRENT_DATE,
+    1,
+    'invoice',
+    'Cross-tenant supplier denial target',
+    'c1000000-0000-4000-8000-000000000001',
     'c2000000-0000-4000-8000-000000000001'
 );
 
@@ -162,6 +185,16 @@ VALUES (
     'c2000000-0000-4000-8000-000000000001'
 );
 
+INSERT INTO public.sales (id, quantity, unit_price, total_price, batch_id, organization_id)
+VALUES (
+    'c8000000-0000-4000-8000-000000000005',
+    1,
+    1,
+    1,
+    'c9000000-0000-4000-8000-000000000003',
+    'c2000000-0000-4000-8000-000000000001'
+);
+
 INSERT INTO public.expenses (id, name, category, amount, batch_id, organization_id)
 VALUES (
     'c8000000-0000-4000-8000-000000000002',
@@ -194,28 +227,37 @@ VALUES (
     'c2000000-0000-4000-8000-000000000001'
 );
 
-INSERT INTO public.activity_logs (module, action_type, description, details, user_id, organization_id)
+INSERT INTO public.activity_logs (
+    id, created_at, module, action_type, description, details, user_id, organization_id
+)
 VALUES
     (
+        'c9100000-0000-4000-8000-000000000001',
+        '2026-08-17 12:00:00+00',
         'Tedarikçi',
         'EKLEME',
         'Historical supplier audit',
-        jsonb_build_object('transaction_id', 'c5000000-0000-4000-8000-000000000001'),
+        '{"transaction_id":"c5000000-0000-4000-8000-000000000001","source":"seed"}'::jsonb,
         'c1000000-0000-4000-8000-000000000001',
         'c2000000-0000-4000-8000-000000000001'
     ),
     (
+        'c9100000-0000-4000-8000-000000000002',
+        '2026-08-17 12:01:00+00',
         'Z-Raporu',
         'EKLEME',
         'Historical Z audit',
-        jsonb_build_object('batch_id', 'c9000000-0000-4000-8000-000000000001'),
+        '{"batch_id":"c9000000-0000-4000-8000-000000000001","source":"seed"}'::jsonb,
         'c1000000-0000-4000-8000-000000000001',
         'c2000000-0000-4000-8000-000000000001'
     );
 
+SELECT set_config('request.jwt.claim.sub', '', true);
+SELECT set_config('request.jwt.claim.role', 'anon', true);
+SELECT set_config('request.jwt.claims', '{}', true);
 SET LOCAL ROLE anon;
 SELECT throws_ok(
-    $$ SELECT public.delete_supplier_transaction('c5000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000001') $$,
+    $$ SELECT public.delete_supplier_transaction('c5000000-0000-4000-8000-000000000003', 'c2000000-0000-4000-8000-000000000001') $$,
     '42501',
     NULL,
     'unauthenticated supplier deletion is denied by ACL'
@@ -226,19 +268,22 @@ SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', 'd1000000-0000-4000-8000-000000000002', true);
 SELECT set_config('request.jwt.claim.role', 'authenticated', true);
 SELECT throws_ok(
-    $$ SELECT public.delete_supplier_transaction('c5000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000001') $$,
+    $$ SELECT public.delete_supplier_transaction('c5000000-0000-4000-8000-000000000003', 'c2000000-0000-4000-8000-000000000001') $$,
     '42501',
     'Bu işletmede işlem yetkiniz yok.',
     'cross-tenant supplier deletion is denied'
 );
 SELECT throws_ok(
-    $$ SELECT public.delete_z_report_transaction('c9000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000001') $$,
+    $$ SELECT public.delete_z_report_transaction('c9000000-0000-4000-8000-000000000003', 'c2000000-0000-4000-8000-000000000001') $$,
     '42501',
     'Bu işletmede işlem yetkiniz yok.',
     'cross-tenant Z deletion is denied'
 );
 RESET ROLE;
 
+SELECT set_config('request.jwt.claim.sub', '', true);
+SELECT set_config('request.jwt.claim.role', 'anon', true);
+SELECT set_config('request.jwt.claims', '{}', true);
 SET LOCAL ROLE anon;
 SELECT throws_ok(
     $$ SELECT public.delete_z_report_transaction('c9000000-0000-4000-8000-000000000001', 'c2000000-0000-4000-8000-000000000001') $$,
@@ -278,14 +323,41 @@ SELECT is(
 );
 SELECT is(
     (
+        SELECT id
+        FROM public.activity_logs
+        WHERE id = 'c9100000-0000-4000-8000-000000000001'
+    ),
+    'c9100000-0000-4000-8000-000000000001'::uuid,
+    'supplier deletion retains the fixed historical audit identity'
+);
+SELECT is(
+    (
+        SELECT created_at
+        FROM public.activity_logs
+        WHERE id = 'c9100000-0000-4000-8000-000000000001'
+    ),
+    '2026-08-17 12:00:00+00'::timestamptz,
+    'supplier deletion leaves the historical audit timestamp unchanged'
+);
+SELECT is(
+    (
+        SELECT details
+        FROM public.activity_logs
+        WHERE id = 'c9100000-0000-4000-8000-000000000001'
+    ),
+    '{"transaction_id":"c5000000-0000-4000-8000-000000000001","source":"seed"}'::jsonb,
+    'supplier deletion leaves the historical audit details unchanged'
+);
+SELECT is(
+    (
         SELECT count(*)::integer
         FROM public.activity_logs
         WHERE organization_id = 'c2000000-0000-4000-8000-000000000001'
-          AND action_type = 'EKLEME'
+          AND module = 'Tedarikçi'
           AND details->>'transaction_id' = 'c5000000-0000-4000-8000-000000000001'
     ),
-    1,
-    'supplier deletion preserves the historical audit event'
+    2,
+    'supplier deletion adds exactly one audit event without replacing history'
 );
 SELECT is(
     (
@@ -294,44 +366,12 @@ SELECT is(
         WHERE organization_id = 'c2000000-0000-4000-8000-000000000001'
           AND module = 'Tedarikçi'
           AND action_type = 'SILME'
-          AND details->>'transaction_id' = 'c5000000-0000-4000-8000-000000000001'
-    ),
-    1,
-    'supplier deletion appends one tenant audit event'
-);
-SELECT is(
-    (
-        SELECT details->>'transaction_id'
-        FROM public.activity_logs
-        WHERE organization_id = 'c2000000-0000-4000-8000-000000000001'
-          AND module = 'Tedarikçi'
-          AND action_type = 'SILME'
-    ),
-    'c5000000-0000-4000-8000-000000000001',
-    'supplier deletion audit identifies the deleted transaction'
-);
-SELECT is(
-    (
-        SELECT details->>'organization_id'
-        FROM public.activity_logs
-        WHERE organization_id = 'c2000000-0000-4000-8000-000000000001'
-          AND module = 'Tedarikçi'
-          AND action_type = 'SILME'
-    ),
-    'c2000000-0000-4000-8000-000000000001',
-    'supplier deletion audit identifies its organization'
-);
-SELECT is(
-    (
-        SELECT count(*)::integer
-        FROM public.activity_logs
-        WHERE organization_id = 'c2000000-0000-4000-8000-000000000001'
-          AND module = 'Tedarikçi'
-          AND action_type = 'SILME'
+          AND user_id = 'c1000000-0000-4000-8000-000000000001'
+          AND details @> '{"transaction_id":"c5000000-0000-4000-8000-000000000001","organization_id":"c2000000-0000-4000-8000-000000000001"}'::jsonb
           AND details ?& ARRAY['transaction_id', 'organization_id']
     ),
     1,
-    'supplier deletion audit has the required immutable identifiers'
+    'supplier deletion audit has immutable identifiers and the authenticated actor'
 );
 
 SELECT lives_ok(
@@ -373,14 +413,41 @@ SELECT is(
 );
 SELECT is(
     (
+        SELECT id
+        FROM public.activity_logs
+        WHERE id = 'c9100000-0000-4000-8000-000000000002'
+    ),
+    'c9100000-0000-4000-8000-000000000002'::uuid,
+    'Z deletion retains the fixed historical audit identity'
+);
+SELECT is(
+    (
+        SELECT created_at
+        FROM public.activity_logs
+        WHERE id = 'c9100000-0000-4000-8000-000000000002'
+    ),
+    '2026-08-17 12:01:00+00'::timestamptz,
+    'Z deletion leaves the historical audit timestamp unchanged'
+);
+SELECT is(
+    (
+        SELECT details
+        FROM public.activity_logs
+        WHERE id = 'c9100000-0000-4000-8000-000000000002'
+    ),
+    '{"batch_id":"c9000000-0000-4000-8000-000000000001","source":"seed"}'::jsonb,
+    'Z deletion leaves the historical audit details unchanged'
+);
+SELECT is(
+    (
         SELECT count(*)::integer
         FROM public.activity_logs
         WHERE organization_id = 'c2000000-0000-4000-8000-000000000001'
-          AND action_type = 'EKLEME'
+          AND module = 'Z-Raporu'
           AND details->>'batch_id' = 'c9000000-0000-4000-8000-000000000001'
     ),
-    1,
-    'Z deletion preserves the historical audit event'
+    2,
+    'Z deletion adds exactly one audit event without replacing history'
 );
 SELECT is(
     (
@@ -389,8 +456,10 @@ SELECT is(
         WHERE organization_id = 'c2000000-0000-4000-8000-000000000001'
           AND module = 'Z-Raporu'
           AND action_type = 'SILME'
-          AND details->>'batch_id' = 'c9000000-0000-4000-8000-000000000001'
+          AND user_id = 'c1000000-0000-4000-8000-000000000001'
+          AND details @> '{"batch_id":"c9000000-0000-4000-8000-000000000001","stock_movements_deleted":1,"sales_deleted":1,"expenses_deleted":1,"account_movements_deleted":1,"stock_quantity_restored":3,"account_balance_reversed":30}'::jsonb
           AND details ?& ARRAY[
+              'batch_id',
               'stock_movements_deleted',
               'sales_deleted',
               'expenses_deleted',
@@ -400,42 +469,7 @@ SELECT is(
           ]
     ),
     1,
-    'Z deletion appends one complete tenant audit event'
-);
-SELECT is(
-    (
-        SELECT details->>'batch_id'
-        FROM public.activity_logs
-        WHERE organization_id = 'c2000000-0000-4000-8000-000000000001'
-          AND module = 'Z-Raporu'
-          AND action_type = 'SILME'
-    ),
-    'c9000000-0000-4000-8000-000000000001',
-    'Z deletion audit identifies the deleted batch'
-);
-SELECT ok(
-    (
-        SELECT details->>'stock_movements_deleted' = '1'
-           AND details->>'sales_deleted' = '1'
-           AND details->>'expenses_deleted' = '1'
-           AND details->>'account_movements_deleted' = '1'
-        FROM public.activity_logs
-        WHERE organization_id = 'c2000000-0000-4000-8000-000000000001'
-          AND module = 'Z-Raporu'
-          AND action_type = 'SILME'
-    ),
-    'Z deletion audit records affected row counts'
-);
-SELECT ok(
-    (
-        SELECT details->>'stock_quantity_restored' = '3'
-           AND details->>'account_balance_reversed' = '30'
-        FROM public.activity_logs
-        WHERE organization_id = 'c2000000-0000-4000-8000-000000000001'
-          AND module = 'Z-Raporu'
-          AND action_type = 'SILME'
-    ),
-    'Z deletion audit records reversal totals'
+    'Z deletion audit records full reversals and the authenticated actor'
 );
 
 RESET ROLE;
@@ -514,21 +548,27 @@ VALUES (
     'c9000000-0000-4000-8000-000000000002',
     'c2000000-0000-4000-8000-000000000001'
 );
-INSERT INTO public.activity_logs (module, action_type, description, details, user_id, organization_id)
+INSERT INTO public.activity_logs (
+    id, created_at, module, action_type, description, details, user_id, organization_id
+)
 VALUES
     (
+        'c9100000-0000-4000-8000-000000000003',
+        '2026-08-17 12:02:00+00',
         'Tedarikçi',
         'EKLEME',
         'Rollback supplier historical audit',
-        jsonb_build_object('transaction_id', 'c5000000-0000-4000-8000-000000000002'),
+        '{"transaction_id":"c5000000-0000-4000-8000-000000000002","source":"rollback-seed"}'::jsonb,
         'c1000000-0000-4000-8000-000000000001',
         'c2000000-0000-4000-8000-000000000001'
     ),
     (
+        'c9100000-0000-4000-8000-000000000004',
+        '2026-08-17 12:03:00+00',
         'Z-Raporu',
         'EKLEME',
         'Rollback Z historical audit',
-        jsonb_build_object('batch_id', 'c9000000-0000-4000-8000-000000000002'),
+        '{"batch_id":"c9000000-0000-4000-8000-000000000002","source":"rollback-seed"}'::jsonb,
         'c1000000-0000-4000-8000-000000000001',
         'c2000000-0000-4000-8000-000000000001'
     );
@@ -587,9 +627,15 @@ SELECT ok(
     'failed supplier deletion preserves account balance and movement'
 );
 SELECT ok(
-    (SELECT count(*) = 1 FROM public.activity_logs WHERE action_type = 'EKLEME' AND details->>'transaction_id' = 'c5000000-0000-4000-8000-000000000002')
+    (
+        SELECT id = 'c9100000-0000-4000-8000-000000000003'::uuid
+           AND created_at = '2026-08-17 12:02:00+00'::timestamptz
+           AND details = '{"transaction_id":"c5000000-0000-4000-8000-000000000002","source":"rollback-seed"}'::jsonb
+        FROM public.activity_logs
+        WHERE id = 'c9100000-0000-4000-8000-000000000003'
+    )
     AND (SELECT count(*) = 0 FROM public.activity_logs WHERE action_type = 'SILME' AND details->>'transaction_id' = 'c5000000-0000-4000-8000-000000000002'),
-    'failed supplier deletion preserves history and appends no success audit'
+    'failed supplier deletion preserves the exact historical audit and appends no success audit'
 );
 SELECT is(
     (SELECT stock_quantity FROM public.materials WHERE id = 'c6000000-0000-4000-8000-000000000001'),
@@ -617,9 +663,15 @@ SELECT ok(
     'failed Z deletion preserves account balance and movement'
 );
 SELECT ok(
-    (SELECT count(*) = 1 FROM public.activity_logs WHERE action_type = 'EKLEME' AND details->>'batch_id' = 'c9000000-0000-4000-8000-000000000002')
+    (
+        SELECT id = 'c9100000-0000-4000-8000-000000000004'::uuid
+           AND created_at = '2026-08-17 12:03:00+00'::timestamptz
+           AND details = '{"batch_id":"c9000000-0000-4000-8000-000000000002","source":"rollback-seed"}'::jsonb
+        FROM public.activity_logs
+        WHERE id = 'c9100000-0000-4000-8000-000000000004'
+    )
     AND (SELECT count(*) = 0 FROM public.activity_logs WHERE action_type = 'SILME' AND details->>'batch_id' = 'c9000000-0000-4000-8000-000000000002'),
-    'failed Z deletion preserves history and appends no success audit'
+    'failed Z deletion preserves the exact historical audit and appends no success audit'
 );
 
 SELECT * FROM finish();
