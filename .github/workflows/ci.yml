@@ -30,6 +30,9 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+      - name: Validate project roadmap
+        run: npm run roadmap:check
+
       - name: Run Linter
         run: npm run lint
 
