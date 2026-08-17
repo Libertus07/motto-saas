@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
-SELECT plan(30);
+SELECT plan(34);
 
 INSERT INTO auth.users (id, email)
 VALUES
@@ -105,36 +105,40 @@ SELECT results_eq(
                 ('private.is_current_user_organization_member(uuid)'::text)
         )
         SELECT (format(
-            '%s|%s|%s|%s',
+            '%s|%s|%s|%s|%s|%s',
             expected.signature,
             procedure.proowner::regrole::text,
+            grantor.rolname,
             coalesce(grantee.rolname, 'PUBLIC'),
-            acl.privilege_type
+            acl.privilege_type,
+            acl.is_grantable
         ) COLLATE "default")::text
         FROM expected
         INNER JOIN pg_catalog.pg_proc AS procedure
             ON procedure.oid = to_regprocedure(expected.signature)
         CROSS JOIN LATERAL aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
+        INNER JOIN pg_catalog.pg_roles AS grantor
+            ON grantor.oid = acl.grantor
         LEFT JOIN pg_catalog.pg_roles AS grantee
             ON grantee.oid = acl.grantee
         ORDER BY 1
     $$,
     $$ VALUES
-        ('private.active_organization_ids()|postgres|authenticated|EXECUTE'::text),
-        ('private.active_organization_ids()|postgres|postgres|EXECUTE'::text),
-        ('private.active_organization_ids()|postgres|service_role|EXECUTE'::text),
-        ('private.current_organization_id()|postgres|authenticated|EXECUTE'::text),
-        ('private.current_organization_id()|postgres|postgres|EXECUTE'::text),
-        ('private.current_organization_id()|postgres|service_role|EXECUTE'::text),
-        ('private.current_user_has_organization_role(uuid,text[])|postgres|authenticated|EXECUTE'::text),
-        ('private.current_user_has_organization_role(uuid,text[])|postgres|postgres|EXECUTE'::text),
-        ('private.current_user_has_organization_role(uuid,text[])|postgres|service_role|EXECUTE'::text),
-        ('private.current_user_organization_role(uuid)|postgres|authenticated|EXECUTE'::text),
-        ('private.current_user_organization_role(uuid)|postgres|postgres|EXECUTE'::text),
-        ('private.current_user_organization_role(uuid)|postgres|service_role|EXECUTE'::text),
-        ('private.is_current_user_organization_member(uuid)|postgres|authenticated|EXECUTE'::text),
-        ('private.is_current_user_organization_member(uuid)|postgres|postgres|EXECUTE'::text),
-        ('private.is_current_user_organization_member(uuid)|postgres|service_role|EXECUTE'::text)
+        ('private.active_organization_ids()|postgres|postgres|authenticated|EXECUTE|f'::text),
+        ('private.active_organization_ids()|postgres|postgres|postgres|EXECUTE|f'::text),
+        ('private.active_organization_ids()|postgres|postgres|service_role|EXECUTE|f'::text),
+        ('private.current_organization_id()|postgres|postgres|authenticated|EXECUTE|f'::text),
+        ('private.current_organization_id()|postgres|postgres|postgres|EXECUTE|f'::text),
+        ('private.current_organization_id()|postgres|postgres|service_role|EXECUTE|f'::text),
+        ('private.current_user_has_organization_role(uuid,text[])|postgres|postgres|authenticated|EXECUTE|f'::text),
+        ('private.current_user_has_organization_role(uuid,text[])|postgres|postgres|postgres|EXECUTE|f'::text),
+        ('private.current_user_has_organization_role(uuid,text[])|postgres|postgres|service_role|EXECUTE|f'::text),
+        ('private.current_user_organization_role(uuid)|postgres|postgres|authenticated|EXECUTE|f'::text),
+        ('private.current_user_organization_role(uuid)|postgres|postgres|postgres|EXECUTE|f'::text),
+        ('private.current_user_organization_role(uuid)|postgres|postgres|service_role|EXECUTE|f'::text),
+        ('private.is_current_user_organization_member(uuid)|postgres|postgres|authenticated|EXECUTE|f'::text),
+        ('private.is_current_user_organization_member(uuid)|postgres|postgres|postgres|EXECUTE|f'::text),
+        ('private.is_current_user_organization_member(uuid)|postgres|postgres|service_role|EXECUTE|f'::text)
     $$,
     'private helper ACLs have only normalized postgres, authenticated, and service role execute entries'
 );
@@ -142,23 +146,41 @@ SELECT results_eq(
 SELECT results_eq(
     $$
         SELECT (format(
-            '%s|%s|%s|%s',
+            '%s|%s|%s|%s|%s|%s',
             procedure.oid::regprocedure::text,
             procedure.proowner::regrole::text,
+            grantor.rolname,
             coalesce(grantee.rolname, 'PUBLIC'),
-            acl.privilege_type
+            acl.privilege_type,
+            acl.is_grantable
         ) COLLATE "default")::text
         FROM pg_catalog.pg_proc AS procedure
         CROSS JOIN LATERAL aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
+        INNER JOIN pg_catalog.pg_roles AS grantor
+            ON grantor.oid = acl.grantor
         LEFT JOIN pg_catalog.pg_roles AS grantee
             ON grantee.oid = acl.grantee
         WHERE procedure.oid = to_regprocedure('private.get_user_organizations()')
         ORDER BY 1
     $$,
     $$ VALUES
-        ('private.get_user_organizations()|postgres|postgres|EXECUTE'::text)
+        ('private.get_user_organizations()|postgres|postgres|postgres|EXECUTE|f'::text)
     $$,
     'legacy private helper has only its owner execute privilege'
+);
+
+SELECT results_eq(
+    $$
+        SELECT procedure.oid::regprocedure::text
+        FROM pg_catalog.pg_proc AS procedure
+        INNER JOIN pg_catalog.pg_namespace AS namespace
+            ON namespace.oid = procedure.pronamespace
+        WHERE namespace.nspname = 'private'
+          AND procedure.proname = 'get_user_organizations'
+        ORDER BY 1
+    $$,
+    $$ VALUES ('private.get_user_organizations()'::text) $$,
+    'legacy private helper has no unexpected overloads'
 );
 
 SELECT is(to_regprocedure('public.current_organization_id()')::text, 'current_organization_id()', 'public current organization wrapper has its exact signature');
@@ -233,36 +255,40 @@ SELECT results_eq(
                 ('public.is_organization_member(uuid,uuid)'::text)
         )
         SELECT (format(
-            '%s|%s|%s|%s',
+            '%s|%s|%s|%s|%s|%s',
             replace(expected.signature, 'public.', ''),
             procedure.proowner::regrole::text,
+            grantor.rolname,
             coalesce(grantee.rolname, 'PUBLIC'),
-            acl.privilege_type
+            acl.privilege_type,
+            acl.is_grantable
         ) COLLATE "default")::text
         FROM expected
         INNER JOIN pg_catalog.pg_proc AS procedure
             ON procedure.oid = to_regprocedure(expected.signature)
         CROSS JOIN LATERAL aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
+        INNER JOIN pg_catalog.pg_roles AS grantor
+            ON grantor.oid = acl.grantor
         LEFT JOIN pg_catalog.pg_roles AS grantee
             ON grantee.oid = acl.grantee
         ORDER BY 1
     $$,
     $$ VALUES
-        ('current_organization_id()|postgres|authenticated|EXECUTE'::text),
-        ('current_organization_id()|postgres|postgres|EXECUTE'::text),
-        ('current_organization_id()|postgres|service_role|EXECUTE'::text),
-        ('get_user_org_role(uuid)|postgres|authenticated|EXECUTE'::text),
-        ('get_user_org_role(uuid)|postgres|postgres|EXECUTE'::text),
-        ('get_user_org_role(uuid)|postgres|service_role|EXECUTE'::text),
-        ('get_user_organizations()|postgres|authenticated|EXECUTE'::text),
-        ('get_user_organizations()|postgres|postgres|EXECUTE'::text),
-        ('get_user_organizations()|postgres|service_role|EXECUTE'::text),
-        ('has_organization_role(uuid,text[],uuid)|postgres|authenticated|EXECUTE'::text),
-        ('has_organization_role(uuid,text[],uuid)|postgres|postgres|EXECUTE'::text),
-        ('has_organization_role(uuid,text[],uuid)|postgres|service_role|EXECUTE'::text),
-        ('is_organization_member(uuid,uuid)|postgres|authenticated|EXECUTE'::text),
-        ('is_organization_member(uuid,uuid)|postgres|postgres|EXECUTE'::text),
-        ('is_organization_member(uuid,uuid)|postgres|service_role|EXECUTE'::text)
+        ('current_organization_id()|postgres|postgres|authenticated|EXECUTE|f'::text),
+        ('current_organization_id()|postgres|postgres|postgres|EXECUTE|f'::text),
+        ('current_organization_id()|postgres|postgres|service_role|EXECUTE|f'::text),
+        ('get_user_org_role(uuid)|postgres|postgres|authenticated|EXECUTE|f'::text),
+        ('get_user_org_role(uuid)|postgres|postgres|postgres|EXECUTE|f'::text),
+        ('get_user_org_role(uuid)|postgres|postgres|service_role|EXECUTE|f'::text),
+        ('get_user_organizations()|postgres|postgres|authenticated|EXECUTE|f'::text),
+        ('get_user_organizations()|postgres|postgres|postgres|EXECUTE|f'::text),
+        ('get_user_organizations()|postgres|postgres|service_role|EXECUTE|f'::text),
+        ('has_organization_role(uuid,text[],uuid)|postgres|postgres|authenticated|EXECUTE|f'::text),
+        ('has_organization_role(uuid,text[],uuid)|postgres|postgres|postgres|EXECUTE|f'::text),
+        ('has_organization_role(uuid,text[],uuid)|postgres|postgres|service_role|EXECUTE|f'::text),
+        ('is_organization_member(uuid,uuid)|postgres|postgres|authenticated|EXECUTE|f'::text),
+        ('is_organization_member(uuid,uuid)|postgres|postgres|postgres|EXECUTE|f'::text),
+        ('is_organization_member(uuid,uuid)|postgres|postgres|service_role|EXECUTE|f'::text)
     $$,
     'public wrapper ACLs have only normalized postgres, authenticated, and service role execute entries'
 );
@@ -286,49 +312,96 @@ SELECT results_eq(
 SELECT results_eq(
     $$
         SELECT (format(
-            '%s|%s|%s|%s|%s',
+            '%s|%s|%s|%s|%s|%s|%s',
             procedure.oid::regprocedure::text,
             procedure.prosecdef,
             array_to_string(procedure.proconfig, ','),
             procedure.proowner::regrole::text,
-            coalesce(grantee.rolname, 'PUBLIC') || ':' || acl.privilege_type
+            grantor.rolname,
+            coalesce(grantee.rolname, 'PUBLIC') || ':' || acl.privilege_type,
+            acl.is_grantable
         ) COLLATE "default")::text
         FROM pg_catalog.pg_proc AS procedure
         CROSS JOIN LATERAL aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
+        INNER JOIN pg_catalog.pg_roles AS grantor
+            ON grantor.oid = acl.grantor
         LEFT JOIN pg_catalog.pg_roles AS grantee
             ON grantee.oid = acl.grantee
         WHERE procedure.oid = to_regprocedure('public.get_users_info(uuid[])')
         ORDER BY 1
     $$,
     $$ VALUES
-        ('get_users_info(uuid[])|t|search_path=""|postgres|postgres:EXECUTE'::text),
-        ('get_users_info(uuid[])|t|search_path=""|postgres|service_role:EXECUTE'::text)
+        ('get_users_info(uuid[])|t|search_path=""|postgres|postgres|postgres:EXECUTE|f'::text),
+        ('get_users_info(uuid[])|t|search_path=""|postgres|postgres|service_role:EXECUTE|f'::text)
     $$,
     'directory RPC remains a fixed-path postgres definer executable only by service role'
+);
+
+SELECT is(
+    (
+        SELECT acl.is_grantable
+        FROM pg_catalog.pg_proc AS procedure
+        CROSS JOIN LATERAL aclexplode(coalesce(procedure.proacl, acldefault('f', procedure.proowner))) AS acl
+        WHERE procedure.oid = to_regprocedure('public.get_users_info(uuid[])')
+          AND acl.grantee = 'service_role'::regrole::oid
+          AND acl.privilege_type = 'EXECUTE'
+    ),
+    false,
+    'service role cannot delegate directory RPC execution'
 );
 
 SELECT results_eq(
     $$
         SELECT (format(
-            '%s|%s|%s',
+            '%s|%s|%s|%s|%s',
             namespace.nspowner::regrole::text,
+            grantor.rolname,
             coalesce(grantee.rolname, 'PUBLIC'),
-            acl.privilege_type
+            acl.privilege_type,
+            acl.is_grantable
         ) COLLATE "default")::text
         FROM pg_catalog.pg_namespace AS namespace
         CROSS JOIN LATERAL aclexplode(coalesce(namespace.nspacl, acldefault('n', namespace.nspowner))) AS acl
+        INNER JOIN pg_catalog.pg_roles AS grantor
+            ON grantor.oid = acl.grantor
         LEFT JOIN pg_catalog.pg_roles AS grantee
             ON grantee.oid = acl.grantee
         WHERE namespace.nspname = 'private'
         ORDER BY 1
     $$,
     $$ VALUES
-        ('postgres|authenticated|USAGE'::text),
-        ('postgres|postgres|CREATE'::text),
-        ('postgres|postgres|USAGE'::text),
-        ('postgres|service_role|USAGE'::text)
+        ('postgres|postgres|authenticated|USAGE|f'::text),
+        ('postgres|postgres|postgres|CREATE|f'::text),
+        ('postgres|postgres|postgres|USAGE|f'::text),
+        ('postgres|postgres|service_role|USAGE|f'::text)
     $$,
     'private schema ACL has only normalized owner, authenticated, and service role entries'
+);
+
+SELECT is(
+    (
+        SELECT count(*)::integer
+        FROM pg_catalog.pg_namespace AS namespace
+        CROSS JOIN LATERAL aclexplode(coalesce(namespace.nspacl, acldefault('n', namespace.nspowner))) AS acl
+        WHERE namespace.nspname = 'private'
+          AND acl.grantee = 0
+          AND acl.privilege_type = 'USAGE'
+    ),
+    0,
+    'PUBLIC cannot use private schema'
+);
+
+SELECT is(
+    (
+        SELECT count(*)::integer
+        FROM pg_catalog.pg_namespace AS namespace
+        CROSS JOIN LATERAL aclexplode(coalesce(namespace.nspacl, acldefault('n', namespace.nspowner))) AS acl
+        WHERE namespace.nspname = 'private'
+          AND acl.grantee = 'anon'::regrole::oid
+          AND acl.privilege_type = 'USAGE'
+    ),
+    0,
+    'anon cannot use private schema'
 );
 
 SET LOCAL ROLE authenticated;
