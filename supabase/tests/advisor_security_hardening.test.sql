@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(9);
+SELECT plan(10);
 
 INSERT INTO auth.users (id, aud, role, email, created_at, updated_at)
 VALUES
@@ -115,10 +115,20 @@ SELECT is(
     'dashboard statistics include only the selected active organization'
 );
 
-SELECT is(
-    (SELECT count(*)::integer FROM public.get_users_info(ARRAY['b2222222-2222-2222-2222-222222222222'::uuid])),
-    0,
-    'user directory lookup cannot reveal users outside the caller organizations'
+SELECT throws_ok(
+    $$
+        SELECT public.get_users_info(
+            ARRAY['b2222222-2222-2222-2222-222222222222'::uuid]
+        )
+    $$,
+    '42501',
+    'permission denied for function get_users_info',
+    'authenticated users cannot execute the directory RPC'
+);
+
+SELECT ok(
+    has_function_privilege('service_role', 'public.get_users_info(uuid[])', 'EXECUTE'),
+    'service role retains directory RPC execution'
 );
 
 SELECT ok(
