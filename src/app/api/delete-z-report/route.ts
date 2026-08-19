@@ -38,26 +38,9 @@ export async function POST(req: Request) {
     })
     if (rpcError) throw rpcError
 
-    // 2. Audit Log Ekle
-    const userAgent = req.headers.get('user-agent') || 'Bilinmeyen Cihaz'
-    const ipAddress = req.headers.get('x-forwarded-for') || 'Bilinmeyen IP'
-
-    await supabase.from('activity_logs').insert({
-      module: 'Z-Raporu',
-      action_type: 'SILME',
-      description: 'Z-Raporu kaydı silindi ve stok/finans rollback yapıldı.',
-      user_id: user.id,
-      organization_id: targetOrgId,
-      details: {
-        batch_id,
-        _meta: { ip: ipAddress, userAgent },
-      },
-    })
-
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
     devError('Delete Z-Report Error:', error)
-    const message = error instanceof Error ? error.message : 'Silme işlemi başarısız'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: 'Z-Raporu silinemedi. Lütfen tekrar deneyin.' }, { status: 500 })
   }
 }

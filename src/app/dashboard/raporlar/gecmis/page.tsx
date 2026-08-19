@@ -5,7 +5,6 @@ import { DocumentPreviewModal } from '@/components/DocumentPreviewModal'
 import { useDocumentPreview } from '@/features/documents'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
 import { devError } from '@/lib/debug'
@@ -231,17 +230,11 @@ export default function GecmisRaporlar() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
-      logActivity(
-        'Z-Raporu',
-        'SILME',
-        `${formatDate(group.date)} tarihli Z-Raporu silindi ve içerisindeki ${group.totalItems} kalem ürünün stokları geri yüklendi.`,
-        { batchId: group.batchId },
-      )
-
       await showAlert('Z-Raporu başarıyla silindi ve stoklar geri alındı.', 'success')
       fetchSales()
     } catch (err: unknown) {
-      await showAlert('Silme işlemi başarısız: ' + getErrorMessage(err), 'error')
+      devError('Z-Report delete failed:', err)
+      await showAlert('Z-Raporu silinemedi. Lütfen tekrar deneyin.', 'error')
     } finally {
       setDeletingDate(null)
     }

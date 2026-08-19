@@ -147,6 +147,21 @@ function collectLiteralRpcCalls(sourceFiles: string[]) {
   return calls
 }
 
+function getVariableInitializerText(filePath: string, variableName: string) {
+  const project = new Project({ useInMemoryFileSystem: true, skipAddingFilesFromTsConfig: true })
+  const sourceFile = project.createSourceFile(filePath, fs.readFileSync(filePath, 'utf8'))
+  const declaration = sourceFile
+    .getDescendantsOfKind(SyntaxKind.VariableDeclaration)
+    .find((candidate) => candidate.getName() === variableName)
+  const initializer = declaration?.getInitializer()
+
+  if (!initializer) {
+    throw new Error(`${variableName} işleyicisi ${filePath} içinde bulunamadı.`)
+  }
+
+  return initializer.getText()
+}
+
 describe('RPC Fonksiyon İletişim ve İmza Doğrulama Testleri', () => {
   it('20260728000004_tenant_rpc_functions_sec102.sql içerisinde eski overload DROP komutları bulunmalıdır', () => {
     const migrationFilePath = path.join(
@@ -206,5 +221,25 @@ describe('RPC Fonksiyon İletişim ve İmza Doğrulama Testleri', () => {
     })
 
     expect(mismatches).toEqual([])
+  })
+
+  it('tedarikçi cari işlem silme işleyicisi teknik ayrıntıları ve ikinci audit çağrısını taşımamalıdır', () => {
+    const pagePath = path.join(process.cwd(), 'src/app/dashboard/tedarikciler/page.tsx')
+    const handler = getVariableInitializerText(pagePath, 'handleDeleteTransaction')
+
+    expect(handler).toContain('Cari işlem silinemedi. Lütfen tekrar deneyin.')
+    expect(handler).toContain("devError('Supplier transaction delete failed:', error)")
+    expect(handler).not.toContain('getErrorMessage(error)')
+    expect(handler).not.toContain('logActivity(')
+  })
+
+  it('Z-Raporu silme işleyicisi güvenli hata metni göstermeli ve ikinci audit çağrısını taşımamalıdır', () => {
+    const pagePath = path.join(process.cwd(), 'src/app/dashboard/raporlar/gecmis/page.tsx')
+    const handler = getVariableInitializerText(pagePath, 'handleDelete')
+
+    expect(handler).toContain('Z-Raporu silinemedi. Lütfen tekrar deneyin.')
+    expect(handler).toContain("devError('Z-Report delete failed:', err)")
+    expect(handler).not.toContain('getErrorMessage(err)')
+    expect(handler).not.toContain('logActivity(')
   })
 })

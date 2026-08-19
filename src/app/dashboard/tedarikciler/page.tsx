@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase'
 import { logActivity } from '@/lib/logger'
 import { useNotification } from '@/components/NotificationProvider'
 import { useOrganization } from '@/context/OrganizationContext'
+import { devError } from '@/lib/debug'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { useAppTour } from '@/hooks/useAppTour'
 
@@ -333,15 +334,10 @@ export default function Tedarikciler() {
       fetchSuppliers()
       viewTransactions({ ...selectedSupplier, total_debt: newDebt })
 
-      logActivity(
-        'Tedarikçi',
-        'SILME',
-        `${selectedSupplier.name} firmasına ait ${trx.amount} TL tutarındaki cari işlem silindi.`,
-        { transaction: trx },
-      )
       await showAlert('İşlem silindi ve bakiye güncellendi!', 'success')
     } catch (error: unknown) {
-      await showAlert('Silme işlemi başarısız oldu: ' + getErrorMessage(error), 'error')
+      devError('Supplier transaction delete failed:', error)
+      await showAlert('Cari işlem silinemedi. Lütfen tekrar deneyin.', 'error')
     }
   }
 
