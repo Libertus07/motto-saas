@@ -41,8 +41,6 @@ type GroupedMonth = {
 
 type SortBy = 'date_desc' | 'date_asc' | 'revenue_desc'
 
-const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : 'Bilinmeyen hata')
-
 export default function GecmisRaporlar() {
   const [allGroups, setAllGroups] = useState<GroupedSale[]>([])
   const [loading, setLoading] = useState(true)
