@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "82aee061eac0b178953e68e0c9563de27bcb8b08",
-    "indexed_at": "2026-08-17T04:39:23Z",
+    "commit": "1a56536d8f2022a18b1828e5eee4fe5de0581490",
+    "indexed_at": "2026-08-26T15:16:20Z",
     "project": "motto-saas",
-    "nodes": 3102,
-    "edges": 5308,
-    "original_size": 7340032,
-    "compressed_size": 1490453,
+    "nodes": 3303,
+    "edges": 5579,
+    "original_size": 7798784,
+    "compressed_size": 1585671,
     "compression_level": 3
 }
