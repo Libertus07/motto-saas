@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next'
 import withPWAInit from '@ducanh2912/next-pwa'
 
+import { imageConfig } from './src/config/image-policy'
+
 const withPWA = withPWAInit({
   dest: 'public',
   cacheOnFrontEndNav: true,
@@ -14,22 +16,7 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   turbopack: {},
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**.supabase.co',
-      },
-      {
-        protocol: 'https',
-        hostname: 'zahdmrvhxsmqpeesrfkt.supabase.co',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-    ],
-  },
+  images: imageConfig,
 }
 
 export default withPWA(nextConfig)
