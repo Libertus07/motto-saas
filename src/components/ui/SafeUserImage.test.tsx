@@ -106,13 +106,16 @@ describe('SafeUserImage', () => {
         alt="İşletme logosu"
         width={96}
         height={96}
+        className="user-image-layout"
         fallbackClassName="fallback-sinifi"
+        style={{ width: '50vw', height: 'auto' }}
       />,
     )
 
     expect(markup).toContain('role="img"')
     expect(markup).toContain('aria-label="İşletme logosu yüklenemedi"')
-    expect(markup).toContain('class="fallback-sinifi"')
+    expect(markup).toContain('class="user-image-layout fallback-sinifi"')
+    expect(markup).toContain('style="width:50vw;height:auto"')
     expect(markup).toContain('data-safe-user-image-fallback="true"')
     expect(markup).not.toContain('data-unoptimized')
     expect(markup).not.toContain('<img')

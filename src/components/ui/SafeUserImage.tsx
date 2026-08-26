@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type React from 'react'
+import type { CSSProperties } from 'react'
 import Image, { type ImageProps } from 'next/image'
 
 export type SafeUserImageProps = Omit<ImageProps, 'unoptimized' | 'onError'> & {
@@ -19,6 +20,14 @@ export function SafeUserImage({
   const hasDimensions = imageProps.width !== undefined && imageProps.height !== undefined
   const hasFillSizing =
     imageProps.fill === true && typeof imageProps.sizes === 'string' && imageProps.sizes.trim().length > 0
+  const fallbackClassNames = [imageProps.className, fallbackClassName].filter(Boolean).join(' ')
+  const fallbackStyle: CSSProperties = imageProps.fill
+    ? { ...imageProps.style, position: 'absolute', inset: 0 }
+    : {
+        ...imageProps.style,
+        width: imageProps.style?.width ?? imageProps.width,
+        height: imageProps.style?.height ?? imageProps.height,
+      }
 
   if (!alt.trim()) {
     throw new Error('Kullanıcı görseli için açıklayıcı alt metin gerekli.')
@@ -33,13 +42,9 @@ export function SafeUserImage({
       <div
         role="img"
         aria-label={`${alt} yüklenemedi`}
-        className={fallbackClassName}
+        className={fallbackClassNames}
         data-safe-user-image-fallback
-        style={
-          imageProps.fill
-            ? { ...imageProps.style, position: 'absolute', inset: 0 }
-            : { ...imageProps.style, width: imageProps.width, height: imageProps.height }
-        }
+        style={fallbackStyle}
       >
         <span aria-hidden="true">🖼️</span>
       </div>
