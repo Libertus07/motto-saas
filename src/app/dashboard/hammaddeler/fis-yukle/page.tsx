@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
 import { devError } from '@/lib/debug'
 import { formatCurrency } from '@/lib/format'
 import { useNotification } from '@/components/NotificationProvider'
+import { SafeUserImage } from '@/components/ui/SafeUserImage'
 import { useOrganization } from '@/context/OrganizationContext'
 import dynamic from 'next/dynamic'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
@@ -467,7 +467,7 @@ function FisYukle() {
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
                 {image && fileType === 'image' && (
-                  <Image
+                  <SafeUserImage
                     src={image}
                     alt="Fiş"
                     width={400}
@@ -521,13 +521,13 @@ function FisYukle() {
 
               {image && image.startsWith('http') && (
                 <div className="mt-4">
-                  <Image
+                  <SafeUserImage
                     src={image}
                     alt="URL Önizleme"
                     width={400}
                     height={384}
                     className="max-h-96 mx-auto rounded-lg object-contain"
-                    onError={() => setError("URL'den resim yüklenemedi, linki kontrol edin.")}
+                    onLoadError={() => setError("URL'den resim yüklenemedi, linki kontrol edin.")}
                   />
                 </div>
               )}

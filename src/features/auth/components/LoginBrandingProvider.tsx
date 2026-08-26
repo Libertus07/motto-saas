@@ -1,8 +1,8 @@
 'use client'
 
-import Image from 'next/image'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
+import { SafeUserImage } from '@/components/ui/SafeUserImage'
 import { createClient } from '@/lib/supabase'
 
 type LoginBranding = {
@@ -90,14 +90,6 @@ export function LoginBrandLogo({ className }: { className: string }) {
   const { businessName, logoUrl } = useLoginBranding()
 
   return (
-    <Image
-      src={logoUrl}
-      alt={`${businessName} logosu`}
-      width={96}
-      height={96}
-      priority
-      unoptimized
-      className={className}
-    />
+    <SafeUserImage src={logoUrl} alt={`${businessName} logosu`} width={96} height={96} priority className={className} />
   )
 }

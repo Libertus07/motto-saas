@@ -1,4 +1,4 @@
-import Image from 'next/image'
+import { SafeUserImage } from '@/components/ui/SafeUserImage'
 import type { ZReportWorkspace } from '../hooks/useZReportWorkspace'
 
 export function ZReportUploadPanel({ workspace }: { workspace: ZReportWorkspace }) {
@@ -46,7 +46,7 @@ export function ZReportUploadPanel({ workspace }: { workspace: ZReportWorkspace 
           <h3 className="mb-4 font-bold">Önizleme</h3>
           <div className="mb-6 flex min-h-40 items-center justify-center">
             {workspace.imageUrl && workspace.fileType === 'image' ? (
-              <Image
+              <SafeUserImage
                 src={workspace.imageUrl}
                 alt="Yüklenen Z Raporu"
                 width={400}

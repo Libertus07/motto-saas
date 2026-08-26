@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
+import { SafeUserImage } from '@/components/ui/SafeUserImage'
 import { createClient } from '@/lib/supabase'
 import { useState, useEffect, useMemo } from 'react'
 import { OrganizationSwitcher } from '@/components/OrganizationSwitcher'
@@ -102,14 +102,13 @@ export default function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void 
             <div className="w-10 h-10 rounded-2xl bg-stone-800 animate-pulse shrink-0 border border-stone-700/50" />
           ) : businessLogo ? (
             <div className="w-10 h-10 rounded-2xl bg-stone-950 border border-amber-500/30 p-1 shrink-0 flex items-center justify-center shadow-inner shadow-amber-500/10">
-              <Image
+              <SafeUserImage
                 src={businessLogo}
-                alt="Logo"
+                alt={`${businessName} logosu`}
                 width={40}
                 height={40}
-                unoptimized
                 className="w-full h-full object-contain"
-                onError={() => setBusinessLogo('')}
+                onLoadError={() => setBusinessLogo('')}
               />
             </div>
           ) : (

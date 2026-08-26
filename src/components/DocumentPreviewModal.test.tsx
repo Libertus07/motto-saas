@@ -1,9 +1,25 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
+vi.mock('@/components/ui/SafeUserImage', () => ({
+  SafeUserImage: ({ src, alt, className }: { src: string; alt: string; className?: string }) => (
+    // eslint-disable-next-line @next/next/no-img-element -- This isolated boundary double exposes forwarded image props.
+    <img src={src} alt={alt} className={className} data-safe-user-image />
+  ),
+}))
+
 import { DocumentPreviewModal } from './DocumentPreviewModal'
 
 describe('DocumentPreviewModal', () => {
+  it('renders signed image documents through the safe user-image boundary', () => {
+    const signedUrl = 'https://zahdmrvhxsmqpeesrfkt.supabase.co/storage/v1/object/sign/receipts/doc.jpg?token=test'
+    const markup = renderToStaticMarkup(<DocumentPreviewModal isOpen onClose={vi.fn()} url={signedUrl} />)
+
+    expect(markup).toContain('data-safe-user-image')
+    expect(markup).toContain(signedUrl)
+    expect(markup).toContain('alt="Fatura önizlemesi"')
+  })
+
   it('gives the initial desktop image preview a real width and keeps the whole document visible', () => {
     const markup = renderToStaticMarkup(
       <DocumentPreviewModal
