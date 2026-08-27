@@ -64,6 +64,13 @@ const identityCases: readonly IdentityCase[] = [
     expected: { code: 'INVALID_WORKBOOK' },
   },
   {
+    name: 'bilinmeyen-kaynak.xlsx',
+    mimeType: '',
+    size: 512,
+    prefix: new Uint8Array([0x4d, 0x5a, 0x90, 0x00]),
+    expected: { code: 'INVALID_WORKBOOK' },
+  },
+  {
     name: 'nul.csv',
     mimeType: 'text/csv',
     size: 5,
@@ -89,6 +96,13 @@ const identityCases: readonly IdentityCase[] = [
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     size: 3 * 1024 * 1024 + 1,
     prefix: zipLocalFile,
+    expected: { code: 'LIMIT_EXCEEDED' },
+  },
+  {
+    name: 'buyuk-bozuk.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    size: 3 * 1024 * 1024 + 1,
+    prefix: new Uint8Array([0x4d, 0x5a, 0x90, 0x00]),
     expected: { code: 'LIMIT_EXCEEDED' },
   },
   {
