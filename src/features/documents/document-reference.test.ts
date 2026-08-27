@@ -21,7 +21,6 @@ describe('private document references', () => {
     ['application/xml', 'xml'],
     ['text/xml', 'xml'],
     ['application/json', 'json'],
-    ['application/vnd.ms-excel', 'xls'],
     ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx'],
   ])('accepts structured supplier receipts with a MIME-derived %s path', (mimeType, extension) => {
     vi.stubGlobal('crypto', { randomUUID: () => '22222222-2222-4222-8222-222222222222' })
@@ -106,7 +105,6 @@ describe('private document references', () => {
     ['z-report', 'receipts', 'application/xml', 'xml', 1],
     ['z-report', 'receipts', 'text/xml', 'xml', 1],
     ['z-report', 'receipts', 'application/json', 'json', tenMiB],
-    ['z-report', 'receipts', 'application/vnd.ms-excel', 'xls', 1],
     ['z-report', 'receipts', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx', 1],
   ] as const)('accepts %s in %s with a MIME-derived extension', (kind, bucket, mimeType, extension, size) => {
     const file = createFile(mimeType, size)
@@ -133,6 +131,14 @@ describe('private document references', () => {
         file: createFile('application/pdf'),
       }),
     ).toBeTruthy()
+    expect(
+      validateOrganizationDocument({
+        organizationId,
+        bucket: 'motto_assets',
+        kind: 'supplier-receipt',
+        file: createFile('application/vnd.ms-excel'),
+      }),
+    ).toBe('Bu belge türü desteklenmiyor.')
     expect(
       validateOrganizationDocument({
         organizationId,

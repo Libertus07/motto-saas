@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
 import { devError } from '@/lib/debug'
 import { formatCurrency } from '@/lib/format'
@@ -12,6 +11,8 @@ import { useOrganization } from '@/context/OrganizationContext'
 import dynamic from 'next/dynamic'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
 import { persistSupplierReceiptWrite, validateOrganizationDocument } from '@/features/documents'
+import { toSupplierReceiptAnalysisInput } from '@/features/materials/services/supplier-spreadsheet-adapter'
+import { createSpreadsheetParseCoordinator } from '@/features/spreadsheets/spreadsheet-parse-coordinator'
 
 const ImagePreprocessModal = dynamic(
   () => import('@/components/ui/ImagePreprocessModal').then((mod) => mod.ImagePreprocessModal),
@@ -51,6 +52,7 @@ function FisYukle() {
   const [fileText, setFileText] = useState<string | null>(null)
   const [fileType, setFileType] = useState<'image' | 'pdf' | 'xml' | 'json' | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isAnalysisOnlySpreadsheet, setIsAnalysisOnlySpreadsheet] = useState(false)
   const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([])
@@ -77,13 +79,16 @@ function FisYukle() {
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const activeOrganizationIdRef = useRef(activeOrg?.id)
+  const [spreadsheetParseCoordinator] = useState(createSpreadsheetParseCoordinator)
 
   useEffect(() => {
     activeOrganizationIdRef.current = activeOrg?.id
+
     return () => {
+      spreadsheetParseCoordinator.cancel()
       activeOrganizationIdRef.current = undefined
     }
-  }, [activeOrg?.id])
+  }, [activeOrg?.id, spreadsheetParseCoordinator])
 
   // Tedarikçi adı değiştiğinde borcunu getir
   useEffect(() => {
@@ -110,7 +115,7 @@ function FisYukle() {
     }
   }, [activeOrg?.id, parsedSupplier?.name, step, supabase])
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = Array.from(e.target.files || [])
     if (fileList.length === 0) return
     e.target.value = ''
@@ -121,6 +126,66 @@ function FisYukle() {
       void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
       return
     }
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase()
+    if (fileExt === 'xlsx' || fileExt === 'csv') {
+      if (fileExt === 'xlsx') {
+        const validationError = validateOrganizationDocument({
+          organizationId,
+          bucket: 'motto_assets',
+          kind: 'supplier-receipt',
+          file,
+        })
+        if (validationError) {
+          void showAlert(validationError, 'warning')
+          return
+        }
+      }
+
+      setImage(null)
+      setFileText(null)
+      setFileType(null)
+      setSelectedFile(null)
+      setIsAnalysisOnlySpreadsheet(false)
+      setPendingOrganizationId(null)
+      setLoading(true)
+      setError('')
+
+      try {
+        const parsed = await spreadsheetParseCoordinator.run(file, organizationId)
+        if (!parsed || activeOrganizationIdRef.current !== organizationId) {
+          return
+        }
+
+        if (!parsed.result.ok) {
+          await showAlert(parsed.result.message, 'warning')
+          return
+        }
+
+        const analysisInput = toSupplierReceiptAnalysisInput(parsed.result.table)
+        if (!analysisInput.ok) {
+          await showAlert(analysisInput.message, 'warning')
+          return
+        }
+
+        setFileText(analysisInput.content)
+        setFileType('json')
+        setSelectedFile(parsed.result.table.kind === 'xlsx' ? file : null)
+        setIsAnalysisOnlySpreadsheet(parsed.result.table.kind === 'csv')
+        setPendingOrganizationId(organizationId)
+      } catch {
+        if (activeOrganizationIdRef.current === organizationId) {
+          await showAlert('Elektronik tablo okunamadı. Lütfen dosyayı kontrol edip tekrar deneyin.', 'warning')
+        }
+      } finally {
+        if (activeOrganizationIdRef.current === organizationId) {
+          setLoading(false)
+        }
+      }
+
+      return
+    }
+
     const validationError = validateOrganizationDocument({
       organizationId,
       bucket: 'motto_assets',
@@ -132,9 +197,9 @@ function FisYukle() {
       return
     }
     setSelectedFile(file)
+    setIsAnalysisOnlySpreadsheet(false)
     setPendingOrganizationId(organizationId)
 
-    const fileExt = file.name.split('.').pop()?.toLowerCase()
     if (fileExt === 'xml' || fileExt === 'json') {
       const reader = new FileReader()
       reader.onload = () => {
@@ -144,21 +209,6 @@ function FisYukle() {
         setFileType(fileExt as 'xml' | 'json')
       }
       reader.readAsText(file)
-    } else if (fileExt === 'xlsx' || fileExt === 'xls') {
-      const reader = new FileReader()
-      reader.onload = (evt) => {
-        if (activeOrganizationIdRef.current !== organizationId) return
-        const data = new Uint8Array(evt.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const firstSheetName = workbook.SheetNames[0]
-        const worksheet = workbook.Sheets[firstSheetName]
-        const json = XLSX.utils.sheet_to_json(worksheet)
-
-        setImage(null)
-        setFileText(JSON.stringify(json))
-        setFileType('json') // AI'a json olarak gönderiyoruz
-      }
-      reader.readAsArrayBuffer(file)
     } else if (file.type === 'application/pdf') {
       if (file.size > 3 * 1024 * 1024) {
         showAlert('Seçtiğiniz PDF belgesi çok büyük (Max 3MB). Lütfen dosya boyutunu küçültün.', 'warning')
@@ -311,6 +361,7 @@ function FisYukle() {
       },
     ])
     setSelectedFile(null)
+    setIsAnalysisOnlySpreadsheet(false)
     setStep('review')
     setLoading(false)
   }
@@ -452,17 +503,17 @@ function FisYukle() {
         {step === 'upload' && (
           <div className="space-y-6">
             <div className="bg-stone-900 border border-stone-800 rounded-xl p-6">
-              <h2 className="font-bold text-lg mb-2">Belge Yükleyin (Görsel, PDF, XML, JSON)</h2>
+              <h2 className="font-bold text-lg mb-2">Belge Yükleyin (Görsel, PDF, XML, JSON, XLSX, CSV)</h2>
               <p className="text-stone-400 text-sm mb-6">
-                Fiş görseli, PDF fatura, XML e-fatura veya JSON fiyat listesi yükleyebilirsiniz. Yapay zeka tüm
-                formatları otomatik okuyacak.
+                Fiş görseli, PDF fatura, XML e-fatura, JSON fiyat listesi veya elektronik tablo yükleyebilirsiniz. Yapay
+                zeka tüm formatları otomatik okuyacak.
               </p>
 
               <label className="block w-full border-2 border-dashed border-stone-700 hover:border-amber-400 rounded-xl p-8 text-center cursor-pointer transition-colors relative overflow-hidden">
                 <input
                   type="file"
                   multiple
-                  accept="image/*,application/pdf,text/xml,.xml,application/json,.json,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  accept="image/*,application/pdf,text/xml,.xml,application/json,.json,.xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                   onChange={handleImageUpload}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
@@ -487,17 +538,24 @@ function FisYukle() {
                     <p className="text-stone-300 font-bold">XML (E-Fatura) Seçildi</p>
                   </div>
                 )}
-                {fileText && fileType === 'json' && (
+                {fileText && fileType === 'json' && isAnalysisOnlySpreadsheet && (
+                  <div className="py-12">
+                    <div className="text-6xl mb-3">📊</div>
+                    <p className="text-stone-300 font-bold">CSV Seçildi</p>
+                    <p className="text-stone-500 text-sm mt-2">CSV yalnızca analiz edilir; özgün dosya kaydedilmez.</p>
+                  </div>
+                )}
+                {fileText && fileType === 'json' && !isAnalysisOnlySpreadsheet && (
                   <div className="py-12">
                     <div className="text-6xl mb-3">🤖</div>
-                    <p className="text-stone-300 font-bold">JSON / Excel Seçildi</p>
+                    <p className="text-stone-300 font-bold">JSON / XLSX Seçildi</p>
                   </div>
                 )}
                 {!image && !fileText && (
                   <div>
                     <div className="text-5xl mb-3">📂</div>
                     <p className="text-stone-400">Dosya seç veya sürükle</p>
-                    <p className="text-stone-600 text-sm mt-1">JPG, PNG, PDF, XML, JSON, XLSX desteklenir</p>
+                    <p className="text-stone-600 text-sm mt-1">JPG, PNG, PDF, XML, JSON, XLSX ve CSV desteklenir</p>
                   </div>
                 )}
               </label>
@@ -695,6 +753,11 @@ function FisYukle() {
                 <span className="text-amber-400 font-bold">{parsedItems.length} kalem</span> tespit edildi. Güncellemek
                 istediklerinizi seçin, fiyatları kontrol edin.
               </p>
+              {isAnalysisOnlySpreadsheet && (
+                <p className="text-stone-500 text-sm mt-2">
+                  CSV içeriği analiz edildi; kayıt sırasında özgün CSV dosyası depolanmayacak.
+                </p>
+              )}
             </div>
 
             {parsedItems.map((item, index) => (
@@ -908,6 +971,7 @@ function FisYukle() {
                   setFileText(null)
                   setFileType(null)
                   setSelectedFile(null)
+                  setIsAnalysisOnlySpreadsheet(false)
                   setPendingOrganizationId(null)
                   setParsedItems([])
                 }}
@@ -936,7 +1000,10 @@ function FisYukle() {
                 onClick={() => {
                   setStep('upload')
                   setImage(null)
+                  setFileText(null)
+                  setFileType(null)
                   setSelectedFile(null)
+                  setIsAnalysisOnlySpreadsheet(false)
                   setPendingOrganizationId(null)
                   setParsedItems([])
                 }}
@@ -964,6 +1031,7 @@ function FisYukle() {
             setFileText(null)
             setImage(firstRes.dataUrl)
             setFileType('image')
+            setIsAnalysisOnlySpreadsheet(false)
             const processedFileObj = dataUrlToFile(firstRes.dataUrl, `processed-receipt-${Date.now()}.jpg`)
             setSelectedFile(processedFileObj)
             setPendingOrganizationId(activeOrg?.id ?? null)
