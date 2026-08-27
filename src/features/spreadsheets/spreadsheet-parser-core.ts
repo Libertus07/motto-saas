@@ -62,6 +62,20 @@ function hasByteRange(bytes: Uint8Array, offset: number, length: number): boolea
   )
 }
 
+function hasMatchingByteRange(bytes: Uint8Array, leftOffset: number, rightOffset: number, length: number): boolean {
+  if (!hasByteRange(bytes, leftOffset, length) || !hasByteRange(bytes, rightOffset, length)) {
+    return false
+  }
+
+  for (let index = 0; index < length; index += 1) {
+    if (bytes[leftOffset + index] !== bytes[rightOffset + index]) {
+      return false
+    }
+  }
+
+  return true
+}
+
 function findEndOfCentralDirectory(bytes: Uint8Array): number | null {
   const minimumOffset = Math.max(0, bytes.length - 65_557)
   for (let offset = bytes.length - 22; offset >= minimumOffset; offset -= 1) {
@@ -181,6 +195,7 @@ function preflightXlsxZip(bytes: Uint8Array): SpreadsheetErrorCode | null {
     }
 
     const flags = readUInt16(bytes, centralDirectoryCursor + 8)
+    const compressionMethod = readUInt16(bytes, centralDirectoryCursor + 10)
     const compressedSize = readUInt32(bytes, centralDirectoryCursor + 20)
     const uncompressedSize = readUInt32(bytes, centralDirectoryCursor + 24)
     const nameLength = readUInt16(bytes, centralDirectoryCursor + 28)
@@ -207,6 +222,11 @@ function preflightXlsxZip(bytes: Uint8Array): SpreadsheetErrorCode | null {
     }
 
     if ((flags & 0x41) !== 0) {
+      return 'UNSAFE_CONTENT'
+    }
+
+    // Data-descriptor archives defer local size fields, so reject them rather than accepting ambiguous local metadata.
+    if ((flags & 0x08) !== 0) {
       return 'UNSAFE_CONTENT'
     }
 
@@ -244,14 +264,47 @@ function preflightXlsxZip(bytes: Uint8Array): SpreadsheetErrorCode | null {
       return 'INVALID_WORKBOOK'
     }
 
+    const localFlags = readUInt16(bytes, localHeaderOffset + 6)
+    const localCompressionMethod = readUInt16(bytes, localHeaderOffset + 8)
+    const localCompressedSize = readUInt32(bytes, localHeaderOffset + 18)
+    const localUncompressedSize = readUInt32(bytes, localHeaderOffset + 22)
     const localNameLength = readUInt16(bytes, localHeaderOffset + 26)
     const localExtraLength = readUInt16(bytes, localHeaderOffset + 28)
     const localDataOffset = localHeaderOffset + 30 + localNameLength + localExtraLength
     if (
       !hasByteRange(bytes, localHeaderOffset, 30 + localNameLength + localExtraLength) ||
-      !hasByteRange(bytes, localDataOffset, compressedSize) ||
-      localDataOffset + compressedSize > centralDirectoryOffset
+      !hasByteRange(bytes, localDataOffset, localCompressedSize) ||
+      localDataOffset + localCompressedSize > centralDirectoryOffset
     ) {
+      return 'INVALID_WORKBOOK'
+    }
+
+    if (localUncompressedSize > ZIP_PRE_FLIGHT_LIMITS.singleEntryBytes) {
+      return 'LIMIT_EXCEEDED'
+    }
+
+    if (
+      localFlags !== flags ||
+      localCompressionMethod !== compressionMethod ||
+      localCompressedSize !== compressedSize ||
+      localUncompressedSize !== uncompressedSize ||
+      localNameLength !== nameLength ||
+      !hasMatchingByteRange(bytes, localHeaderOffset + 30, centralDirectoryCursor + 46, nameLength)
+    ) {
+      return 'INVALID_WORKBOOK'
+    }
+
+    const localZip64Extra = hasZip64ExtraField(bytes, localHeaderOffset + 30 + localNameLength, localExtraLength)
+    if (localZip64Extra === null) {
+      return 'INVALID_WORKBOOK'
+    }
+
+    if (localZip64Extra) {
+      return 'UNSAFE_CONTENT'
+    }
+
+    const localEntryName = decodeZipEntryName(bytes, localHeaderOffset + 30, localNameLength)
+    if (localEntryName === null || localEntryName !== entryName) {
       return 'INVALID_WORKBOOK'
     }
 

@@ -86,6 +86,10 @@ function centralDirectoryEntryOffsets(bytes: Uint8Array): number[] {
   return entries
 }
 
+function localHeaderOffset(bytes: Uint8Array, centralDirectoryEntryOffset: number): number {
+  return readUInt32(bytes, centralDirectoryEntryOffset + 42)
+}
+
 function mutateZip(bytes: Uint8Array, mutate: (copy: Uint8Array) => void): Uint8Array {
   const copy = bytes.slice()
   mutate(copy)
@@ -221,6 +225,7 @@ describe('parseSpreadsheetBytes', () => {
           const declaredSize = Math.floor(ZIP_INTERNAL_TOTAL_BYTES / entryOffsets.length) + 1
           for (const entryOffset of entryOffsets) {
             writeUInt32(copy, entryOffset + 24, declaredSize)
+            writeUInt32(copy, localHeaderOffset(copy, entryOffset) + 22, declaredSize)
           }
         }),
       'LIMIT_EXCEEDED',
@@ -245,6 +250,84 @@ describe('parseSpreadsheetBytes', () => {
 
     expect(bytes.byteLength).toBeLessThan(3 * 1024 * 1024)
     expectFailure(parseSpreadsheetBytes({ bytes, kind: 'xlsx' }), 'LIMIT_EXCEEDED')
+  })
+
+  it('rejects an attacker-large local expanded size at ZIP preflight', () => {
+    const bytes = mutateZip(xlsxBytes([['deger']]), (copy) => {
+      const centralDirectoryEntryOffset = centralDirectoryEntryOffsets(copy)[0]
+      writeUInt32(copy, localHeaderOffset(copy, centralDirectoryEntryOffset) + 22, ZIP_INTERNAL_SINGLE_ENTRY_BYTES + 1)
+    })
+    expectFailure(parseSpreadsheetBytes({ bytes, kind: 'xlsx' }), 'LIMIT_EXCEEDED')
+  })
+
+  it.each([
+    [
+      'mismatched general-purpose flags',
+      (copy: Uint8Array, localOffset: number) =>
+        writeUInt16(copy, localOffset + 6, readUInt16(copy, localOffset + 6) ^ 0x0002),
+      'INVALID_WORKBOOK',
+    ],
+    [
+      'mismatched compression method',
+      (copy: Uint8Array, localOffset: number) =>
+        writeUInt16(copy, localOffset + 8, readUInt16(copy, localOffset + 8) === 0 ? 8 : 0),
+      'INVALID_WORKBOOK',
+    ],
+    [
+      'mismatched compressed size',
+      (copy: Uint8Array, localOffset: number) =>
+        writeUInt32(copy, localOffset + 18, readUInt32(copy, localOffset + 18) + 1),
+      'INVALID_WORKBOOK',
+    ],
+    [
+      'mismatched uncompressed size',
+      (copy: Uint8Array, localOffset: number) =>
+        writeUInt32(copy, localOffset + 22, readUInt32(copy, localOffset + 22) + 1),
+      'INVALID_WORKBOOK',
+    ],
+    [
+      'mismatched filename bytes',
+      (copy: Uint8Array, localOffset: number) => {
+        copy[localOffset + 30] = copy[localOffset + 30] === 0x78 ? 0x79 : 0x78
+      },
+      'INVALID_WORKBOOK',
+    ],
+    [
+      'ZIP64 extra data',
+      (copy: Uint8Array, localOffset: number) => {
+        const localNameLength = readUInt16(copy, localOffset + 26)
+        writeUInt16(copy, localOffset + 28, 4)
+        copy.set([0x01, 0x00, 0x00, 0x00], localOffset + 30 + localNameLength)
+      },
+      'UNSAFE_CONTENT',
+    ],
+    [
+      'malformed extra data',
+      (copy: Uint8Array, localOffset: number) => {
+        const localNameLength = readUInt16(copy, localOffset + 26)
+        writeUInt16(copy, localOffset + 28, 4)
+        copy.set([0x02, 0x00, 0x05, 0x00], localOffset + 30 + localNameLength)
+      },
+      'INVALID_WORKBOOK',
+    ],
+  ])('rejects a local header with %s before reading XLSX', (_label, mutateLocalHeader, code) => {
+    const bytes = mutateZip(xlsxBytes([['deger']]), (copy) => {
+      const centralDirectoryEntryOffset = centralDirectoryEntryOffsets(copy)[0]
+      mutateLocalHeader(copy, localHeaderOffset(copy, centralDirectoryEntryOffset))
+    })
+
+    expectFailure(parseSpreadsheetBytes({ bytes, kind: 'xlsx' }), code)
+  })
+
+  it('rejects data-descriptor XLSX entries as outside the narrow parser contract', () => {
+    const bytes = mutateZip(xlsxBytes([['deger']]), (copy) => {
+      const centralDirectoryEntryOffset = centralDirectoryEntryOffsets(copy)[0]
+      const localOffset = localHeaderOffset(copy, centralDirectoryEntryOffset)
+      writeUInt16(copy, centralDirectoryEntryOffset + 8, readUInt16(copy, centralDirectoryEntryOffset + 8) | 0x0008)
+      writeUInt16(copy, localOffset + 6, readUInt16(copy, localOffset + 6) | 0x0008)
+    })
+
+    expectFailure(parseSpreadsheetBytes({ bytes, kind: 'xlsx' }), 'UNSAFE_CONTENT')
   })
 
   it('rejects more than five XLSX sheets before converting cells', () => {
