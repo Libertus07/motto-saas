@@ -15,7 +15,8 @@ function getImageSource(src: ImageProps['src']): string {
 }
 
 const reactState = vi.hoisted(() => ({
-  setFailed: vi.fn<[failed: boolean], void>(),
+  current: undefined as unknown,
+  setState: vi.fn<[value: unknown], void>(),
   useState: vi.fn(),
 }))
 
@@ -44,9 +45,19 @@ import { SafeUserImage } from './SafeUserImage'
 describe('SafeUserImage', () => {
   beforeEach(() => {
     capturedImageOnError = undefined
-    reactState.setFailed.mockReset()
+    reactState.current = undefined
+    reactState.setState.mockReset()
+    reactState.setState.mockImplementation((value) => {
+      reactState.current = value
+    })
     reactState.useState.mockReset()
-    reactState.useState.mockReturnValue([false, reactState.setFailed])
+    reactState.useState.mockImplementation((initialValue) => {
+      if (reactState.current === undefined) {
+        reactState.current = initialValue
+      }
+
+      return [reactState.current, reactState.setState]
+    })
   })
 
   it('always disables the optimizer for a user-controlled URL', () => {
@@ -75,30 +86,70 @@ describe('SafeUserImage', () => {
     ).toThrow('Kullanıcı görseli için genişlik ve yükseklik gerekli.')
   })
 
-  it('requests fallback state and calls onLoadError when the image errors', () => {
-    const onLoadError = vi.fn()
-
-    renderToStaticMarkup(
+  it('accepts fill sizing with non-empty responsive sizes', () => {
+    const markup = renderToStaticMarkup(
       <SafeUserImage
         src="https://example.com/logo.png"
         alt="İşletme logosu"
-        width={96}
-        height={96}
-        onLoadError={onLoadError}
+        fill
+        sizes="(max-width: 768px) 100vw, 50vw"
       />,
+    )
+
+    expect(markup).toContain('<img')
+    expect(markup).toContain('src="https://example.com/logo.png"')
+  })
+
+  it('rejects fill sizing when sizes is missing', () => {
+    expect(() =>
+      renderToStaticMarkup(<SafeUserImage src="https://example.com/logo.png" alt="İşletme logosu" fill />),
+    ).toThrow('Kullanıcı görseli için genişlik ve yükseklik gerekli.')
+  })
+
+  it('rejects fill sizing when sizes is blank', () => {
+    expect(() =>
+      renderToStaticMarkup(<SafeUserImage src="https://example.com/logo.png" alt="İşletme logosu" fill sizes="   " />),
+    ).toThrow('Kullanıcı görseli için genişlik ve yükseklik gerekli.')
+  })
+
+  it('requests fallback state and calls onLoadError when the image errors', () => {
+    const onLoadError = vi.fn()
+    const source = 'https://example.com/logo.png'
+
+    renderToStaticMarkup(
+      <SafeUserImage src={source} alt="İşletme logosu" width={96} height={96} onLoadError={onLoadError} />,
     )
 
     expect(capturedImageOnError).toBeTypeOf('function')
     capturedImageOnError?.()
 
-    expect(reactState.setFailed).toHaveBeenCalledTimes(1)
-    expect(reactState.setFailed).toHaveBeenLastCalledWith(true)
+    const markup = renderToStaticMarkup(
+      <SafeUserImage src={source} alt="İşletme logosu" width={96} height={96} onLoadError={onLoadError} />,
+    )
+
+    expect(markup).toContain('data-safe-user-image-fallback="true"')
     expect(onLoadError).toHaveBeenCalledTimes(1)
     expect(onLoadError).toHaveBeenLastCalledWith()
   })
 
+  it('renders a changed source after the previous source fails', () => {
+    const firstSource = 'https://example.com/first-logo.png'
+    const nextSource = 'https://example.com/next-logo.png'
+
+    renderToStaticMarkup(<SafeUserImage src={firstSource} alt="İşletme logosu" width={96} height={96} />)
+    capturedImageOnError?.()
+
+    const markup = renderToStaticMarkup(
+      <SafeUserImage src={nextSource} alt="Yeni işletme logosu" width={96} height={96} />,
+    )
+
+    expect(markup).toContain('<img')
+    expect(markup).toContain(`src="${nextSource}"`)
+    expect(markup).not.toContain('data-safe-user-image-fallback')
+  })
+
   it('renders an accessible fallback instead of the image boundary after failure', () => {
-    reactState.useState.mockReturnValue([true, reactState.setFailed])
+    reactState.current = 'https://example.com/logo.png'
 
     const markup = renderToStaticMarkup(
       <SafeUserImage
@@ -118,6 +169,40 @@ describe('SafeUserImage', () => {
     expect(markup).toContain('style="width:50vw;height:auto"')
     expect(markup).toContain('data-safe-user-image-fallback="true"')
     expect(markup).not.toContain('data-unoptimized')
+    expect(markup).not.toContain('<img')
+  })
+
+  it('preserves fill layout when rendering the failure fallback', () => {
+    const source = 'https://example.com/fill-logo.png'
+
+    renderToStaticMarkup(
+      <SafeUserImage
+        src={source}
+        alt="İşletme logosu"
+        fill
+        sizes="100vw"
+        className="fill-layout"
+        fallbackClassName="fallback-sinifi"
+        style={{ objectFit: 'cover' }}
+      />,
+    )
+    capturedImageOnError?.()
+
+    const markup = renderToStaticMarkup(
+      <SafeUserImage
+        src={source}
+        alt="İşletme logosu"
+        fill
+        sizes="100vw"
+        className="fill-layout"
+        fallbackClassName="fallback-sinifi"
+        style={{ objectFit: 'cover' }}
+      />,
+    )
+
+    expect(markup).toContain('class="fill-layout fallback-sinifi"')
+    expect(markup).toContain('style="object-fit:cover;position:absolute;inset:0"')
+    expect(markup).toContain('data-safe-user-image-fallback="true"')
     expect(markup).not.toContain('<img')
   })
 })

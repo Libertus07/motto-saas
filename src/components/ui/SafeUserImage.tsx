@@ -10,13 +10,22 @@ export type SafeUserImageProps = Omit<ImageProps, 'unoptimized' | 'onError'> & {
   onLoadError?: () => void
 }
 
+function getImageSourceKey(src: ImageProps['src']): string {
+  if (typeof src === 'string') {
+    return src
+  }
+
+  return 'default' in src ? src.default.src : src.src
+}
+
 export function SafeUserImage({
   alt,
   fallbackClassName = '',
   onLoadError,
   ...imageProps
 }: SafeUserImageProps): React.ReactNode {
-  const [failed, setFailed] = useState(false)
+  const sourceKey = getImageSourceKey(imageProps.src)
+  const [failedSource, setFailedSource] = useState<string | null>(null)
   const hasDimensions = imageProps.width !== undefined && imageProps.height !== undefined
   const hasFillSizing =
     imageProps.fill === true && typeof imageProps.sizes === 'string' && imageProps.sizes.trim().length > 0
@@ -37,7 +46,7 @@ export function SafeUserImage({
     throw new Error('Kullanıcı görseli için genişlik ve yükseklik gerekli.')
   }
 
-  if (failed) {
+  if (failedSource === sourceKey) {
     return (
       <div
         role="img"
@@ -57,7 +66,7 @@ export function SafeUserImage({
       alt={alt}
       unoptimized
       onError={() => {
-        setFailed(true)
+        setFailedSource(sourceKey)
         onLoadError?.()
       }}
     />
