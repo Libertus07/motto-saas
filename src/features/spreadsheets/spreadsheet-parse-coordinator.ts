@@ -31,13 +31,24 @@ export function createSpreadsheetParseCoordinator(dependencies: CoordinatorDepen
       const controller = new AbortController()
       activeController = controller
 
-      const result = await parse(file, { signal: controller.signal })
-      if (generation !== activeGeneration || activeController !== controller) {
-        return null
-      }
+      try {
+        const result = await parse(file, { signal: controller.signal })
+        if (generation !== activeGeneration || activeController !== controller) {
+          return null
+        }
 
-      activeController = null
-      return { organizationId, result }
+        return { organizationId, result }
+      } catch (error) {
+        if (generation !== activeGeneration || activeController !== controller) {
+          return null
+        }
+
+        throw error
+      } finally {
+        if (activeController === controller) {
+          activeController = null
+        }
+      }
     },
     cancel() {
       invalidate()

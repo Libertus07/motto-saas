@@ -87,7 +87,13 @@ export async function parseSpreadsheet(
   file: File,
   options: { signal?: AbortSignal; workerFactory?: () => Worker } = {},
 ): Promise<SpreadsheetParseResult> {
-  const readable = await readSpreadsheetFile(file, options.signal)
+  let readable: ReadableSpreadsheet | SpreadsheetParseResult
+  try {
+    readable = await readSpreadsheetFile(file, options.signal)
+  } catch {
+    return failure(aborted(options.signal) ? 'ORGANIZATION_CHANGED' : 'INVALID_WORKBOOK')
+  }
+
   if (isResult(readable)) {
     return readable
   }
@@ -96,7 +102,13 @@ export async function parseSpreadsheet(
     return failure('ORGANIZATION_CHANGED')
   }
 
-  const worker = (options.workerFactory ?? createWorker)()
+  let worker: Worker
+  try {
+    worker = (options.workerFactory ?? createWorker)()
+  } catch {
+    return failure(aborted(options.signal) ? 'ORGANIZATION_CHANGED' : 'INVALID_WORKBOOK')
+  }
+
   const id = `spreadsheet-${(nextRequestId += 1)}`
   const timeoutMs = SPREADSHEET_LIMITS[`${readable.kind}TimeoutMs`]
 

@@ -97,6 +97,16 @@ function spreadsheetFile(name: string, type: string, bytes: Uint8Array): File {
   } as File
 }
 
+function unreadableSpreadsheetFile(): File {
+  return {
+    name: 'stok.xlsx',
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    size: 4,
+    slice: () => ({ arrayBuffer: async () => new Uint8Array([0x50, 0x4b, 0x03, 0x04]).buffer }),
+    arrayBuffer: async () => Promise.reject(new Error('read failed')),
+  } as File
+}
+
 async function waitForWorker(workers: readonly FakeWorker[]): Promise<FakeWorker> {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const worker = workers.at(0)
@@ -281,5 +291,53 @@ describe('parseSpreadsheet worker boundary', () => {
     expect(worker.terminate).toHaveBeenCalledTimes(1)
     expect(worker.listenerCount()).toBe(0)
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('maps rejected file reads to INVALID_WORKBOOK without creating a worker', async () => {
+    const factory = vi.fn(() => new FakeWorker() as unknown as Worker)
+
+    await expect(parseSpreadsheet(unreadableSpreadsheetFile(), { workerFactory: factory })).resolves.toMatchObject({
+      ok: false,
+      code: 'INVALID_WORKBOOK',
+    })
+    expect(factory).not.toHaveBeenCalled()
+  })
+
+  it('maps a worker factory exception to INVALID_WORKBOOK', async () => {
+    await expect(
+      parseSpreadsheet(
+        spreadsheetFile(
+          'stok.xlsx',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
+        ),
+        {
+          workerFactory: () => {
+            throw new Error('worker creation failed')
+          },
+        },
+      ),
+    ).resolves.toMatchObject({ ok: false, code: 'INVALID_WORKBOOK' })
+  })
+
+  it('prefers ORGANIZATION_CHANGED when cancellation races with a worker factory exception', async () => {
+    const signal = new TrackingAbortSignal()
+
+    await expect(
+      parseSpreadsheet(
+        spreadsheetFile(
+          'stok.xlsx',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          new Uint8Array([0x50, 0x4b, 0x03, 0x04]),
+        ),
+        {
+          signal: signal as unknown as AbortSignal,
+          workerFactory: () => {
+            signal.abort()
+            throw new Error('worker creation failed')
+          },
+        },
+      ),
+    ).resolves.toMatchObject({ ok: false, code: 'ORGANIZATION_CHANGED' })
   })
 })
