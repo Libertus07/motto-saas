@@ -22,11 +22,45 @@ const mocks = vi.hoisted(() => ({
     run: vi.fn(),
     cancel: vi.fn(),
   },
+  live: false,
+  liveOrganizationId: '11111111-1111-4111-8111-111111111111',
+  liveStateIndex: 0,
+  liveStates: [] as unknown[],
+  liveRefIndex: 0,
+  liveRefs: [] as { current: unknown }[],
+  liveCallbackIndex: 0,
+  liveCallbacks: [] as { deps: unknown[] | undefined; value: unknown }[],
+  liveEffectIndex: 0,
+  liveEffects: [] as { deps: unknown[] | undefined; cleanup: (() => void) | undefined }[],
 }))
 
 vi.mock('react', () => ({
-  useCallback: <T>(callback: T) => callback,
-  useEffect: (effect: () => void | (() => void)) => {
+  useCallback: <T>(callback: T, deps?: unknown[]) => {
+    if (!mocks.live) return callback
+    const index = mocks.liveCallbackIndex++
+    const previous = mocks.liveCallbacks[index]
+    const changed =
+      !previous ||
+      previous.deps?.length !== deps?.length ||
+      previous.deps?.some((value, dependencyIndex) => value !== deps?.[dependencyIndex])
+    if (changed) mocks.liveCallbacks[index] = { deps, value: callback }
+    return mocks.liveCallbacks[index].value as T
+  },
+  useEffect: (effect: () => void | (() => void), deps?: unknown[]) => {
+    if (mocks.live) {
+      const index = mocks.liveEffectIndex++
+      const previous = mocks.liveEffects[index]
+      const changed =
+        !previous ||
+        previous.deps?.length !== deps?.length ||
+        previous.deps?.some((value, dependencyIndex) => value !== deps?.[dependencyIndex])
+      if (changed) {
+        previous?.cleanup?.()
+        const cleanup = effect()
+        mocks.liveEffects[index] = { deps, cleanup: typeof cleanup === 'function' ? cleanup : undefined }
+      }
+      return
+    }
     const index = mocks.effectIndex++
     if (index === 0) {
       const cleanup = effect()
@@ -35,10 +69,28 @@ vi.mock('react', () => ({
   },
   useMemo: <T>(factory: () => T) => factory(),
   useRef: <T>(value: T) => {
+    if (mocks.live) {
+      const index = mocks.liveRefIndex++
+      if (!mocks.liveRefs[index]) mocks.liveRefs[index] = { current: value }
+      return mocks.liveRefs[index] as { current: T }
+    }
     const index = mocks.refIndex++
     return { current: index in mocks.refValues ? (mocks.refValues[index] as T) : value }
   },
   useState: <T>(initialValue: T | (() => T)) => {
+    if (mocks.live) {
+      const index = mocks.liveStateIndex++
+      const initial = typeof initialValue === 'function' ? (initialValue as () => T)() : initialValue
+      if (!(index in mocks.liveStates)) mocks.liveStates[index] = initial
+      return [
+        mocks.liveStates[index] as T,
+        (nextValue: T | ((current: T) => T)) => {
+          const current = mocks.liveStates[index] as T
+          mocks.liveStates[index] =
+            typeof nextValue === 'function' ? (nextValue as (current: T) => T)(current) : nextValue
+        },
+      ]
+    }
     const index = mocks.stateIndex++
     const initial = typeof initialValue === 'function' ? (initialValue as () => T)() : initialValue
     const value = index in mocks.stateValues ? (mocks.stateValues[index] as T) : initial
@@ -46,12 +98,16 @@ vi.mock('react', () => ({
   },
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.routerPush }) }))
-vi.mock('@/lib/supabase', () => ({ createClient: () => ({ from: vi.fn() }) }))
+vi.mock('@/lib/supabase', () => ({
+  createClient: () => ({
+    from: vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: [] })) })) })),
+  }),
+}))
 vi.mock('@/components/NotificationProvider', () => ({
   useNotification: () => ({ showAlert: mocks.showAlert, showConfirm: mocks.showConfirm }),
 }))
 vi.mock('@/context/OrganizationContext', () => ({
-  useOrganization: () => ({ activeOrg: { id: ORGANIZATION_ID } }),
+  useOrganization: () => ({ activeOrg: { id: mocks.live ? mocks.liveOrganizationId : ORGANIZATION_ID } }),
 }))
 vi.mock('@/lib/debug', () => ({ devError: mocks.devError }))
 vi.mock('@/lib/imagePreprocess', () => ({ dataUrlToFile: vi.fn() }))
@@ -424,5 +480,140 @@ describe('Z-report approval', () => {
 
     expect(mocks.showAlert).not.toHaveBeenCalled()
     expect(mocks.devError).not.toHaveBeenCalled()
+  })
+})
+
+function resetLiveRender() {
+  mocks.liveStateIndex = 0
+  mocks.liveRefIndex = 0
+  mocks.liveCallbackIndex = 0
+  mocks.liveEffectIndex = 0
+}
+
+function useLiveWorkspace() {
+  resetLiveRender()
+  return useZReportWorkspace()
+}
+
+describe('Z-report workspace live wiring', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.live = true
+    mocks.liveOrganizationId = ORGANIZATION_ID
+    mocks.liveStates = []
+    mocks.liveRefs = []
+    mocks.liveCallbacks = []
+    mocks.liveEffects = []
+    mocks.coordinator.run.mockResolvedValue({
+      organizationId: ORGANIZATION_ID,
+      result: { ok: true, table: { kind: 'xlsx', sheetName: 'Z Raporu', rows: [['Çay', 2]] } },
+    })
+    mocks.findExistingZReportBatch.mockResolvedValue(undefined)
+    mocks.processZReport.mockResolvedValue('batch-id')
+    mocks.persistZReportWrite.mockImplementation(
+      async (_supabase, _organizationId, _document, persist: (documentReference: string | null) => Promise<unknown>) =>
+        persist('organization-document-reference'),
+    )
+  })
+
+  it.each([
+    ['gun-sonu.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx'],
+    ['gun-sonu.csv', 'text/csv', 'csv'],
+  ] as const)('wires %s upload through review into one approved persistence write', async (name, type, kind) => {
+    mocks.coordinator.run.mockResolvedValueOnce({
+      organizationId: ORGANIZATION_ID,
+      result: { ok: true, table: { kind, sheetName: 'Z Raporu', rows: [['Çay', 2]] } },
+    })
+    let workspace = useLiveWorkspace()
+    const uploaded = file(name, type)
+
+    await workspace.handleFileUpload(upload(uploaded))
+    workspace = useLiveWorkspace()
+    expect(workspace.fileText).toBe('[["Çay",2]]')
+
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ date: '2026-08-28', total_revenue: 0, payment_methods: {}, items: [], expenses: [] }),
+            { headers: { 'Content-Type': 'application/json' } },
+          ),
+        ),
+    )
+    await workspace.analyze()
+    workspace = useLiveWorkspace()
+    expect(workspace.parsedData).not.toBeNull()
+
+    await workspace.approve()
+    expect(mocks.persistZReportWrite).toHaveBeenCalledWith(
+      expect.anything(),
+      ORGANIZATION_ID,
+      kind === 'xlsx' ? uploaded : null,
+      expect.any(Function),
+      ORGANIZATION_ID,
+      expect.any(Function),
+    )
+    vi.unstubAllGlobals()
+  })
+
+  it('invalidates an in-flight upload when the active organization changes on rerender', async () => {
+    let resolveParse: ((value: unknown) => void) | undefined
+    mocks.coordinator.run.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveParse = resolve
+        }),
+    )
+    let workspace = useLiveWorkspace()
+    const pending = workspace.handleFileUpload(
+      upload(file('gun-sonu.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')),
+    )
+
+    mocks.liveOrganizationId = '22222222-2222-4222-8222-222222222222'
+    workspace = useLiveWorkspace()
+    resolveParse?.({
+      organizationId: ORGANIZATION_ID,
+      result: { ok: true, table: { kind: 'xlsx', sheetName: 'Z Raporu', rows: [['GEÇ', 1]] } },
+    })
+    await pending
+    workspace = useLiveWorkspace()
+
+    expect(mocks.coordinator.cancel).toHaveBeenCalled()
+    expect(workspace.fileText).toBeNull()
+    expect(workspace.parsedData).toBeNull()
+  })
+
+  it('invalidates a pending analysis when reset is called before its response resolves', async () => {
+    let resolveFetch: ((response: Response) => void) | undefined
+    let workspace = useLiveWorkspace()
+    await workspace.handleFileUpload(
+      upload(file('gun-sonu.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')),
+    )
+    workspace = useLiveWorkspace()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve
+          }),
+      ),
+    )
+    const pending = workspace.analyze()
+    workspace.reset()
+    resolveFetch?.(
+      new Response(
+        JSON.stringify({ date: '2026-08-28', total_revenue: 0, payment_methods: {}, items: [], expenses: [] }),
+        { headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+    await pending
+    workspace = useLiveWorkspace()
+
+    expect(workspace.parsedData).toBeNull()
+    expect(workspace.fileText).toBeNull()
+    vi.unstubAllGlobals()
   })
 })

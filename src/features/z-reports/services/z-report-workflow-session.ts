@@ -8,6 +8,7 @@ type Source = {
   generation: number
   organizationId: string
   document: File | null
+  staged: boolean
   reviewed: boolean
 }
 
@@ -37,7 +38,7 @@ export function createZReportWorkflowSession() {
   return {
     beginSource(organizationId: string) {
       generation += 1
-      source = { generation, organizationId, document: null, reviewed: false }
+      source = { generation, organizationId, document: null, staged: false, reviewed: false }
       activeAnalysis = null
       activeApproval = null
       return generation
@@ -55,11 +56,13 @@ export function createZReportWorkflowSession() {
     stage(sourceGeneration: number, document: File | null) {
       if (source?.generation !== sourceGeneration) return false
       source.document = document
+      source.staged = true
       source.reviewed = false
+      activeAnalysis = null
       return true
     },
     beginAnalysis(activeOrganizationId: string | null | undefined): Attempt | null {
-      if (!source || source.organizationId !== activeOrganizationId || activeAnalysis) return null
+      if (!source || source.organizationId !== activeOrganizationId || !source.staged || activeAnalysis) return null
       source.reviewed = false
       const attempt = { id: (nextAttemptId += 1), generation: source.generation, organizationId: source.organizationId }
       activeAnalysis = attempt

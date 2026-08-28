@@ -10,6 +10,27 @@ function document(name: string): File {
 }
 
 describe('Z-report workflow session', () => {
+  it('rejects analysis until the current source has been staged', () => {
+    const session = createZReportWorkflowSession()
+
+    session.beginSource(ORGANIZATION_A)
+
+    expect(session.beginAnalysis(ORGANIZATION_A)).toBeNull()
+  })
+
+  it('invalidates an active analysis when staging replacement content', () => {
+    const session = createZReportWorkflowSession()
+    const generation = session.beginSource(ORGANIZATION_A)
+    session.stage(generation, document('onceki.xlsx'))
+    const analysis = session.beginAnalysis(ORGANIZATION_A)
+    if (!analysis) throw new Error('Expected an analysis attempt')
+
+    session.stage(generation, document('yeni.xlsx'))
+
+    expect(session.isCurrentAnalysis(analysis, ORGANIZATION_A)).toBe(false)
+    expect(session.markReviewed(analysis, ORGANIZATION_A)).toBe(false)
+  })
+
   it('permits review then one approval with the retained XLSX document', () => {
     const session = createZReportWorkflowSession()
     const generation = session.beginSource(ORGANIZATION_A)
