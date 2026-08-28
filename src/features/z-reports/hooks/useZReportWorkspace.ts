@@ -10,6 +10,7 @@ import { saveProductWithRecipe } from '@/features/products/services/product-serv
 import { createSpreadsheetParseCoordinator } from '@/features/spreadsheets/spreadsheet-parse-coordinator'
 import { toZReportAnalysisInput } from '../services/z-report-spreadsheet-adapter'
 import { findExistingZReportBatch, processZReport } from '../services/z-report-service'
+import { createZReportWorkflowSession } from '../services/z-report-workflow-session'
 import type { NewZReportProduct, ParsedExpenseItem, ParsedSaleItem, ParsedZReport, ZReportProduct } from '../types'
 import { findBestProductMatch, matchExpenseCategory } from '../z-report-utils'
 
@@ -26,12 +27,10 @@ export function useZReportWorkspace() {
   const supabase = useMemo(() => createClient(), [])
   const activeOrganizationIdRef = useRef(activeOrg?.id)
   const sourceGenerationRef = useRef(0)
-  const stagedSourceGenerationRef = useRef<number | null>(null)
-  const reviewedSourceGenerationRef = useRef<number | null>(null)
   const organizationEffectMountedRef = useRef(false)
   const preprocessSourceRef = useRef<{ generation: number; organizationId: string } | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [, setSelectedFile] = useState<File | null>(null)
   const [fileText, setFileText] = useState<string | null>(null)
   const [fileType, setFileType] = useState<ZReportFileType>(null)
   const [loading, setLoading] = useState(false)
@@ -44,12 +43,11 @@ export function useZReportWorkspace() {
   const [preprocessFiles, setPreprocessFiles] = useState<File[] | File | null>(null)
   const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null)
   const [spreadsheetParseCoordinator] = useState(createSpreadsheetParseCoordinator)
+  const [workflow] = useState(createZReportWorkflowSession)
 
   const invalidateSourceSelection = useCallback(() => {
-    const generation = sourceGenerationRef.current + 1
+    const generation = workflow.invalidate()
     sourceGenerationRef.current = generation
-    stagedSourceGenerationRef.current = null
-    reviewedSourceGenerationRef.current = null
     preprocessSourceRef.current = null
     spreadsheetParseCoordinator.cancel()
     setImageUrl(null)
@@ -63,11 +61,17 @@ export function useZReportWorkspace() {
     setIsPreprocessOpen(false)
     setPreprocessFiles(null)
     return generation
-  }, [spreadsheetParseCoordinator])
+  }, [spreadsheetParseCoordinator, workflow])
 
-  const isCurrentSource = useCallback((generation: number, organizationId: string) => {
-    return sourceGenerationRef.current === generation && activeOrganizationIdRef.current === organizationId
-  }, [])
+  const isCurrentSource = useCallback(
+    (generation: number, organizationId: string) => {
+      return (
+        workflow.isCurrentSource(generation, activeOrganizationIdRef.current) &&
+        organizationId === activeOrganizationIdRef.current
+      )
+    },
+    [workflow],
+  )
 
   useEffect(() => {
     const organizationChanged =
@@ -79,10 +83,10 @@ export function useZReportWorkspace() {
     organizationEffectMountedRef.current = true
 
     return () => {
-      sourceGenerationRef.current += 1
+      workflow.invalidate()
       spreadsheetParseCoordinator.cancel()
     }
-  }, [activeOrg?.id, invalidateSourceSelection, spreadsheetParseCoordinator])
+  }, [activeOrg?.id, invalidateSourceSelection, spreadsheetParseCoordinator, workflow])
 
   useEffect(() => {
     if (!activeOrg?.id) return
@@ -110,12 +114,14 @@ export function useZReportWorkspace() {
     if (!files.length) return
 
     const file = files[0]
-    const sourceGeneration = invalidateSourceSelection()
+    invalidateSourceSelection()
     const organizationId = activeOrg?.id
     if (!organizationId) {
       await showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
       return
     }
+    const sourceGeneration = workflow.beginSource(organizationId)
+    sourceGenerationRef.current = sourceGeneration
 
     const extension = file.name.split('.').pop()?.toLowerCase()
     if (extension === 'xls' || extension === 'xlsm') {
@@ -156,7 +162,7 @@ export function useZReportWorkspace() {
         }
         if (!isCurrentSource(sourceGeneration, organizationId)) return
 
-        stagedSourceGenerationRef.current = sourceGeneration
+        workflow.stage(sourceGeneration, parsed.result.table.kind === 'xlsx' ? file : null)
         setSelectedFile(parsed.result.table.kind === 'xlsx' ? file : null)
         setImageUrl(null)
         setFileText(analysisInput.content)
@@ -183,7 +189,7 @@ export function useZReportWorkspace() {
     }
 
     if (extension === 'xml' || extension === 'json') {
-      stagedSourceGenerationRef.current = sourceGeneration
+      workflow.stage(sourceGeneration, file)
       setSelectedFile(file)
       const reader = new FileReader()
       reader.onload = () => {
@@ -207,7 +213,7 @@ export function useZReportWorkspace() {
         await showAlert('Seçtiğiniz PDF belgesi çok büyük (Max 3MB). Lütfen dosya boyutunu küçültün.', 'warning')
         return
       }
-      stagedSourceGenerationRef.current = sourceGeneration
+      workflow.stage(sourceGeneration, file)
       setSelectedFile(file)
       const reader = new FileReader()
       reader.onload = () => {
@@ -235,15 +241,12 @@ export function useZReportWorkspace() {
     if (!imageUrl && !fileText) return
     const organizationId = pendingOrganizationId
     const sourceGeneration = sourceGenerationRef.current
-    if (
-      !organizationId ||
-      stagedSourceGenerationRef.current !== sourceGeneration ||
-      !isCurrentSource(sourceGeneration, organizationId)
-    ) {
+    if (!organizationId || !isCurrentSource(sourceGeneration, organizationId)) {
       await showAlert('Belge farklı bir işletme için hazırlandı. Lütfen yeniden seçin.', 'warning')
       return
     }
-    reviewedSourceGenerationRef.current = null
+    const analysisAttempt = workflow.beginAnalysis(organizationId)
+    if (!analysisAttempt) return
     setAnalyzing(true)
     try {
       const response = await fetch('/api/analyze-z-report', {
@@ -252,7 +255,7 @@ export function useZReportWorkspace() {
         body: JSON.stringify({ image: imageUrl, fileText, fileType }),
       })
       const data = (await response.json()) as ParsedZReport & { error?: string }
-      if (!isCurrentSource(sourceGeneration, organizationId)) return
+      if (!workflow.isCurrentAnalysis(analysisAttempt, activeOrganizationIdRef.current)) return
       if (response.status === 429) {
         await showAlert('Günlük limit doldu, yarın tekrar deneyin.', 'warning')
         return
@@ -269,14 +272,14 @@ export function useZReportWorkspace() {
           category: matchExpenseCategory(expense.expense_name),
         })),
       })
-      reviewedSourceGenerationRef.current = sourceGeneration
+      workflow.markReviewed(analysisAttempt, activeOrganizationIdRef.current)
     } catch (error: unknown) {
-      if (isCurrentSource(sourceGeneration, organizationId)) {
+      if (workflow.isCurrentAnalysis(analysisAttempt, activeOrganizationIdRef.current)) {
         devError('Z Raporu analiz edilemedi.', error)
         await showAlert('Z Raporu analiz edilemedi. Lütfen tekrar deneyin.', 'error')
       }
     } finally {
-      if (isCurrentSource(sourceGeneration, organizationId)) {
+      if (workflow.finishAnalysis(analysisAttempt, activeOrganizationIdRef.current)) {
         setAnalyzing(false)
       }
     }
@@ -320,13 +323,19 @@ export function useZReportWorkspace() {
   }
 
   const startManualMode = () => {
-    const sourceGeneration = invalidateSourceSelection()
+    invalidateSourceSelection()
     if (!activeOrg?.id) {
       void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
       return
     }
-    stagedSourceGenerationRef.current = sourceGeneration
-    reviewedSourceGenerationRef.current = sourceGeneration
+    const sourceGeneration = workflow.beginSource(activeOrg.id)
+    sourceGenerationRef.current = sourceGeneration
+    workflow.stage(sourceGeneration, null)
+    const analysisAttempt = workflow.beginAnalysis(activeOrg.id)
+    if (analysisAttempt) {
+      workflow.markReviewed(analysisAttempt, activeOrg.id)
+      workflow.finishAnalysis(analysisAttempt, activeOrg.id)
+    }
     setPendingOrganizationId(activeOrg.id)
     setParsedData({
       date: new Date().toISOString().split('T')[0],
@@ -361,12 +370,15 @@ export function useZReportWorkspace() {
     if (!parsedData || !activeOrg?.id) return
     const organizationId = activeOrg.id
     const sourceGeneration = sourceGenerationRef.current
-    if (
-      pendingOrganizationId !== organizationId ||
-      stagedSourceGenerationRef.current !== sourceGeneration ||
-      reviewedSourceGenerationRef.current !== sourceGeneration ||
-      !isCurrentSource(sourceGeneration, organizationId)
-    ) {
+    if (pendingOrganizationId !== organizationId || !isCurrentSource(sourceGeneration, organizationId)) {
+      await showAlert('Belge farklı bir işletme için hazırlandı. Lütfen yeniden analiz edin.', 'warning')
+      return
+    }
+    const approvalAttempt = workflow.beginApproval(organizationId)
+    if (!approvalAttempt) return
+    const persistenceFile = workflow.documentForApproval(approvalAttempt, organizationId)
+    if (persistenceFile === undefined) {
+      workflow.finishApproval(approvalAttempt, organizationId)
       await showAlert('Belge farklı bir işletme için hazırlandı. Lütfen yeniden analiz edin.', 'warning')
       return
     }
@@ -375,19 +387,23 @@ export function useZReportWorkspace() {
     try {
       const reportDate = parsedData.date || new Date().toISOString().split('T')[0]
       const existingBatchId = await findExistingZReportBatch(supabase, organizationId, reportDate)
-      if (!isCurrentSource(sourceGeneration, organizationId)) return
+      if (!workflow.isCurrentApproval(approvalAttempt, activeOrganizationIdRef.current)) return
       const replaceExisting = existingBatchId
         ? await showConfirm(
             `Bu tarihe (${reportDate}) ait bir Z-Raporu zaten var. Önceki kaydı yenisiyle değiştirmek istiyor musunuz?`,
             'warning',
           )
         : false
-      if (!isCurrentSource(sourceGeneration, organizationId) || (existingBatchId && !replaceExisting)) return
+      if (
+        !workflow.isCurrentApproval(approvalAttempt, activeOrganizationIdRef.current) ||
+        (existingBatchId && !replaceExisting)
+      )
+        return
 
       await persistZReportWrite(
         supabase,
         organizationId,
-        selectedFile,
+        persistenceFile,
         (documentUrl) =>
           processZReport(supabase, {
             organizationId,
@@ -398,16 +414,17 @@ export function useZReportWorkspace() {
         pendingOrganizationId,
         () => activeOrganizationIdRef.current,
       )
-      if (!isCurrentSource(sourceGeneration, organizationId)) return
+      if (!workflow.isCurrentApproval(approvalAttempt, activeOrganizationIdRef.current)) return
       await showAlert('Z Raporu başarıyla işlendi ve stoklar düşüldü!', 'success')
+      if (!workflow.isCurrentApproval(approvalAttempt, activeOrganizationIdRef.current)) return
       router.push('/dashboard/raporlar')
     } catch (error: unknown) {
-      if (isCurrentSource(sourceGeneration, organizationId)) {
+      if (workflow.isCurrentApproval(approvalAttempt, activeOrganizationIdRef.current)) {
         devError('Z Raporu kaydedilemedi.', error)
         await showAlert('Z Raporu kaydedilemedi. Lütfen tekrar deneyin.', 'error')
       }
     } finally {
-      if (isCurrentSource(sourceGeneration, organizationId)) {
+      if (workflow.finishApproval(approvalAttempt, activeOrganizationIdRef.current)) {
         setLoading(false)
       }
     }
@@ -431,11 +448,12 @@ export function useZReportWorkspace() {
     }
 
     closePreprocess()
-    stagedSourceGenerationRef.current = source.generation
+    const processedFile = dataUrlToFile(results[0].dataUrl, `processed-zreport-${Date.now()}.jpg`)
+    workflow.stage(source.generation, processedFile)
     setFileText(null)
     setImageUrl(results[0].dataUrl)
     setFileType('image')
-    setSelectedFile(dataUrlToFile(results[0].dataUrl, `processed-zreport-${Date.now()}.jpg`))
+    setSelectedFile(processedFile)
     setPendingOrganizationId(source.organizationId)
   }
 
