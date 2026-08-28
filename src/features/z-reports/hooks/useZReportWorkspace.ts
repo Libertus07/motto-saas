@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
 import { useNotification } from '@/components/NotificationProvider'
@@ -8,12 +7,16 @@ import { useOrganization } from '@/context/OrganizationContext'
 import { persistZReportWrite, validateOrganizationDocument } from '@/features/documents'
 import { devError } from '@/lib/debug'
 import { saveProductWithRecipe } from '@/features/products/services/product-service'
+import { createSpreadsheetParseCoordinator } from '@/features/spreadsheets/spreadsheet-parse-coordinator'
+import { toZReportAnalysisInput } from '../services/z-report-spreadsheet-adapter'
+import { findExistingZReportBatch, processZReport } from '../services/z-report-service'
 import type { NewZReportProduct, ParsedExpenseItem, ParsedSaleItem, ParsedZReport, ZReportProduct } from '../types'
 import { findBestProductMatch, matchExpenseCategory } from '../z-report-utils'
-import { findExistingZReportBatch, processZReport } from '../services/z-report-service'
 
 type ZReportFileType = 'image' | 'pdf' | 'xml' | 'json' | null
+
 const DEFAULT_CATEGORIES = ['Sıcak İçecek', 'Soğuk İçecek', 'Tatlı', 'Yemek', 'Genel']
+const SPREADSHEET_UNSUPPORTED_MESSAGE = 'Bu dosya türü desteklenmiyor. XLSX veya CSV seçin.'
 const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : 'Bilinmeyen hata')
 
 export function useZReportWorkspace() {
@@ -22,6 +25,11 @@ export function useZReportWorkspace() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const activeOrganizationIdRef = useRef(activeOrg?.id)
+  const sourceGenerationRef = useRef(0)
+  const stagedSourceGenerationRef = useRef<number | null>(null)
+  const reviewedSourceGenerationRef = useRef<number | null>(null)
+  const organizationEffectMountedRef = useRef(false)
+  const preprocessSourceRef = useRef<{ generation: number; organizationId: string } | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [fileText, setFileText] = useState<string | null>(null)
@@ -35,13 +43,46 @@ export function useZReportWorkspace() {
   const [isPreprocessOpen, setIsPreprocessOpen] = useState(false)
   const [preprocessFiles, setPreprocessFiles] = useState<File[] | File | null>(null)
   const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null)
+  const [spreadsheetParseCoordinator] = useState(createSpreadsheetParseCoordinator)
+
+  const invalidateSourceSelection = useCallback(() => {
+    const generation = sourceGenerationRef.current + 1
+    sourceGenerationRef.current = generation
+    stagedSourceGenerationRef.current = null
+    reviewedSourceGenerationRef.current = null
+    preprocessSourceRef.current = null
+    spreadsheetParseCoordinator.cancel()
+    setImageUrl(null)
+    setSelectedFile(null)
+    setFileText(null)
+    setFileType(null)
+    setParsedData(null)
+    setPendingOrganizationId(null)
+    setAnalyzing(false)
+    setLoading(false)
+    setIsPreprocessOpen(false)
+    setPreprocessFiles(null)
+    return generation
+  }, [spreadsheetParseCoordinator])
+
+  const isCurrentSource = useCallback((generation: number, organizationId: string) => {
+    return sourceGenerationRef.current === generation && activeOrganizationIdRef.current === organizationId
+  }, [])
 
   useEffect(() => {
-    activeOrganizationIdRef.current = activeOrg?.id
-    return () => {
-      activeOrganizationIdRef.current = undefined
+    const organizationChanged =
+      organizationEffectMountedRef.current && activeOrganizationIdRef.current !== activeOrg?.id
+    if (organizationChanged) {
+      invalidateSourceSelection()
     }
-  }, [activeOrg?.id])
+    activeOrganizationIdRef.current = activeOrg?.id
+    organizationEffectMountedRef.current = true
+
+    return () => {
+      sourceGenerationRef.current += 1
+      spreadsheetParseCoordinator.cancel()
+    }
+  }, [activeOrg?.id, invalidateSourceSelection, spreadsheetParseCoordinator])
 
   useEffect(() => {
     if (!activeOrg?.id) return
@@ -63,17 +104,73 @@ export function useZReportWorkspace() {
     [products],
   )
 
-  const handleFileUpload = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
     event.target.value = ''
     if (!files.length) return
 
     const file = files[0]
+    const sourceGeneration = invalidateSourceSelection()
     const organizationId = activeOrg?.id
     if (!organizationId) {
-      void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
+      await showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
       return
     }
+
+    const extension = file.name.split('.').pop()?.toLowerCase()
+    if (extension === 'xls' || extension === 'xlsm') {
+      await showAlert(SPREADSHEET_UNSUPPORTED_MESSAGE, 'warning')
+      return
+    }
+
+    if (extension === 'xlsx' || extension === 'csv') {
+      if (extension === 'xlsx') {
+        const validationError = validateOrganizationDocument({
+          organizationId,
+          bucket: 'receipts',
+          kind: 'z-report',
+          file,
+        })
+        if (validationError) {
+          await showAlert(validationError, 'warning')
+          return
+        }
+      }
+
+      try {
+        const parsed = await spreadsheetParseCoordinator.run(file, organizationId)
+        if (!parsed || !isCurrentSource(sourceGeneration, organizationId)) return
+        if (parsed.organizationId !== organizationId) {
+          await showAlert('İşletme değiştiği için dosya işlemi iptal edildi.', 'warning')
+          return
+        }
+        if (!parsed.result.ok) {
+          await showAlert(parsed.result.message, 'warning')
+          return
+        }
+
+        const analysisInput = toZReportAnalysisInput(parsed.result.table)
+        if (!analysisInput.ok) {
+          await showAlert(analysisInput.message, 'warning')
+          return
+        }
+        if (!isCurrentSource(sourceGeneration, organizationId)) return
+
+        stagedSourceGenerationRef.current = sourceGeneration
+        setSelectedFile(parsed.result.table.kind === 'xlsx' ? file : null)
+        setImageUrl(null)
+        setFileText(analysisInput.content)
+        setFileType('json')
+        setPendingOrganizationId(organizationId)
+      } catch (error: unknown) {
+        if (isCurrentSource(sourceGeneration, organizationId)) {
+          devError('Z-Raporu elektronik tablo okunamadı.', error)
+          await showAlert('Elektronik tablo okunamadı. Lütfen dosyayı kontrol edip tekrar deneyin.', 'warning')
+        }
+      }
+      return
+    }
+
     const validationError = validateOrganizationDocument({
       organizationId,
       bucket: 'receipts',
@@ -81,48 +178,55 @@ export function useZReportWorkspace() {
       file,
     })
     if (validationError) {
-      void showAlert(validationError, 'warning')
+      await showAlert(validationError, 'warning')
       return
     }
-    setSelectedFile(file)
-    setPendingOrganizationId(organizationId)
-    const extension = file.name.split('.').pop()?.toLowerCase()
+
     if (extension === 'xml' || extension === 'json') {
+      stagedSourceGenerationRef.current = sourceGeneration
+      setSelectedFile(file)
       const reader = new FileReader()
       reader.onload = () => {
+        if (!isCurrentSource(sourceGeneration, organizationId)) return
         setImageUrl(null)
         setFileText(String(reader.result ?? ''))
         setFileType(extension)
+        setPendingOrganizationId(organizationId)
+      }
+      reader.onerror = () => {
+        if (isCurrentSource(sourceGeneration, organizationId)) {
+          void showAlert('Belge okunamadı. Lütfen dosyayı kontrol edip tekrar deneyin.', 'warning')
+        }
       }
       reader.readAsText(file)
       return
     }
-    if (extension === 'xlsx' || extension === 'xls') {
-      const reader = new FileReader()
-      reader.onload = (loadEvent) => {
-        const workbook = XLSX.read(new Uint8Array(loadEvent.target?.result as ArrayBuffer), { type: 'array' })
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-        setImageUrl(null)
-        setFileText(JSON.stringify(XLSX.utils.sheet_to_json(worksheet)))
-        setFileType('json')
-      }
-      reader.readAsArrayBuffer(file)
-      return
-    }
+
     if (file.type === 'application/pdf') {
       if (file.size > 3 * 1024 * 1024) {
-        void showAlert('Seçtiğiniz PDF belgesi çok büyük (Max 3MB). Lütfen dosya boyutunu küçültün.', 'warning')
+        await showAlert('Seçtiğiniz PDF belgesi çok büyük (Max 3MB). Lütfen dosya boyutunu küçültün.', 'warning')
         return
       }
+      stagedSourceGenerationRef.current = sourceGeneration
+      setSelectedFile(file)
       const reader = new FileReader()
       reader.onload = () => {
+        if (!isCurrentSource(sourceGeneration, organizationId)) return
         setFileText(null)
         setImageUrl(String(reader.result ?? ''))
         setFileType('pdf')
+        setPendingOrganizationId(organizationId)
+      }
+      reader.onerror = () => {
+        if (isCurrentSource(sourceGeneration, organizationId)) {
+          void showAlert('Belge okunamadı. Lütfen dosyayı kontrol edip tekrar deneyin.', 'warning')
+        }
       }
       reader.readAsDataURL(file)
       return
     }
+
+    preprocessSourceRef.current = { generation: sourceGeneration, organizationId }
     setPreprocessFiles(files)
     setIsPreprocessOpen(true)
   }
@@ -130,10 +234,16 @@ export function useZReportWorkspace() {
   const analyze = async () => {
     if (!imageUrl && !fileText) return
     const organizationId = pendingOrganizationId
-    if (!organizationId || activeOrganizationIdRef.current !== organizationId) {
+    const sourceGeneration = sourceGenerationRef.current
+    if (
+      !organizationId ||
+      stagedSourceGenerationRef.current !== sourceGeneration ||
+      !isCurrentSource(sourceGeneration, organizationId)
+    ) {
       await showAlert('Belge farklı bir işletme için hazırlandı. Lütfen yeniden seçin.', 'warning')
       return
     }
+    reviewedSourceGenerationRef.current = null
     setAnalyzing(true)
     try {
       const response = await fetch('/api/analyze-z-report', {
@@ -142,7 +252,7 @@ export function useZReportWorkspace() {
         body: JSON.stringify({ image: imageUrl, fileText, fileType }),
       })
       const data = (await response.json()) as ParsedZReport & { error?: string }
-      if (activeOrganizationIdRef.current !== organizationId) return
+      if (!isCurrentSource(sourceGeneration, organizationId)) return
       if (response.status === 429) {
         await showAlert('Günlük limit doldu, yarın tekrar deneyin.', 'warning')
         return
@@ -159,13 +269,14 @@ export function useZReportWorkspace() {
           category: matchExpenseCategory(expense.expense_name),
         })),
       })
+      reviewedSourceGenerationRef.current = sourceGeneration
     } catch (error: unknown) {
-      if (activeOrganizationIdRef.current === organizationId) {
+      if (isCurrentSource(sourceGeneration, organizationId)) {
         devError('Z Raporu analiz edilemedi.', error)
         await showAlert('Z Raporu analiz edilemedi. Lütfen tekrar deneyin.', 'error')
       }
     } finally {
-      if (activeOrganizationIdRef.current === organizationId) {
+      if (isCurrentSource(sourceGeneration, organizationId)) {
         setAnalyzing(false)
       }
     }
@@ -209,12 +320,14 @@ export function useZReportWorkspace() {
   }
 
   const startManualMode = () => {
+    const sourceGeneration = invalidateSourceSelection()
     if (!activeOrg?.id) {
       void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
       return
     }
+    stagedSourceGenerationRef.current = sourceGeneration
+    reviewedSourceGenerationRef.current = sourceGeneration
     setPendingOrganizationId(activeOrg.id)
-    setSelectedFile(null)
     setParsedData({
       date: new Date().toISOString().split('T')[0],
       total_revenue: 0,
@@ -246,25 +359,38 @@ export function useZReportWorkspace() {
 
   const approve = async () => {
     if (!parsedData || !activeOrg?.id) return
+    const organizationId = activeOrg.id
+    const sourceGeneration = sourceGenerationRef.current
+    if (
+      pendingOrganizationId !== organizationId ||
+      stagedSourceGenerationRef.current !== sourceGeneration ||
+      reviewedSourceGenerationRef.current !== sourceGeneration ||
+      !isCurrentSource(sourceGeneration, organizationId)
+    ) {
+      await showAlert('Belge farklı bir işletme için hazırlandı. Lütfen yeniden analiz edin.', 'warning')
+      return
+    }
+
     setLoading(true)
     try {
       const reportDate = parsedData.date || new Date().toISOString().split('T')[0]
-      const existingBatchId = await findExistingZReportBatch(supabase, activeOrg.id, reportDate)
+      const existingBatchId = await findExistingZReportBatch(supabase, organizationId, reportDate)
+      if (!isCurrentSource(sourceGeneration, organizationId)) return
       const replaceExisting = existingBatchId
         ? await showConfirm(
             `Bu tarihe (${reportDate}) ait bir Z-Raporu zaten var. Önceki kaydı yenisiyle değiştirmek istiyor musunuz?`,
             'warning',
           )
         : false
-      if (existingBatchId && !replaceExisting) return
+      if (!isCurrentSource(sourceGeneration, organizationId) || (existingBatchId && !replaceExisting)) return
 
       await persistZReportWrite(
         supabase,
-        activeOrg.id,
+        organizationId,
         selectedFile,
         (documentUrl) =>
           processZReport(supabase, {
-            organizationId: activeOrg.id,
+            organizationId,
             report: { ...parsedData, date: reportDate },
             documentUrl,
             replaceExisting,
@@ -272,40 +398,45 @@ export function useZReportWorkspace() {
         pendingOrganizationId,
         () => activeOrganizationIdRef.current,
       )
+      if (!isCurrentSource(sourceGeneration, organizationId)) return
       await showAlert('Z Raporu başarıyla işlendi ve stoklar düşüldü!', 'success')
       router.push('/dashboard/raporlar')
     } catch (error: unknown) {
-      devError('Z Raporu kaydedilemedi.', error)
-      await showAlert('Z Raporu kaydedilemedi. Lütfen tekrar deneyin.', 'error')
+      if (isCurrentSource(sourceGeneration, organizationId)) {
+        devError('Z Raporu kaydedilemedi.', error)
+        await showAlert('Z Raporu kaydedilemedi. Lütfen tekrar deneyin.', 'error')
+      }
     } finally {
-      setLoading(false)
+      if (isCurrentSource(sourceGeneration, organizationId)) {
+        setLoading(false)
+      }
     }
   }
 
   const reset = () => {
-    setParsedData(null)
-    setImageUrl(null)
-    setFileText(null)
-    setFileType(null)
-    setSelectedFile(null)
-    setPendingOrganizationId(null)
+    invalidateSourceSelection()
   }
+
   const closePreprocess = () => {
+    preprocessSourceRef.current = null
     setIsPreprocessOpen(false)
     setPreprocessFiles(null)
   }
+
   const confirmPreprocess = (results: { dataUrl: string }[]) => {
-    closePreprocess()
-    if (!results.length) return
-    if (!activeOrg?.id) {
-      void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
+    const source = preprocessSourceRef.current
+    if (!results.length || !source || !isCurrentSource(source.generation, source.organizationId)) {
+      closePreprocess()
       return
     }
+
+    closePreprocess()
+    stagedSourceGenerationRef.current = source.generation
     setFileText(null)
     setImageUrl(results[0].dataUrl)
     setFileType('image')
     setSelectedFile(dataUrlToFile(results[0].dataUrl, `processed-zreport-${Date.now()}.jpg`))
-    setPendingOrganizationId(activeOrg.id)
+    setPendingOrganizationId(source.organizationId)
   }
 
   return {
