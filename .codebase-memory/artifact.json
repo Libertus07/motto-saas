@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "1a56536d8f2022a18b1828e5eee4fe5de0581490",
-    "indexed_at": "2026-08-26T15:16:20Z",
-    "project": "motto-saas",
-    "nodes": 3303,
-    "edges": 5579,
-    "original_size": 7798784,
-    "compressed_size": 1585671,
+    "commit": "2fd6acff69618b074126237e808f2a6adca43385",
+    "indexed_at": "2026-08-28T20:36:22Z",
+    "project": "motto-saas-architecture-roadmap",
+    "nodes": 2930,
+    "edges": 5283,
+    "original_size": 6684672,
+    "compressed_size": 694080,
     "compression_level": 3
 }
