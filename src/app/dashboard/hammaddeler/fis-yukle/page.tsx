@@ -555,7 +555,7 @@ function FisYukle() {
                 zeka tüm formatları otomatik okuyacak.
               </p>
 
-              <label className="block w-full border-2 border-dashed border-stone-700 hover:border-amber-400 rounded-xl p-8 text-center cursor-pointer transition-colors relative overflow-hidden">
+              <label className="relative block w-full cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-stone-700 p-8 text-center transition-colors hover:border-amber-400 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-amber-400">
                 <input
                   type="file"
                   multiple

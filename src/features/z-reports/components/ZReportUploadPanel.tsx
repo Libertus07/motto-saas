@@ -1,7 +1,12 @@
 import { SafeUserImage } from '@/components/ui/SafeUserImage'
 import type { ZReportWorkspace } from '../hooks/useZReportWorkspace'
 
-export function ZReportUploadPanel({ workspace }: { workspace: ZReportWorkspace }) {
+export type ZReportUploadWorkspace = Pick<
+  ZReportWorkspace,
+  'imageUrl' | 'fileText' | 'fileType' | 'loading' | 'analyzing' | 'handleFileUpload' | 'analyze' | 'startManualMode'
+>
+
+export function ZReportUploadPanel({ workspace }: { workspace: ZReportUploadWorkspace }) {
   const hasPreview = Boolean(workspace.imageUrl || workspace.fileText)
   return (
     <div className="space-y-6">
@@ -13,7 +18,7 @@ export function ZReportUploadPanel({ workspace }: { workspace: ZReportWorkspace 
         <p className="mx-auto mb-6 max-w-md text-sm leading-6 text-stone-400 sm:text-base">
           Görsel, PDF, XML, JSON, XLSX veya CSV raporunu yükleyin; sistem satışları okuyup eşleşmeleri hazırlasın.
         </p>
-        <label className="relative block min-h-32 cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-stone-700 bg-stone-900/50 p-6 text-center transition-colors hover:border-amber-400">
+        <label className="relative block min-h-32 cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-stone-700 bg-stone-900/50 p-6 text-center transition-colors hover:border-amber-400 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-amber-400">
           <input
             type="file"
             multiple
