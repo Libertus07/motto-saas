@@ -37,11 +37,11 @@ function assertNoDirectSharp(packageJson) {
     }
   }
 
-  for (const sectionName of ['overrides', 'resolutions']) {
-    const section = packageJson[sectionName]
-    if (isRecord(section) && hasOwn(section, 'sharp')) {
-      throw new Error('project must not override sharp.')
-    }
+  if (hasOwn(packageJson, 'overrides')) {
+    throw new Error('project must not use overrides.')
+  }
+  if (hasOwn(packageJson, 'resolutions')) {
+    throw new Error('project must not use resolutions.')
   }
 }
 

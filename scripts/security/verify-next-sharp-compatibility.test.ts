@@ -55,7 +55,21 @@ const invalidCases: Array<[string, (fixture: ContractFixture) => void, string]> 
     (fixture) => {
       Object.assign(fixture.packageJson, { overrides: { sharp: '0.35.3' } })
     },
-    'project must not override sharp.',
+    'project must not use overrides.',
+  ],
+  [
+    'non-Sharp override mechanism',
+    (fixture) => {
+      Object.assign(fixture.packageJson, { overrides: { next: '16.3.3' } })
+    },
+    'project must not use overrides.',
+  ],
+  [
+    'non-Sharp resolutions mechanism',
+    (fixture) => {
+      Object.assign(fixture.packageJson, { resolutions: { lodash: '4.17.21' } })
+    },
+    'project must not use resolutions.',
   ],
   [
     'lockfile root drift',
