@@ -508,7 +508,7 @@ etkiler. Bu plan, Next'in `^0.35.3` optional aralığını koruyarak npm'in doğ
   npm run verify:next-sharp
   npm ls next sharp eslint-config-next --all
   npm explain sharp
-  node -e "const sharp=require('sharp');console.log({sharp:require('sharp/package.json').version,libvips:sharp.versions.vips})"
+  node -e "const sharp=require('sharp');console.log({sharp:sharp.versions.sharp,libvips:sharp.versions.vips})"
   ```
 
   Expected:
@@ -605,7 +605,7 @@ etkiler. Bu plan, Next'in `^0.35.3` optional aralığını koruyarak npm'in doğ
   $env:SUPABASE_SERVICE_ROLE_KEY='build-test-service-role-key'
   $env:GEMINI_API_KEY='build-test-gemini-key'
   npm run build
-  node -e "const sharp=require('sharp');console.log({sharp:require('sharp/package.json').version,libvips:sharp.versions.vips})"
+  node -e "const sharp=require('sharp');console.log({sharp:sharp.versions.sharp,libvips:sharp.versions.vips})"
   Remove-Item Env:NEXT_PUBLIC_SUPABASE_URL, Env:NEXT_PUBLIC_SUPABASE_ANON_KEY, Env:SUPABASE_SERVICE_ROLE_KEY, Env:GEMINI_API_KEY -ErrorAction SilentlyContinue
   ```
 
@@ -626,7 +626,7 @@ etkiler. Bu plan, Next'in `^0.35.3` optional aralığını koruyarak npm'in doğ
     -e SUPABASE_SERVICE_ROLE_KEY=build-test-service-role-key `
     -e GEMINI_API_KEY=build-test-gemini-key `
     node:22-bookworm-slim `
-    sh -lc "mkdir /work && tar -C /src --exclude=.git --exclude=.next --exclude=node_modules -cf - . | tar -C /work -xf - && cd /work && npm ci --ignore-scripts && npm run verify:next-sharp && npm run check && npm run build && node -e \"const sharp=require('sharp');console.log({sharp:require('sharp/package.json').version,libvips:sharp.versions.vips})\" && test -f public/sw.js"
+    sh -lc "mkdir /work && tar -C /src --exclude=.git --exclude=.next --exclude=node_modules -cf - . | tar -C /work -xf - && cd /work && npm ci --ignore-scripts && npm run verify:next-sharp && npm run check && npm run build && node -e \"const sharp=require('sharp');console.log({sharp:sharp.versions.sharp,libvips:sharp.versions.vips})\" && test -f public/sw.js"
   ```
 
   Expected: ephemeral container exits `0`; clean Linux install resolves
