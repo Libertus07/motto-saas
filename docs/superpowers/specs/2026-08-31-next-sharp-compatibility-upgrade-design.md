@@ -1,4 +1,4 @@
-# Next.js 16.3.3 ve Sharp 0.35.3 Uyumluluk Yükseltmesi Tasarımı
+# Next.js 16.3.3 ve Sharp 0.35.4 Uyumluluk Yükseltmesi Tasarımı
 
 **Durum:** Onaylanmış tasarım yönü; uygulama planı bekleniyor<br>
 **Tarih:** 2026-08-31<br>
@@ -9,7 +9,8 @@ ingestion yerelde tamam
 ## 1. Amaç
 
 Motto SaaS'ı `next@16.2.12` ve geçişli `sharp@0.34.5` sözleşmesinden,
-framework'ün doğrudan desteklediği `next@16.3.3` ve `sharp@0.35.3` sözleşmesine
+framework'ün doğrudan desteklediği `next@16.3.3` ve doğal olarak çözülen
+`sharp@0.35.4` sözleşmesine
 kontrollü biçimde taşımak.
 
 Yükseltme şu iki sonucu birlikte sağlamalıdır:
@@ -58,6 +59,13 @@ lockfile'da kaldığından dependency advisory kapanmış değildir.
 Next 16.3.3 kaynak paket manifesti Node `>=20.9.0` ve `sharp: ^0.35.3` beyan
 eder. Sharp 0.35 serisi de Node `>=20.9.0` gerektirir. Mevcut CI Node 22 bu
 ortak minimumu karşılar.
+
+26 Ağustos 2026 tarihli resmi [Sharp v0.35.4 yayın notları](https://github.com/lovell/sharp/releases/tag/v0.35.4)
+resize ve composite koordinat sınırlarını ekler ve `sharp-libvips` 1.3.3 platform
+paketleriyle yayımlanır. Resmi [Sharp 0.35.4 npm paket kaydı](https://www.npmjs.com/package/sharp/v/0.35.4)
+Node `>=20.9.0` sözleşmesini taşır. Bu sürüm, advisory'nin etkilediği `<0.35.0`
+aralığının dışındadır. Bu nedenle karar, Next'in `^0.35.3` aralığını değiştirmeden
+npm'in 0.35.4 doğal çözümünü kabul eder.
 
 ### 3.2 Reddedilen yaklaşımlar
 
@@ -163,7 +171,7 @@ npm resolution -> package-lock.json
           |
           +--> next@16.3.3
           |       |
-          |       +--> sharp@0.35.3 optional contract
+          |       +--> sharp: ^0.35.3 optional contract -> sharp@0.35.4
           |
           +--> eslint-config-next@16.3.3
           |
@@ -184,7 +192,7 @@ hiç gitmez. Yükseltme bu sınıflandırmayı değiştirmez.
 
 - `npm ls next sharp eslint-config-next --all`
 - `npm explain sharp`
-- package-lock'ta tek `next@16.3.3` ve tek `sharp@0.35.3` doğrulaması
+- package-lock'ta tek `next@16.3.3` ve tek `sharp@0.35.4` doğrulaması
 - `sharp@0.34.x`, direct Sharp dependency ve override yokluğu
 - `npm ci` ile temiz kurulum kanıtı
 
@@ -268,7 +276,7 @@ ile davranış düzeltmesi mümkün olduğunda ayrı commitlerde tutulur.
 
 Aşağıdaki durumlardan biri oluşursa upgrade zorlanmaz:
 
-- Next 16.3.3 installed contract'ı `sharp@0.35.3` üretmez;
+- Next 16.3.3 installed contract'ı `sharp@0.35.4` doğal çözümünü üretmez;
 - npm peer çözümü `--force` veya `--legacy-peer-deps` ister;
 - PWA service worker üretimi veya protected navigation bozulur;
 - trusted image optimizer ya da user-image bypass invariant'ı bozulur;
@@ -300,7 +308,7 @@ manuel node_modules müdahalesi yapılmaz.
 Yerel implementation ancak aşağıdaki koşulların tümü sağlandığında tamamlanır:
 
 1. Exact `next@16.3.3` ve `eslint-config-next@16.3.3` kurulu.
-2. Next tarafından çözülen tek `sharp@0.35.3` node'u var; `0.34.x` yok.
+2. Next tarafından doğal olarak çözülen tek `sharp@0.35.4` node'u var; `0.34.x` yok.
 3. Direct Sharp dependency, override ve force flag yok.
 4. React, Supabase, SheetJS ve ilgisiz direct dependency sürümleri değişmemiş.
 5. SafeUserImage ve exact image policy testleri geçmiş.

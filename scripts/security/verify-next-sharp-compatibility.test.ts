@@ -20,7 +20,7 @@ function createValidContract() {
           optionalDependencies: { sharp: '^0.35.3' },
         },
         'node_modules/eslint-config-next': { version: '16.3.3' },
-        'node_modules/sharp': { version: '0.35.3' },
+        'node_modules/sharp': { version: '0.35.4' },
       },
     },
   }
@@ -46,14 +46,14 @@ const invalidCases: Array<[string, (fixture: ContractFixture) => void, string]> 
   [
     'direct Sharp dependency',
     (fixture) => {
-      Object.assign(fixture.packageJson.dependencies, { sharp: '0.35.3' })
+      Object.assign(fixture.packageJson.dependencies, { sharp: '0.35.4' })
     },
     'project must not declare sharp directly.',
   ],
   [
     'Sharp override',
     (fixture) => {
-      Object.assign(fixture.packageJson, { overrides: { sharp: '0.35.3' } })
+      Object.assign(fixture.packageJson, { overrides: { sharp: '0.35.4' } })
     },
     'project must not use overrides.',
   ],
@@ -97,13 +97,13 @@ const invalidCases: Array<[string, (fixture: ContractFixture) => void, string]> 
     (fixture) => {
       fixture.packageLock.packages['node_modules/sharp'].version = '0.34.5'
     },
-    'installed Sharp package must be exactly 0.35.3.',
+    'installed Sharp package must be exactly 0.35.4.',
   ],
   [
     'duplicate nested Sharp package',
     (fixture) => {
       Object.assign(fixture.packageLock.packages, {
-        'node_modules/example/node_modules/sharp': { version: '0.35.3' },
+        'node_modules/example/node_modules/sharp': { version: '0.35.4' },
       })
     },
     'lockfile must contain exactly one Sharp package node.',
@@ -115,7 +115,7 @@ describe('verify-next-sharp-compatibility', () => {
     expect(verifyNextSharpCompatibility(createValidContract())).toEqual({
       nextVersion: '16.3.3',
       eslintConfigNextVersion: '16.3.3',
-      sharpVersion: '0.35.3',
+      sharpVersion: '0.35.4',
     })
   })
 

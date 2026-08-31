@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url'
 
 const EXPECTED_NEXT = '16.3.3'
 const EXPECTED_ESLINT_CONFIG_NEXT = '16.3.3'
-const EXPECTED_SHARP = '0.35.3'
+const EXPECTED_SHARP = '0.35.4'
 const EXPECTED_NEXT_SHARP_RANGE = '^0.35.3'
 
 function isRecord(value) {
@@ -105,7 +105,7 @@ export function verifyNextSharpCompatibility({ packageJson, packageLock }) {
   }
   const sharpPackage = requireRecord(sharpPackageValue, 'installed Sharp package is invalid.')
   if (sharpPackage.version !== EXPECTED_SHARP) {
-    throw new Error('installed Sharp package must be exactly 0.35.3.')
+    throw new Error('installed Sharp package must be exactly 0.35.4.')
   }
 
   return {

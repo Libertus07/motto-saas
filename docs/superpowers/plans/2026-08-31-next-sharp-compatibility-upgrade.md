@@ -1,4 +1,4 @@
-# Next.js 16.3.3 ve Sharp 0.35.3 Uyumluluk Yükseltmesi Uygulama Planı
+# Next.js 16.3.3 ve Sharp 0.35.4 Uyumluluk Yükseltmesi Uygulama Planı
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > superpowers:subagent-driven-development (recommended) or
@@ -6,7 +6,7 @@
 > checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Motto SaaS'ı exact `next@16.3.3` ve framework tarafından çözülen tek
-`sharp@0.35.3` node'una taşırken mevcut user-image, PWA, mobil ve build
+doğal olarak çözülen `sharp@0.35.4` node'una taşırken mevcut user-image, PWA, mobil ve build
 davranışlarını korumak.
 
 **Architecture:** Önce package/lockfile kimliğini fail-closed doğrulayan bağımsız
@@ -27,8 +27,16 @@ Docker, Graphify, codebase-memory
 - Hedef direct dependency exact `next@16.3.3` ve exact
   `eslint-config-next@16.3.3` olmalıdır.
 - Sharp doğrudan dependency veya override olarak eklenmez; Next'in
-  `sharp: ^0.35.3` optional contract'ından tek exact `sharp@0.35.3` çözülür.
+  `sharp: ^0.35.3` optional contract'ından tek exact `sharp@0.35.4` çözülür.
 - `--force`, `--legacy-peer-deps`, `overrides` ve `resolutions` kullanılmaz.
+
+Resmi [Sharp v0.35.4 yayın notları](https://github.com/lovell/sharp/releases/tag/v0.35.4)
+26 Ağustos 2026 tarihli koordinat-sınırı düzeltmelerini ve `sharp-libvips` 1.3.3
+platform güncellemesini kaydeder; resmi [npm paketi](https://www.npmjs.com/package/sharp/v/0.35.4)
+Node `>=20.9.0` gerektirir. `GHSA-f88m-g3jw-g9cj` yalnız `<0.35.0` aralığını
+etkiler. Bu plan, Next'in `^0.35.3` optional aralığını koruyarak npm'in doğal
+0.35.4 çözümünü kabul eder.
+
 - React, React DOM, Supabase, SheetJS, PWA ve ilgisiz direct dependency sürümleri
   değiştirilmez.
 - `SafeUserImage` zorunlu `unoptimized` davranışı ve exact `imageConfig`
@@ -99,7 +107,7 @@ Docker, Graphify, codebase-memory
             optionalDependencies: { sharp: '^0.35.3' },
           },
           'node_modules/eslint-config-next': { version: '16.3.3' },
-          'node_modules/sharp': { version: '0.35.3' },
+          'node_modules/sharp': { version: '0.35.4' },
         },
       },
     }
@@ -125,16 +133,30 @@ Docker, Graphify, codebase-memory
     [
       'direct Sharp dependency',
       (fixture) => {
-        Object.assign(fixture.packageJson.dependencies, { sharp: '0.35.3' })
+        Object.assign(fixture.packageJson.dependencies, { sharp: '0.35.4' })
       },
       'project must not declare sharp directly.',
     ],
     [
       'Sharp override',
       (fixture) => {
-        Object.assign(fixture.packageJson, { overrides: { sharp: '0.35.3' } })
+        Object.assign(fixture.packageJson, { overrides: { sharp: '0.35.4' } })
       },
-      'project must not override sharp.',
+      'project must not use overrides.',
+    ],
+    [
+      'non-Sharp override mechanism',
+      (fixture) => {
+        Object.assign(fixture.packageJson, { overrides: { next: '16.3.3' } })
+      },
+      'project must not use overrides.',
+    ],
+    [
+      'non-Sharp resolutions mechanism',
+      (fixture) => {
+        Object.assign(fixture.packageJson, { resolutions: { lodash: '4.17.21' } })
+      },
+      'project must not use resolutions.',
     ],
     [
       'lockfile root drift',
@@ -162,13 +184,13 @@ Docker, Graphify, codebase-memory
       (fixture) => {
         fixture.packageLock.packages['node_modules/sharp'].version = '0.34.5'
       },
-      'installed Sharp package must be exactly 0.35.3.',
+      'installed Sharp package must be exactly 0.35.4.',
     ],
     [
       'duplicate nested Sharp package',
       (fixture) => {
         Object.assign(fixture.packageLock.packages, {
-          'node_modules/example/node_modules/sharp': { version: '0.35.3' },
+          'node_modules/example/node_modules/sharp': { version: '0.35.4' },
         })
       },
       'lockfile must contain exactly one Sharp package node.',
@@ -180,7 +202,7 @@ Docker, Graphify, codebase-memory
       expect(verifyNextSharpCompatibility(createValidContract())).toEqual({
         nextVersion: '16.3.3',
         eslintConfigNextVersion: '16.3.3',
-        sharpVersion: '0.35.3',
+        sharpVersion: '0.35.4',
       })
     })
 
@@ -214,7 +236,7 @@ Docker, Graphify, codebase-memory
 
   const EXPECTED_NEXT = '16.3.3'
   const EXPECTED_ESLINT_CONFIG_NEXT = '16.3.3'
-  const EXPECTED_SHARP = '0.35.3'
+  const EXPECTED_SHARP = '0.35.4'
   const EXPECTED_NEXT_SHARP_RANGE = '^0.35.3'
 
   function isRecord(value) {
@@ -315,7 +337,7 @@ Docker, Graphify, codebase-memory
     }
     const sharpPackage = requireRecord(sharpPackageValue, 'installed Sharp package is invalid.')
     if (sharpPackage.version !== EXPECTED_SHARP) {
-      throw new Error('installed Sharp package must be exactly 0.35.3.')
+      throw new Error('installed Sharp package must be exactly 0.35.4.')
     }
 
     return {
@@ -405,7 +427,7 @@ Docker, Graphify, codebase-memory
 
 - Consumes: Task 1 `npm run verify:next-sharp` fail-closed contract.
 - Produces: exact direct `next@16.3.3`, exact dev
-  `eslint-config-next@16.3.3`, Next-owned single `sharp@0.35.3`, and a clean npm
+  `eslint-config-next@16.3.3`, Next-owned single `sharp@0.35.4`, and a clean npm
   lockfile v3 install graph.
 - Task 3 consumes this exact dependency tree for Windows/Linux/PWA/browser
   compatibility evidence.
@@ -448,7 +470,7 @@ Docker, Graphify, codebase-memory
 
   Expected: exit `0`; `package.json` retains only the two approved direct version
   changes; `package-lock.json` resolves Next 16.3.3, its matching `@next/*`
-  packages, eslint-config-next 16.3.3 and Sharp 0.35.3 platform packages.
+  packages, eslint-config-next 16.3.3 and Sharp 0.35.4 platform packages.
 
 - [ ] **Step 4: Reject unrelated manifest or lockfile drift**
 
@@ -465,7 +487,7 @@ Docker, Graphify, codebase-memory
   ```
 
   Expected: direct manifest diff contains only Next and eslint-config-next; the
-  summary is `16.3.3`, `16.3.3`, `16.3.3`, `0.35.3`, `16.3.3`. If npm rewrites
+  summary is `16.3.3`, `16.3.3`, `16.3.3`, `0.35.4`, `16.3.3`. If npm rewrites
   an unrelated direct dependency, stop and restore only that unintended hunk
   before continuing.
 
@@ -493,7 +515,7 @@ Docker, Graphify, codebase-memory
 
   - verifier exit `0`;
   - one `next@16.3.3`;
-  - one root `sharp@0.35.3`, explained only by Next's optional dependency;
+  - one root `sharp@0.35.4`, explained only by Next's optional dependency;
   - one `eslint-config-next@16.3.3`;
   - native Sharp load succeeds and reports a non-empty libvips version;
   - no direct Sharp dependency or override.
@@ -506,8 +528,8 @@ Docker, Graphify, codebase-memory
   .\node_modules\.bin\tsc.cmd --noEmit
   ```
 
-  Expected: 31 focused tests PASS; ESLint and TypeScript exit `0`. The count is
-  Task 1 verifier 10 + SafeUserImage 10 + boundaries 9 + image policy 2.
+  Expected: 33 focused tests PASS; ESLint and TypeScript exit `0`. The count is
+  Task 1 verifier 12 + SafeUserImage 10 + boundaries 9 + image policy 2.
 
 - [ ] **Step 8: Run the repository quality gate before commit**
 
@@ -588,7 +610,7 @@ Docker, Graphify, codebase-memory
   ```
 
   Expected: all checks pass, 35/35 static generation completes, `public/sw.js`
-  is generated, and native Sharp reports `0.35.3`. Record counts and sanitized
+  is generated, and native Sharp reports `0.35.4`. Record counts and sanitized
   versions; restore only build-generated `next-env.d.ts` drift.
 
 - [ ] **Step 3: Prove clean Linux/Node 22 install and build in an ephemeral container**
@@ -608,7 +630,7 @@ Docker, Graphify, codebase-memory
   ```
 
   Expected: ephemeral container exits `0`; clean Linux install resolves
-  `sharp@0.35.3`; quality/build pass; service worker exists. The container is
+  `sharp@0.35.4`; quality/build pass; service worker exists. The container is
   removed and writes nothing to the host worktree.
 
 - [ ] **Step 4: Prepare an exact local-only authenticated fixture**
