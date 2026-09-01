@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "d8d4d08c07341a54437068f28efeba46b8d555bd",
-    "indexed_at": "2026-08-31T04:20:39Z",
+    "commit": "3583573056077fa6d92ec7927b81d939e8f7c567",
+    "indexed_at": "2026-09-01T23:55:38Z",
     "project": "motto-saas-security-definer-review",
-    "nodes": 2919,
-    "edges": 5409,
-    "original_size": 5701632,
-    "compressed_size": 1179683,
+    "nodes": 4305,
+    "edges": 7962,
+    "original_size": 7602176,
+    "compressed_size": 1671146,
     "compression_level": 9
 }
