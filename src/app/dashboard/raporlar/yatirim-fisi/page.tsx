@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useNotification } from '@/components/NotificationProvider'
+import { SafeUserImage } from '@/components/ui/SafeUserImage'
 import { useOrganization } from '@/context/OrganizationContext'
 import { persistInvestmentReceiptWrite, validateOrganizationDocument } from '@/features/documents'
 import {
@@ -336,7 +336,7 @@ function YatirimFisiYukle() {
                 <h3 className="font-bold mb-4">Önizleme</h3>
                 <div className="flex justify-center mb-6">
                   {fileType === 'image' && (
-                    <Image
+                    <SafeUserImage
                       src={imageUrl}
                       alt="Yatırım Belgesi"
                       width={400}

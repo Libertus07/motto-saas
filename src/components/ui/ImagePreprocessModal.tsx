@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { preprocessReceiptImage, mergeImagesVertically, PreprocessResult, FilterPreset } from '@/lib/imagePreprocess'
-import Image from 'next/image'
+
+import { SafeUserImage } from '@/components/ui/SafeUserImage'
 
 interface ImagePreprocessModalProps {
   isOpen: boolean
@@ -40,8 +41,6 @@ export function ImagePreprocessModal({ isOpen, files, onClose, onConfirm }: Imag
     imgX: number
     imgY: number
   }>({ show: false, x: 0, y: 0, imgX: 0, imgY: 0 })
-
-  const imgRef = useRef<HTMLImageElement>(null)
 
   // Turn single File or File[] into array
   const filesList: File[] = React.useMemo(() => {
@@ -259,8 +258,7 @@ export function ImagePreprocessModal({ isOpen, files, onClose, onConfirm }: Imag
 
   // Hover Büyüteç Lens Mantığı
   const handleMouseMove = (e: React.MouseEvent<HTMLImageElement>) => {
-    if (!imgRef.current) return
-    const rect = imgRef.current.getBoundingClientRect()
+    const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
 
@@ -434,12 +432,11 @@ export function ImagePreprocessModal({ isOpen, files, onClose, onConfirm }: Imag
 
           {activeSrc && (
             <div className="relative cursor-crosshair group my-auto w-full h-[42vh]">
-              <Image
-                ref={imgRef}
+              <SafeUserImage
                 src={activeSrc}
                 alt="Receipt Preview"
                 fill
-                unoptimized
+                sizes="100vw"
                 onMouseMove={handleMouseMove}
                 onMouseLeave={handleMouseLeave}
                 className="object-contain rounded-lg shadow-2xl border border-stone-800"

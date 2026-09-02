@@ -1,17 +1,19 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
-import * as XLSX from 'xlsx'
 import { useRouter } from 'next/navigation'
 import { devError } from '@/lib/debug'
 import { formatCurrency } from '@/lib/format'
 import { useNotification } from '@/components/NotificationProvider'
+import { SafeUserImage } from '@/components/ui/SafeUserImage'
 import { useOrganization } from '@/context/OrganizationContext'
 import dynamic from 'next/dynamic'
 import { dataUrlToFile } from '@/lib/imagePreprocess'
 import { persistSupplierReceiptWrite, validateOrganizationDocument } from '@/features/documents'
+import { createSupplierReceiptSourceSelection } from '@/features/materials/services/supplier-receipt-source-selection'
+import { toSupplierReceiptAnalysisInput } from '@/features/materials/services/supplier-spreadsheet-adapter'
+import { createSpreadsheetParseCoordinator } from '@/features/spreadsheets/spreadsheet-parse-coordinator'
 
 const ImagePreprocessModal = dynamic(
   () => import('@/components/ui/ImagePreprocessModal').then((mod) => mod.ImagePreprocessModal),
@@ -50,7 +52,7 @@ function FisYukle() {
   const [image, setImage] = useState<string | null>(null)
   const [fileText, setFileText] = useState<string | null>(null)
   const [fileType, setFileType] = useState<'image' | 'pdf' | 'xml' | 'json' | null>(null)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isAnalysisOnlySpreadsheet, setIsAnalysisOnlySpreadsheet] = useState(false)
   const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([])
@@ -71,19 +73,50 @@ function FisYukle() {
   const [step, setStep] = useState<'upload' | 'review' | 'done'>('upload')
   const [error, setError] = useState('')
   const [isPreprocessOpen, setIsPreprocessOpen] = useState(false)
-  const [preprocessFiles, setPreprocessFiles] = useState<File[] | File | null>(null)
+  const [preprocessSelection, setPreprocessSelection] = useState<{
+    files: File[] | File
+    generation: number
+    organizationId: string
+  } | null>(null)
   const { showAlert, showConfirm } = useNotification()
   const { activeOrg } = useOrganization()
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const activeOrganizationIdRef = useRef(activeOrg?.id)
+  const [spreadsheetParseCoordinator] = useState(createSpreadsheetParseCoordinator)
+  const [sourceSelection] = useState(() =>
+    createSupplierReceiptSourceSelection({
+      clear() {
+        setImage(null)
+        setFileText(null)
+        setFileType(null)
+        setIsAnalysisOnlySpreadsheet(false)
+        setPendingOrganizationId(null)
+        setLoading(false)
+        setParsedItems([])
+        setParsedSupplier(null)
+        setSupplierDebt(0)
+        setMaterials([])
+        setSuppliers([])
+        setStep('upload')
+        setError('')
+        setIsPreprocessOpen(false)
+        setPreprocessSelection(null)
+      },
+      cancelSpreadsheetParsing() {
+        spreadsheetParseCoordinator.cancel()
+      },
+    }),
+  )
 
   useEffect(() => {
     activeOrganizationIdRef.current = activeOrg?.id
+
     return () => {
+      sourceSelection.dispose()
       activeOrganizationIdRef.current = undefined
     }
-  }, [activeOrg?.id])
+  }, [activeOrg?.id, sourceSelection])
 
   // Tedarikçi adı değiştiğinde borcunu getir
   useEffect(() => {
@@ -110,17 +143,79 @@ function FisYukle() {
     }
   }, [activeOrg?.id, parsedSupplier?.name, step, supabase])
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = Array.from(e.target.files || [])
     if (fileList.length === 0) return
     e.target.value = ''
 
     const file = fileList[0]
+    const sourceGeneration = sourceSelection.begin()
     const organizationId = activeOrg?.id
     if (!organizationId) {
       void showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
       return
     }
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase()
+    if (fileExt === 'xlsx' || fileExt === 'csv') {
+      if (fileExt === 'xlsx') {
+        const validationError = validateOrganizationDocument({
+          organizationId,
+          bucket: 'motto_assets',
+          kind: 'supplier-receipt',
+          file,
+        })
+        if (validationError) {
+          void showAlert(validationError, 'warning')
+          return
+        }
+      }
+
+      setLoading(true)
+
+      try {
+        const parsed = await spreadsheetParseCoordinator.run(file, organizationId)
+        if (
+          !parsed ||
+          !sourceSelection.isCurrent(sourceGeneration) ||
+          activeOrganizationIdRef.current !== organizationId
+        ) {
+          return
+        }
+
+        if (!parsed.result.ok) {
+          await showAlert(parsed.result.message, 'warning')
+          return
+        }
+
+        const analysisInput = toSupplierReceiptAnalysisInput(parsed.result.table)
+        if (!analysisInput.ok) {
+          await showAlert(analysisInput.message, 'warning')
+          return
+        }
+
+        const persistenceFile = parsed.result.table.kind === 'xlsx' ? file : null
+        if (!sourceSelection.stage(sourceGeneration, persistenceFile)) {
+          return
+        }
+
+        setFileText(analysisInput.content)
+        setFileType('json')
+        setIsAnalysisOnlySpreadsheet(parsed.result.table.kind === 'csv')
+        setPendingOrganizationId(organizationId)
+      } catch {
+        if (sourceSelection.isCurrent(sourceGeneration) && activeOrganizationIdRef.current === organizationId) {
+          await showAlert('Elektronik tablo okunamadı. Lütfen dosyayı kontrol edip tekrar deneyin.', 'warning')
+        }
+      } finally {
+        if (sourceSelection.isCurrent(sourceGeneration) && activeOrganizationIdRef.current === organizationId) {
+          setLoading(false)
+        }
+      }
+
+      return
+    }
+
     const validationError = validateOrganizationDocument({
       organizationId,
       bucket: 'motto_assets',
@@ -131,56 +226,43 @@ function FisYukle() {
       void showAlert(validationError, 'warning')
       return
     }
-    setSelectedFile(file)
-    setPendingOrganizationId(organizationId)
 
-    const fileExt = file.name.split('.').pop()?.toLowerCase()
     if (fileExt === 'xml' || fileExt === 'json') {
+      sourceSelection.stage(sourceGeneration, file)
       const reader = new FileReader()
       reader.onload = () => {
-        if (activeOrganizationIdRef.current !== organizationId) return
+        if (!sourceSelection.isCurrent(sourceGeneration) || activeOrganizationIdRef.current !== organizationId) return
         setImage(null)
         setFileText(reader.result as string)
         setFileType(fileExt as 'xml' | 'json')
+        setPendingOrganizationId(organizationId)
       }
       reader.readAsText(file)
-    } else if (fileExt === 'xlsx' || fileExt === 'xls') {
-      const reader = new FileReader()
-      reader.onload = (evt) => {
-        if (activeOrganizationIdRef.current !== organizationId) return
-        const data = new Uint8Array(evt.target?.result as ArrayBuffer)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const firstSheetName = workbook.SheetNames[0]
-        const worksheet = workbook.Sheets[firstSheetName]
-        const json = XLSX.utils.sheet_to_json(worksheet)
-
-        setImage(null)
-        setFileText(JSON.stringify(json))
-        setFileType('json') // AI'a json olarak gönderiyoruz
-      }
-      reader.readAsArrayBuffer(file)
     } else if (file.type === 'application/pdf') {
       if (file.size > 3 * 1024 * 1024) {
         showAlert('Seçtiğiniz PDF belgesi çok büyük (Max 3MB). Lütfen dosya boyutunu küçültün.', 'warning')
         return
       }
+      sourceSelection.stage(sourceGeneration, file)
       const reader = new FileReader()
       reader.onload = () => {
-        if (activeOrganizationIdRef.current !== organizationId) return
+        if (!sourceSelection.isCurrent(sourceGeneration) || activeOrganizationIdRef.current !== organizationId) return
         setFileText(null)
         setImage(reader.result as string)
         setFileType('pdf')
+        setPendingOrganizationId(organizationId)
       }
       reader.readAsDataURL(file)
     } else {
       // Görseller (JPEG/PNG/WEBP) için Görsel İyileştirme Stüdyosu Modalını Aç
-      setPreprocessFiles(fileList)
+      setPreprocessSelection({ files: fileList, generation: sourceGeneration, organizationId })
       setIsPreprocessOpen(true)
     }
   }
 
   const analyzeReceipt = async () => {
     if (!image && !fileText) return
+    const sourceGeneration = sourceSelection.currentGeneration()
     if (!activeOrg?.id) {
       await showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
       return
@@ -200,7 +282,8 @@ function FisYukle() {
         supabase.from('suppliers').select('id, name').eq('organization_id', requestedOrganizationId),
       ])
 
-      if (activeOrganizationIdRef.current !== requestedOrganizationId) return
+      if (!sourceSelection.isCurrent(sourceGeneration) || activeOrganizationIdRef.current !== requestedOrganizationId)
+        return
 
       setMaterials(existingMaterials || [])
       setSuppliers(existingSuppliers || [])
@@ -217,7 +300,8 @@ function FisYukle() {
 
       const data = await response.json()
 
-      if (activeOrganizationIdRef.current !== requestedOrganizationId) return
+      if (!sourceSelection.isCurrent(sourceGeneration) || activeOrganizationIdRef.current !== requestedOrganizationId)
+        return
 
       if (data.error) {
         setError(data.error)
@@ -257,24 +341,27 @@ function FisYukle() {
       })
 
       setParsedItems(itemsWithMatch)
+      if (!sourceSelection.markReviewed(sourceGeneration)) return
       setStep('review')
     } catch {
-      if (activeOrganizationIdRef.current === requestedOrganizationId) {
+      if (sourceSelection.isCurrent(sourceGeneration) && activeOrganizationIdRef.current === requestedOrganizationId) {
         setError('Fiş okunamadı, bağlantıyı kontrol edin veya tekrar deneyin.')
       }
     } finally {
-      if (activeOrganizationIdRef.current === requestedOrganizationId) {
+      if (sourceSelection.isCurrent(sourceGeneration) && activeOrganizationIdRef.current === requestedOrganizationId) {
         setLoading(false)
       }
     }
   }
 
   const startManualMode = async () => {
+    const sourceGeneration = sourceSelection.begin()
     if (!activeOrg?.id) {
       await showAlert('Aktif işletme bilgisi bulunamadı.', 'error')
       return
     }
     const requestedOrganizationId = activeOrg.id
+    sourceSelection.stage(sourceGeneration, null)
     setLoading(true)
     setPendingOrganizationId(requestedOrganizationId)
     const [{ data: existingMaterials }, { data: existingSuppliers }] = await Promise.all([
@@ -282,7 +369,8 @@ function FisYukle() {
       supabase.from('suppliers').select('id, name').eq('organization_id', requestedOrganizationId),
     ])
 
-    if (activeOrganizationIdRef.current !== requestedOrganizationId) return
+    if (!sourceSelection.isCurrent(sourceGeneration) || activeOrganizationIdRef.current !== requestedOrganizationId)
+      return
 
     setMaterials(existingMaterials || [])
     setSuppliers(existingSuppliers || [])
@@ -310,7 +398,7 @@ function FisYukle() {
         isNew: true,
       },
     ])
-    setSelectedFile(null)
+    if (!sourceSelection.markReviewed(sourceGeneration)) return
     setStep('review')
     setLoading(false)
   }
@@ -345,6 +433,7 @@ function FisYukle() {
 
   const applyChanges = async () => {
     setLoading(true)
+    const sourceGeneration = sourceSelection.currentGeneration()
 
     if (!activeOrg?.id) {
       setError('Fiş kaydedilemedi. Aktif işletme bilgisi bulunamadı.')
@@ -392,38 +481,46 @@ function FisYukle() {
     }
 
     try {
-      await persistSupplierReceiptWrite(
-        supabase,
-        activeOrg.id,
-        selectedFile,
-        duplicateBatchId,
-        {
-          user_id: user?.id,
-          batch_id: batchId,
-          supplier: parsedSupplier
-            ? {
-                id: parsedSupplier.id || null,
-                name: parsedSupplier.name,
-                phone: parsedSupplier.phone || null,
-                iban: parsedSupplier.iban || null,
-                address: parsedSupplier.address || null,
-                date: parsedSupplier.date,
-                totalAmount: parsedSupplier.totalAmount,
-                paidAmount: parsedSupplier.paidAmount,
-              }
-            : null,
-          items: selectedItems.map((item) => ({
-            matchedMaterialId: item.matchedMaterialId || null,
-            name: item.name || 'İsimsiz Ürün',
-            category: item.category || 'Diğer',
-            unit: item.unit || 'Adet',
-            quantity: parseNum(item.quantity),
-            unitPrice: parseNum(item.unitPrice),
-          })),
-        },
-        pendingOrganizationId,
-        () => activeOrganizationIdRef.current,
+      const persistenceOperation = sourceSelection.persistReviewed(sourceGeneration, (persistenceFile) =>
+        persistSupplierReceiptWrite(
+          supabase,
+          activeOrg.id,
+          persistenceFile,
+          duplicateBatchId,
+          {
+            user_id: user?.id,
+            batch_id: batchId,
+            supplier: parsedSupplier
+              ? {
+                  id: parsedSupplier.id || null,
+                  name: parsedSupplier.name,
+                  phone: parsedSupplier.phone || null,
+                  iban: parsedSupplier.iban || null,
+                  address: parsedSupplier.address || null,
+                  date: parsedSupplier.date,
+                  totalAmount: parsedSupplier.totalAmount,
+                  paidAmount: parsedSupplier.paidAmount,
+                }
+              : null,
+            items: selectedItems.map((item) => ({
+              matchedMaterialId: item.matchedMaterialId || null,
+              name: item.name || 'İsimsiz Ürün',
+              category: item.category || 'Diğer',
+              unit: item.unit || 'Adet',
+              quantity: parseNum(item.quantity),
+              unitPrice: parseNum(item.unitPrice),
+            })),
+          },
+          pendingOrganizationId,
+          () => activeOrganizationIdRef.current,
+        ),
       )
+      if (!persistenceOperation) {
+        setError('Fiş kaydedilemedi. Lütfen belgeyi yeniden analiz edin.')
+        setLoading(false)
+        return
+      }
+      await persistenceOperation
     } catch (error) {
       devError('Fiş yükleme atomic işlem hatası:', error)
       setError('Fiş ve finansal kayıt işlemi tamamlanamadı. Lütfen tekrar deneyin.')
@@ -452,22 +549,22 @@ function FisYukle() {
         {step === 'upload' && (
           <div className="space-y-6">
             <div className="bg-stone-900 border border-stone-800 rounded-xl p-6">
-              <h2 className="font-bold text-lg mb-2">Belge Yükleyin (Görsel, PDF, XML, JSON)</h2>
+              <h2 className="font-bold text-lg mb-2">Belge Yükleyin (Görsel, PDF, XML, JSON, XLSX, CSV)</h2>
               <p className="text-stone-400 text-sm mb-6">
-                Fiş görseli, PDF fatura, XML e-fatura veya JSON fiyat listesi yükleyebilirsiniz. Yapay zeka tüm
-                formatları otomatik okuyacak.
+                Fiş görseli, PDF fatura, XML e-fatura, JSON fiyat listesi veya elektronik tablo yükleyebilirsiniz. Yapay
+                zeka tüm formatları otomatik okuyacak.
               </p>
 
-              <label className="block w-full border-2 border-dashed border-stone-700 hover:border-amber-400 rounded-xl p-8 text-center cursor-pointer transition-colors relative overflow-hidden">
+              <label className="relative block w-full cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-stone-700 p-8 text-center transition-colors hover:border-amber-400 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-amber-400">
                 <input
                   type="file"
                   multiple
-                  accept="image/*,application/pdf,text/xml,.xml,application/json,.json,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  accept="image/*,application/pdf,text/xml,.xml,application/json,.json,.xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                   onChange={handleImageUpload}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
                 {image && fileType === 'image' && (
-                  <Image
+                  <SafeUserImage
                     src={image}
                     alt="Fiş"
                     width={400}
@@ -487,17 +584,24 @@ function FisYukle() {
                     <p className="text-stone-300 font-bold">XML (E-Fatura) Seçildi</p>
                   </div>
                 )}
-                {fileText && fileType === 'json' && (
+                {fileText && fileType === 'json' && isAnalysisOnlySpreadsheet && (
+                  <div className="py-12">
+                    <div className="text-6xl mb-3">📊</div>
+                    <p className="text-stone-300 font-bold">CSV Seçildi</p>
+                    <p className="text-stone-500 text-sm mt-2">CSV yalnızca analiz edilir; özgün dosya kaydedilmez.</p>
+                  </div>
+                )}
+                {fileText && fileType === 'json' && !isAnalysisOnlySpreadsheet && (
                   <div className="py-12">
                     <div className="text-6xl mb-3">🤖</div>
-                    <p className="text-stone-300 font-bold">JSON / Excel Seçildi</p>
+                    <p className="text-stone-300 font-bold">JSON / XLSX Seçildi</p>
                   </div>
                 )}
                 {!image && !fileText && (
                   <div>
                     <div className="text-5xl mb-3">📂</div>
                     <p className="text-stone-400">Dosya seç veya sürükle</p>
-                    <p className="text-stone-600 text-sm mt-1">JPG, PNG, PDF, XML, JSON, XLSX desteklenir</p>
+                    <p className="text-stone-600 text-sm mt-1">JPG, PNG, PDF, XML, JSON, XLSX ve CSV desteklenir</p>
                   </div>
                 )}
               </label>
@@ -513,21 +617,26 @@ function FisYukle() {
                 placeholder="Fiş resmi URL'sini yapıştırın (https://...)"
                 value={image && image.startsWith('http') ? image : ''}
                 onChange={(e) => {
-                  setImage(e.target.value || null)
-                  setPendingOrganizationId(e.target.value ? (activeOrg?.id ?? null) : null)
+                  const sourceGeneration = sourceSelection.begin()
+                  const value = e.target.value
+                  if (!value) return
+
+                  sourceSelection.stage(sourceGeneration, null)
+                  setImage(value)
+                  setPendingOrganizationId(activeOrg?.id ?? null)
                 }}
                 className="w-full bg-stone-950 border border-stone-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-amber-400"
               />
 
               {image && image.startsWith('http') && (
                 <div className="mt-4">
-                  <Image
+                  <SafeUserImage
                     src={image}
                     alt="URL Önizleme"
                     width={400}
                     height={384}
                     className="max-h-96 mx-auto rounded-lg object-contain"
-                    onError={() => setError("URL'den resim yüklenemedi, linki kontrol edin.")}
+                    onLoadError={() => setError("URL'den resim yüklenemedi, linki kontrol edin.")}
                   />
                 </div>
               )}
@@ -695,6 +804,11 @@ function FisYukle() {
                 <span className="text-amber-400 font-bold">{parsedItems.length} kalem</span> tespit edildi. Güncellemek
                 istediklerinizi seçin, fiyatları kontrol edin.
               </p>
+              {isAnalysisOnlySpreadsheet && (
+                <p className="text-stone-500 text-sm mt-2">
+                  CSV içeriği analiz edildi; kayıt sırasında özgün CSV dosyası depolanmayacak.
+                </p>
+              )}
             </div>
 
             {parsedItems.map((item, index) => (
@@ -903,13 +1017,7 @@ function FisYukle() {
               </button>
               <button
                 onClick={() => {
-                  setStep('upload')
-                  setImage(null)
-                  setFileText(null)
-                  setFileType(null)
-                  setSelectedFile(null)
-                  setPendingOrganizationId(null)
-                  setParsedItems([])
+                  sourceSelection.begin()
                 }}
                 className="bg-stone-800 hover:bg-stone-700 text-white px-6 py-3 rounded-xl transition-colors"
               >
@@ -934,11 +1042,7 @@ function FisYukle() {
               </button>
               <button
                 onClick={() => {
-                  setStep('upload')
-                  setImage(null)
-                  setSelectedFile(null)
-                  setPendingOrganizationId(null)
-                  setParsedItems([])
+                  sourceSelection.begin()
                 }}
                 className="bg-stone-800 hover:bg-stone-700 text-white px-6 py-3 rounded-xl transition-colors"
               >
@@ -951,22 +1055,30 @@ function FisYukle() {
 
       <ImagePreprocessModal
         isOpen={isPreprocessOpen}
-        files={preprocessFiles}
+        files={preprocessSelection?.files ?? null}
         onClose={() => {
           setIsPreprocessOpen(false)
-          setPreprocessFiles(null)
+          setPreprocessSelection(null)
         }}
         onConfirm={(results) => {
           setIsPreprocessOpen(false)
-          setPreprocessFiles(null)
-          if (results.length > 0) {
+          const pendingSelection = preprocessSelection
+          setPreprocessSelection(null)
+          if (
+            results.length > 0 &&
+            pendingSelection &&
+            sourceSelection.isCurrent(pendingSelection.generation) &&
+            activeOrganizationIdRef.current === pendingSelection.organizationId
+          ) {
             const firstRes = results[0]
+            const processedFileObj = dataUrlToFile(firstRes.dataUrl, `processed-receipt-${Date.now()}.jpg`)
+            if (!sourceSelection.stage(pendingSelection.generation, processedFileObj)) return
+
             setFileText(null)
             setImage(firstRes.dataUrl)
             setFileType('image')
-            const processedFileObj = dataUrlToFile(firstRes.dataUrl, `processed-receipt-${Date.now()}.jpg`)
-            setSelectedFile(processedFileObj)
-            setPendingOrganizationId(activeOrg?.id ?? null)
+            setIsAnalysisOnlySpreadsheet(false)
+            setPendingOrganizationId(pendingSelection.organizationId)
           }
         }}
       />

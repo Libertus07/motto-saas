@@ -1,11 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { formatDate } from '@/lib/format'
 import { HistoryAccordion } from '@/components/ui/HistoryAccordion'
+import { SafeUserImage } from '@/components/ui/SafeUserImage'
 
 type ActivityLogDetails = Record<string, unknown> & {
   detay?: string
@@ -470,9 +470,9 @@ export default function IslemGecmisi() {
                                     val.includes('supabase.co'))
                                 ) {
                                   return (
-                                    <Image
+                                    <SafeUserImage
                                       src={val}
-                                      alt="preview"
+                                      alt="İşlem belgesi önizlemesi"
                                       width={200}
                                       height={64}
                                       className="h-16 w-auto rounded-lg object-contain bg-stone-900 p-1 border border-stone-700 shadow-sm"
@@ -574,9 +574,9 @@ export default function IslemGecmisi() {
                               ) {
                                 return (
                                   <div className="mt-1">
-                                    <Image
+                                    <SafeUserImage
                                       src={v}
-                                      alt="preview"
+                                      alt="İşlem belgesi önizlemesi"
                                       width={200}
                                       height={96}
                                       className="max-h-24 w-auto rounded-lg object-contain border border-stone-700 bg-stone-900 p-1"

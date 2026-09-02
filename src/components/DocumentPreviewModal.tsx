@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Image from 'next/image'
+
+import { SafeUserImage } from '@/components/ui/SafeUserImage'
 
 import { openDocumentInNewTab } from './document-preview-utils'
 
@@ -138,11 +139,11 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
         ) : isImage ? (
           <div className="w-full min-h-full flex flex-col items-center justify-start my-auto">
             <div className={`relative ${viewMode === 'fitWidth' ? 'w-full sm:max-w-2xl h-[78vh]' : 'w-full h-[78vh]'}`}>
-              <Image
+              <SafeUserImage
                 src={url}
-                alt="Fatura Önizleme"
+                alt="Fatura önizlemesi"
                 fill
-                unoptimized
+                sizes="(min-width: 640px) 672px, 100vw"
                 className="rounded-2xl shadow-2xl border border-stone-800/80 transition-all duration-200 ease-out origin-top object-contain"
                 style={{
                   transform: `scale(${zoom})`,

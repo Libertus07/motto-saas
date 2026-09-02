@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Image from 'next/image'
 import { Copy, ImagePlus, RotateCcw } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase'
 import { useNotification } from '@/components/NotificationProvider'
+import { SafeUserImage } from '@/components/ui/SafeUserImage'
 import { Input } from '@/components/ui/input'
 import { useOrganization } from '@/context/OrganizationContext'
 
@@ -117,12 +117,11 @@ export function GenelTab({ s, set, onSave, saving }: GenelTabProps) {
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
           <div className="relative flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-3xl border-2 border-dashed border-stone-700 bg-stone-950 p-3">
             {previewUrl || (!removeLogo && s.business_logo) ? (
-              <Image
+              <SafeUserImage
                 src={previewUrl || s.business_logo}
                 alt="İşletme logosu önizlemesi"
                 width={112}
                 height={112}
-                unoptimized
                 className="h-full w-full object-contain"
               />
             ) : (

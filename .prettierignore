@@ -5,6 +5,7 @@ graphify-out
 .codebase-memory
 .agents
 .specify
+.superpowers/sdd/
 .husky
 supabase/.temp
 package-lock.json

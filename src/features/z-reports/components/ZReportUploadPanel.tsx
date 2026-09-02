@@ -1,7 +1,12 @@
-import Image from 'next/image'
+import { SafeUserImage } from '@/components/ui/SafeUserImage'
 import type { ZReportWorkspace } from '../hooks/useZReportWorkspace'
 
-export function ZReportUploadPanel({ workspace }: { workspace: ZReportWorkspace }) {
+export type ZReportUploadWorkspace = Pick<
+  ZReportWorkspace,
+  'imageUrl' | 'fileText' | 'fileType' | 'loading' | 'analyzing' | 'handleFileUpload' | 'analyze' | 'startManualMode'
+>
+
+export function ZReportUploadPanel({ workspace }: { workspace: ZReportUploadWorkspace }) {
   const hasPreview = Boolean(workspace.imageUrl || workspace.fileText)
   return (
     <div className="space-y-6">
@@ -11,21 +16,24 @@ export function ZReportUploadPanel({ workspace }: { workspace: ZReportWorkspace 
         </div>
         <h2 className="mb-2 text-xl font-bold">Belge Yükleyin</h2>
         <p className="mx-auto mb-6 max-w-md text-sm leading-6 text-stone-400 sm:text-base">
-          Görsel, PDF, XML, JSON veya Excel raporunu yükleyin; sistem satışları okuyup eşleşmeleri hazırlasın.
+          Görsel, PDF, XML, JSON, XLSX veya CSV raporunu yükleyin; sistem satışları okuyup eşleşmeleri hazırlasın.
         </p>
-        <label className="relative block min-h-32 cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-stone-700 bg-stone-900/50 p-6 text-center transition-colors hover:border-amber-400">
+        <label className="relative block min-h-32 cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-stone-700 bg-stone-900/50 p-6 text-center transition-colors hover:border-amber-400 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-amber-400">
           <input
             type="file"
             multiple
-            accept="image/*,application/pdf,text/xml,.xml,application/json,.json,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            accept="image/*,application/pdf,text/xml,.xml,application/json,.json,.xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
             onChange={workspace.handleFileUpload}
             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
           />
           <span className="inline-block rounded-lg bg-blue-600 px-6 py-3 font-bold text-white transition-colors hover:bg-blue-500">
             Belge Seç / Çek
           </span>
-          <span className="mt-3 block text-sm text-stone-500">JPG, PNG, PDF, XML, JSON ve XLSX</span>
+          <span className="mt-3 block text-sm text-stone-500">JPG, PNG, PDF, XML, JSON, XLSX ve CSV</span>
         </label>
+        <p className="mt-3 text-xs leading-5 text-stone-500 sm:text-sm">
+          Elektronik tablolar için yalnızca XLSX veya CSV seçin; XLS ve XLSM dosyaları güvenlik nedeniyle kabul edilmez.
+        </p>
         <div className="my-6 flex items-center gap-4" aria-hidden="true">
           <div className="h-px flex-1 bg-stone-800" />
           <span className="text-xs font-bold text-stone-500 sm:text-sm">VEYA MANUEL GİRİN</span>
@@ -46,7 +54,7 @@ export function ZReportUploadPanel({ workspace }: { workspace: ZReportWorkspace 
           <h3 className="mb-4 font-bold">Önizleme</h3>
           <div className="mb-6 flex min-h-40 items-center justify-center">
             {workspace.imageUrl && workspace.fileType === 'image' ? (
-              <Image
+              <SafeUserImage
                 src={workspace.imageUrl}
                 alt="Yüklenen Z Raporu"
                 width={400}
@@ -59,7 +67,8 @@ export function ZReportUploadPanel({ workspace }: { workspace: ZReportWorkspace 
                   {workspace.fileType === 'pdf' ? '📄' : workspace.fileType === 'xml' ? '📰' : '🤖'}
                 </div>
                 <p className="font-bold text-stone-300">
-                  {workspace.fileType === 'pdf' ? 'PDF' : workspace.fileType === 'xml' ? 'XML' : 'JSON / Excel'} seçildi
+                  {workspace.fileType === 'pdf' ? 'PDF' : workspace.fileType === 'xml' ? 'XML' : 'JSON / XLSX / CSV'}{' '}
+                  seçildi
                 </p>
               </div>
             )}

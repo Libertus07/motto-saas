@@ -92,7 +92,7 @@ describe('roadmap validator', () => {
     const result = runValidator(process.cwd())
 
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Roadmap validation passed (18 tasks).')
+    expect(result.stdout).toContain('Roadmap validation passed (19 tasks).')
   })
 
   it('keeps roadmap validation in local and GitHub quality gates', () => {

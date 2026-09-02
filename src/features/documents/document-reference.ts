@@ -26,7 +26,6 @@ const extensionByMimeType = {
   'application/xml': 'xml',
   'text/xml': 'xml',
   'application/json': 'json',
-  'application/vnd.ms-excel': 'xls',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
 } as const
 
@@ -42,7 +41,6 @@ const zReportMimeTypes = new Set<keyof typeof extensionByMimeType>([
   'application/xml',
   'text/xml',
   'application/json',
-  'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ])
 

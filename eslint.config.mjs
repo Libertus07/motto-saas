@@ -17,6 +17,32 @@ const eslintConfig = defineConfig([
       '@typescript-eslint/no-require-imports': 'error',
     },
   },
+  {
+    files: [
+      'src/components/DocumentPreviewModal.tsx',
+      'src/components/Sidebar.tsx',
+      'src/features/auth/components/LoginBrandingProvider.tsx',
+      'src/features/settings/components/tabs/GenelTab.tsx',
+      'src/components/ui/ImagePreprocessModal.tsx',
+      'src/features/z-reports/components/ZReportUploadPanel.tsx',
+      'src/app/dashboard/hammaddeler/fis-yukle/page.tsx',
+      'src/app/dashboard/raporlar/yatirim-fisi/page.tsx',
+      'src/app/dashboard/islem-gecmisi/page.tsx',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'next/image',
+              message: 'Kullanıcı kontrollü görseller SafeUserImage üzerinden işlenmelidir.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   globalIgnores([
     '.next/**',
     'out/**',
