@@ -1,6 +1,6 @@
 # Next.js 16.3.3 ve Sharp 0.35.4 Uyumluluk Yükseltmesi Tasarımı
 
-**Durum:** Onaylanmış tasarım yönü; uygulama planı bekleniyor<br>
+**Durum:** Onaylanmış; yerel uygulama ve doğrulama tamam, teslimat kapıları bekliyor<br>
 **Tarih:** 2026-08-31<br>
 **Sahip:** `DEP-02` production dependency remediation<br>
 **Önkoşul:** DEP-02A image pipeline hardening ve DEP-02B safe spreadsheet
