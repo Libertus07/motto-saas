@@ -132,8 +132,27 @@ biçim, roadmap, lint ve tip kontrolleri geçti. Üretim derlemesi, yalnız sür
 içinde kullanılan sahte public Supabase değerleriyle 35 statik sayfa üreterek
 tamamlandı. Gerçek canlı anahtar veya veri kullanılmadı.
 
-Bu yerel kod henüz commit/push/deploy edilmedi. Bu nedenle canlı modal odak
-davranışı yeniden doğrulanana kadar production kabul kapısı açık kalır.
+Yerel düzeltme `da1bd6b`, codebase-memory yenilemesi `df213d5` commit'lerinde
+kayıtlıdır; push veya deploy yapılmadı. Bu nedenle canlı modal odak davranışı
+yeniden doğrulanana kadar production kabul kapısı açık kalır.
+
+## Yerel tarayıcı kontrolü — 2026-09-17
+
+Yalnızca yerel Next sunucusunda, sahte public Supabase değerleri ve geçici,
+sonradan kaldırılmış bir test sayfasıyla gerçek Chromium kontrolü yapıldı.
+Hiçbir gerçek işletme verisi veya belge kullanılmadı. 390×844 ve 1440×900 CSS
+görünümlerinde modal açıldığında kapatma düğmesi odaklandı; Tab sırası belge
+kontrollerine ulaştı ve arka plan/Next geliştirici araçları düğmelerine geçmedi.
+Son işlem düğmesinden sonraki bir Tab adımında Chromium `body` öğesini etkin
+gösterdi, sonraki adım kapatma düğmesine döndü. Bu nedenle her Tab adımının
+mutlaka dialog içinde kaldığı iddia edilmez; gözlenen sonuç, arka plandaki
+etkileşimli düğmelere odak geçmemesidir. Escape modalı kapattı ve odağı açan
+düğmeye döndürdü. İki görünümde de document düzeyinde yatay taşma ölçülmedi.
+
+Bu kontrol geçici yerel sayfada, sentetik tek piksellik görselle yapıldı; canlı
+Vercel Toolbar, gerçek imzalı belge, fiziksel dokunma ve önbelleği temizlenmiş
+ilk-açılış davranışının yerine geçmez. Tarayıcı testi henüz CI'ya eklenmiş
+kalıcı bir otomasyon değildir.
 
 ## Veri ve teslimat sınırı
 
