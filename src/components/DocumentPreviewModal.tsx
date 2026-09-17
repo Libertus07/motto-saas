@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 import { SafeUserImage } from '@/components/ui/SafeUserImage'
 
@@ -16,6 +16,9 @@ type DocumentPreviewModalProps = {
 export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Önizleme' }: DocumentPreviewModalProps) {
   const [zoom, setZoom] = useState(1)
   const [viewMode, setViewMode] = useState<'fitWidth' | 'fitScreen'>('fitWidth')
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const hasDocument = Boolean(url)
 
   // Reset view state when modal opens or URL changes
   useEffect(() => {
@@ -29,20 +32,26 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
     return () => clearTimeout(id)
   }, [url, isOpen])
 
-  // Handle escape key
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = 'hidden'
-    }
+    if (!isOpen || !hasDocument) return
+
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const previousOverflow = document.body.style.overflow
+
+    // The browser top layer makes the page inert and keeps keyboard focus in the modal.
+    if (!dialog.open) dialog.showModal()
+    closeButtonRef.current?.focus()
+    document.body.style.overflow = 'hidden'
+
     return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-      document.body.style.overflow = 'unset'
+      if (dialog.open) dialog.close()
+      document.body.style.overflow = previousOverflow
+      if (previousFocus?.isConnected) previousFocus.focus()
     }
-  }, [isOpen, onClose])
+  }, [isOpen, hasDocument])
 
   if (!isOpen || !url) return null
 
@@ -77,9 +86,17 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-stone-950/95 backdrop-blur-xl flex flex-col justify-between z-[9999] overflow-hidden select-none animate-fadeIn"
-      onClick={onClose}
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="document-preview-title"
+      className="fixed inset-0 m-0 h-dvh w-screen max-h-none max-w-none border-0 p-0 bg-stone-950/95 text-stone-100 backdrop-blur-xl hidden open:flex flex-col justify-between z-[9999] overflow-hidden select-none animate-fadeIn backdrop:bg-stone-950/95"
+      onCancel={(event) => {
+        event.preventDefault()
+        onClose()
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
     >
       {/* ÜST DOCK (Floating Header Bar) */}
       <header
@@ -93,7 +110,10 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-stone-100 font-bold text-sm sm:text-base truncate max-w-[170px] sm:max-w-md">
+              <h3
+                id="document-preview-title"
+                className="text-stone-100 font-bold text-sm sm:text-base truncate max-w-[170px] sm:max-w-md"
+              >
                 {title}
               </h3>
               <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full bg-stone-800 text-amber-400 border border-stone-700 shrink-0">
@@ -106,6 +126,8 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
         {/* Sağ Taraf: Hızlı Kapat Butonu */}
         <div className="flex items-center gap-2">
           <button
+            ref={closeButtonRef}
+            type="button"
             onClick={onClose}
             className="bg-stone-800/90 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30 text-stone-300 text-sm font-bold px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border border-stone-700/80 transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
             title="Kapat (ESC)"
@@ -276,6 +298,6 @@ export function DocumentPreviewModal({ isOpen, onClose, url, title = 'Belge Öni
           </button>
         </div>
       </footer>
-    </div>
+    </dialog>
   )
 }

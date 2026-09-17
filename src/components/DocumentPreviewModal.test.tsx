@@ -11,6 +11,18 @@ vi.mock('@/components/ui/SafeUserImage', () => ({
 import { DocumentPreviewModal } from './DocumentPreviewModal'
 
 describe('DocumentPreviewModal', () => {
+  it('renders a labelled native dialog for browser-managed focus', () => {
+    const markup = renderToStaticMarkup(
+      <DocumentPreviewModal isOpen onClose={vi.fn()} url="https://example.com/document.jpg" title="Test Belgesi" />,
+    )
+
+    expect(markup).toContain('<dialog')
+    expect(markup).toContain('aria-labelledby="document-preview-title"')
+    expect(markup).toContain('hidden open:flex')
+    expect(markup).toContain('<h3 id="document-preview-title"')
+    expect(markup).toMatch(/<button[^>]*type="button"[^>]*title="Kapat \(ESC\)"/)
+  })
+
   it('renders signed image documents through the safe user-image boundary', () => {
     const signedUrl = 'https://zahdmrvhxsmqpeesrfkt.supabase.co/storage/v1/object/sign/receipts/doc.jpg?token=test'
     const markup = renderToStaticMarkup(<DocumentPreviewModal isOpen onClose={vi.fn()} url={signedUrl} />)
