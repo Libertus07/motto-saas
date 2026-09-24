@@ -136,7 +136,8 @@ describe('OPS-02 storage inventory contract', () => {
           source_table: 'z_reports',
           source_id: 'public',
           organization_id: 'org-a',
-          document_url: 'https://project.supabase.co/storage/v1/object/public/receipts/org-a/public.pdf?download=1',
+          document_url:
+            'https://zahdmrvhxsmqpeesrfkt.supabase.co/storage/v1/object/public/receipts/org-a/public.pdf?download=1',
         },
         {
           source_table: 'supplier_transactions',
@@ -163,6 +164,26 @@ describe('OPS-02 storage inventory contract', () => {
     })
     expect(manifest.referenced_missing_object_ids).toEqual([objectId('motto_assets', 'org-a/missing.pdf')])
     expect(manifest.unreferenced_object_ids).toEqual([objectId('motto_assets', 'org-a/orphan.pdf')])
+  })
+
+  it.each([
+    'https://attacker.example/storage/v1/object/public/receipts/org-a/public.pdf',
+    'https://zahdmrvhxsmqpeesrfkt.supabase.co/storage/v1/object/public/receipts/org-a/../secret.pdf',
+    'https://zahdmrvhxsmqpeesrfkt.supabase.co/storage/v1/object/public/receipts/org-a/%2e%2e/secret.pdf',
+  ])('does not reconcile an untrusted or traversal-bearing legacy URL: %s', (documentUrl) => {
+    const manifest = build({
+      references: [
+        {
+          source_table: 'investments',
+          source_id: 'legacy-invalid',
+          organization_id: 'org-a',
+          document_url: documentUrl,
+        },
+      ],
+    })
+
+    expect(manifest.totals).toMatchObject({ invalid_references: 1, legacy_public_references: 0 })
+    expect(manifest.referenced_missing_object_ids).toEqual([])
   })
 
   it('produces byte-stable output when input order changes', () => {

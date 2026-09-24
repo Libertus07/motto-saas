@@ -27,6 +27,10 @@ nesne kopyalama, silme veya restore yetkisi vermez.
   kısıtlanmış ve ayrıca şifrelenen bir dizin.
 - Production için salt okunur bağlantı kimliği, değişiklik penceresi, sorumlu ve
   ikinci gözden geçiren yazılı olarak onaylanmış olmalı.
+- Bağlantı URL'si resmi Supabase biçimlerinden biri olmalıdır: doğrudan
+  bağlantıda proje ref'i `db.<project-ref>.supabase.co` hostunda, shared pooler'da
+  ise `<role>.<project-ref>` kullanıcı adında bulunur. Araç bu bağı bağlantıdan
+  önce doğrular.
 
 Anahtar ilk kez aşağıdaki komutla kaydedilir. Var olan dosya bilinçli rotasyon
 olmadan üzerine yazılmaz:
@@ -70,11 +74,12 @@ hazırlanır:
 4. çalıştıran operatör ile çıktıyı inceleyen ikinci kişi;
 5. son yerel entegrasyon, kalite kapısı ve build kanıtı.
 
-Onaylı çalıştırma biçimi:
+Onaylı bağlantı URL'si komut satırına veya PowerShell geçmişine yazılmaz;
+kurumsal gizli-değer sağlayıcısı tarafından mevcut sürecin
+`OPS02_DATABASE_URL` değişkenine enjekte edilir. Ardından çalıştırma biçimi:
 
 ```powershell
 .\scripts\security\New-StorageInventory.ps1 `
-  -DatabaseUrl '<ONAYLI-SALT-OKUNUR-URL>' `
   -OutputFile 'D:\Sifreli-OPS02\storage-inventory.json' `
   -CapturedAtUtc '<UTC-ZAMANI>'
 ```
@@ -100,7 +105,8 @@ Aşağıdakilerden herhangi biri oluşursa çıktı tamamlanmış kanıt sayılm
 sonraki aşamaya geçilmez:
 
 - hedef proje kimliği eşleşmiyor;
-- transaction'ın `transaction_read_only` değeri `on` değil;
+- transaction'ın `transaction_read_only` değeri `on` veya
+  `transaction_isolation` değeri `repeatable read` değil;
 - invalid referans veya çelişkili duplicate nesne metadata'sı var;
 - DB'de referanslanan fakat Storage metadata'sında bulunmayan nesne var;
 - sayfalama tamamlanmadı, sorgu/timeout/bağlantı hatası oluştu;

@@ -6,7 +6,7 @@
 
 Mevcut [production veritabanı yedeği](production-database-deployment.md) `storage.objects` kayıtlarını içerebilir; nesnelerin fiziksel baytlarını içermez. Supabase de veritabanı yedeğinin Storage nesnelerini geri getirmediğini [belirtir](https://supabase.com/docs/guides/platform/backups). Bu nedenle veritabanı yedeği ile Storage yedeği ayrı ama eşleştirilebilir kanıt paketleri olmalıdır.
 
-Önce salt okunur envanterle production projesindeki **bütün** bucket'lar, nesne sayıları, toplam boyut, sahiplik, uygulama referansları ve erişim politikaları belirlenir. Mevcut finansal belge akışları `motto_assets` ve `receipts` kullanır; yalnız bu iki adı sabitlemek yeni veya unutulmuş bucket'ları kapsam dışı bırakabilir. [Finansal belge rollout sözleşmesi](private-financial-document-rollout.md) `storage://<bucket>/<tenant-path>` referanslarını, kısa ömürlü görüntüleme URL'lerini ve legacy `data:`/URL uyumluluğunu tanımlar. Legacy satırlar otomatik dönüştürülmez veya silinmez.
+Önce salt okunur envanterle production projesindeki **bütün** bucket'ların yapılandırması, nesne sayıları, toplam boyutları ve kalıcı uygulama referansları belirlenir. Bucket RLS politikalarının katalog incelemesi ve nesne sahipliği bu ilk metadata/referans aracının kapsamında değildir; fiziksel yedek planından önce ayrı bir erişim denetimi olarak ele alınır. Mevcut finansal belge akışları `motto_assets` ve `receipts` kullanır; yalnız bu iki adı sabitlemek yeni veya unutulmuş bucket'ları kapsam dışı bırakabilir. [Finansal belge rollout sözleşmesi](private-financial-document-rollout.md) `storage://<bucket>/<tenant-path>` referanslarını, kısa ömürlü görüntüleme URL'lerini ve legacy `data:`/URL uyumluluğunu tanımlar. Legacy satırlar otomatik dönüştürülmez veya silinmez.
 
 İlk aşamanın çalıştırma, anahtar saklama, durma koşulları ve kanıt sınırı
 [salt okunur Storage envanteri runbook'unda](OPS-02-storage-inventory-runbook.md)
@@ -16,14 +16,15 @@ bucket gerçekleri bulunur.
 
 ## Yerelde doğrulanan ilk aşama
 
-- PostgreSQL adapteri `BEGIN TRANSACTION READ ONLY` sonrasında
-  `transaction_read_only=on` değerini doğrulamadan envanter sorgularını
-  çalıştırmaz.
+- PostgreSQL adapteri `REPEATABLE READ READ ONLY` transaction'unda hem
+  `transaction_read_only=on` hem de `transaction_isolation=repeatable read`
+  değerlerini doğrulamadan envanter sorgularını çalıştırmaz; böylece tüm
+  keyset sayfaları aynı snapshot'ı görür.
 - Nesneler `(bucket_id, name)`, sabit dört finansal referans yüzeyi ise
   `(source_table, source_id)` anahtarıyla OFFSET kullanmadan sayfalanır.
-- CLI hedef projeyi, dedicated HMAC anahtarını ve Git/worktree dışındaki çıktı
-  yolunu bağlantı kurulmadan önce doğrular; manifesti `0600`, fsync ve rename
-  sırasıyla atomik yazar.
+- CLI hedef projeyi, Supabase direct/shared-pooler endpoint kimliğini, dedicated
+  HMAC anahtarını ve Git/worktree dışındaki çıktı yolunu bağlantı kurulmadan
+  önce doğrular; manifesti `0600`, fsync ve rename sırasıyla atomik yazar.
 - Windows sarmalayıcısı anahtarı CurrentUser DPAPI ile korur ve süreç
   değişkenlerini `finally` içinde eski değerlerine getirir.
 - Yerel entegrasyon testi resmi Storage API'siyle yüklenen iki fixture üzerinde

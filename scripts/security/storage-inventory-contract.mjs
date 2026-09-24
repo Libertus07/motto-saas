@@ -4,6 +4,7 @@ const EXPECTED_PROJECT_REF = 'zahdmrvhxsmqpeesrfkt'
 const SAFE_SEGMENT_PATTERN = /^[^/\\?#%\u0000-\u001f]+$/u
 const STORAGE_PREFIX = 'storage://'
 const LEGACY_PUBLIC_PREFIX = ['storage', 'v1', 'object', 'public']
+const LEGACY_PUBLIC_HOST = `${EXPECTED_PROJECT_REF}.supabase.co`
 
 function invalidReference() {
   return { status: 'invalid' }
@@ -26,12 +27,14 @@ function parseLegacyPublicStorageUrl(value) {
     return invalidReference()
   }
 
-  if (url.protocol !== 'https:') return invalidReference()
+  if (url.protocol !== 'https:' || url.host !== LEGACY_PUBLIC_HOST || url.username !== '' || url.password !== '') {
+    return invalidReference()
+  }
 
   const rawPath = value.slice(value.indexOf('/', value.indexOf('://') + 3)).split(/[?#]/u, 1)[0]
   if (!rawPath || rawPath.includes('%') || rawPath.includes('\\')) return invalidReference()
 
-  const segments = url.pathname.split('/').slice(1)
+  const segments = rawPath.split('/').slice(1)
   if (LEGACY_PUBLIC_PREFIX.some((part, index) => segments[index] !== part)) return invalidReference()
 
   const bucket = segments[4]

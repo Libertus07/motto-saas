@@ -20,6 +20,7 @@ const SAFE_ERROR_CODES = new Set([
   'target_project_mismatch',
   'capture_time_invalid',
   'database_url_invalid',
+  'database_project_mismatch',
   'inventory_hmac_key_invalid',
   'unsafe_output_path',
   'output_directory_unavailable',
@@ -76,6 +77,18 @@ function validateDatabaseUrl(value) {
     fail('database_url_invalid')
   }
   if (!['postgres:', 'postgresql:'].includes(databaseUrl.protocol)) fail('database_url_invalid')
+
+  const directHost = `db.${EXPECTED_PROJECT_REF}.supabase.co`
+  const port = databaseUrl.port || '5432'
+  const supportedPort = port === '5432' || port === '6543'
+  const directConnection = databaseUrl.hostname === directHost
+  const poolerConnection =
+    /^[a-z0-9-]+[.]pooler[.]supabase[.]com$/u.test(databaseUrl.hostname) &&
+    databaseUrl.username.endsWith(`.${EXPECTED_PROJECT_REF}`)
+
+  if (!supportedPort || databaseUrl.pathname !== '/postgres' || (!directConnection && !poolerConnection)) {
+    fail('database_project_mismatch')
+  }
 }
 
 function gitOutput(args) {

@@ -1,6 +1,7 @@
-const BEGIN_READ_ONLY = 'BEGIN TRANSACTION READ ONLY'
+const BEGIN_READ_ONLY = 'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY'
 const SET_STATEMENT_TIMEOUT = "SET LOCAL statement_timeout = '30s'"
 const SHOW_READ_ONLY = 'SHOW transaction_read_only'
+const SHOW_ISOLATION = 'SHOW transaction_isolation'
 
 const BUCKETS_QUERY = `
 SELECT id, public, file_size_limit, allowed_mime_types
@@ -77,6 +78,10 @@ export async function collectStorageInventoryRows(client, { pageSize }) {
     const readOnlyResult = await client.query(SHOW_READ_ONLY)
     if (readOnlyResult.rows?.[0]?.transaction_read_only !== 'on') {
       throw new Error('read_only_transaction_required')
+    }
+    const isolationResult = await client.query(SHOW_ISOLATION)
+    if (isolationResult.rows?.[0]?.transaction_isolation !== 'repeatable read') {
+      throw new Error('repeatable_read_transaction_required')
     }
 
     const buckets = (await client.query(BUCKETS_QUERY)).rows

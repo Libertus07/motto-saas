@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const projectRef = 'zahdmrvhxsmqpeesrfkt'
 const capturedAt = '2026-09-22T12:00:00.000Z'
-const databaseUrl = 'postgresql://inventory-user:database-secret@127.0.0.1:5432/postgres'
+const databaseUrl = `postgresql://postgres:database-secret@db.${projectRef}.supabase.co:5432/postgres`
 const encodedKey = Buffer.alloc(32, 9).toString('base64')
 const cliPath = path.resolve('scripts/security/create-storage-inventory.mjs')
 let tempDirectory: string
@@ -24,6 +24,7 @@ export class Client {
   async end() {}
   async query(text) {
     if (text === 'SHOW transaction_read_only') return { rows: [{ transaction_read_only: 'on' }] }
+    if (text === 'SHOW transaction_isolation') return { rows: [{ transaction_isolation: 'repeatable read' }] }
     if (text.includes('FROM storage.buckets')) {
       if (process.env.OPS02_FAKE_MODE === 'adapter-failure') throw new Error(process.env.OPS02_DATABASE_URL)
       return { rows: [{ id: 'motto_assets', public: false, file_size_limit: 3145728, allowed_mime_types: ['application/pdf'] }] }
@@ -95,6 +96,31 @@ describe('OPS-02 storage inventory CLI', () => {
     expect(parseFailure(result)).toEqual({ status: 'FAIL', code: 'target_project_mismatch' })
   })
 
+  it.each([
+    'postgresql://postgres:database-secret@db.differentproject0000.supabase.co:5432/postgres',
+    'postgresql://postgres.differentproject0000:database-secret@aws-1-eu-central-1.pooler.supabase.com:5432/postgres',
+    'postgresql://postgres:database-secret@127.0.0.1:5432/postgres',
+  ])('rejects a database endpoint that is not bound to the approved project: %s', (untrustedDatabaseUrl) => {
+    const result = runCli({ OPS02_DATABASE_URL: untrustedDatabaseUrl })
+
+    expect(result.status).toBe(1)
+    expect(parseFailure(result)).toEqual({ status: 'FAIL', code: 'database_project_mismatch' })
+    expect(`${result.stdout}${result.stderr}`).not.toContain(untrustedDatabaseUrl)
+  })
+
+  it('accepts the approved project identity in a shared-pooler username', () => {
+    const outputFile = path.join(tempDirectory, 'pooler-success.json')
+    const result = runCli(
+      {
+        OPS02_DATABASE_URL: `postgresql://inventory_reader.${projectRef}:database-secret@aws-1-eu-central-1.pooler.supabase.com:5432/postgres`,
+        OPS02_OUTPUT_FILE: outputFile,
+      },
+      true,
+    )
+
+    expect(result.status).toBe(0)
+  })
+
   const commonDirectory = path.resolve(
     execFileSync('git', ['rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim(),
   )
@@ -162,6 +188,8 @@ describe('OPS-02 storage inventory CLI', () => {
     expect(initializer).toContain('DataProtectionScope]::CurrentUser')
     expect(initializer).toContain('Test-Path -LiteralPath $KeyPath')
     expect(wrapper).toContain('OPS02_DATABASE_URL')
+    expect(wrapper).toContain('[string]$DatabaseUrl = $env:OPS02_DATABASE_URL')
+    expect(wrapper).not.toContain('[Parameter(Mandatory)]\n    [string]$DatabaseUrl')
     expect(wrapper).toContain("SetEnvironmentVariable($name, $previousEnvironment[$name], 'Process')")
     expect(wrapper).toContain('[Array]::Clear($keyBytes, 0, $keyBytes.Length)')
   })

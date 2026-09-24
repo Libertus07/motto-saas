@@ -10,10 +10,12 @@ interface QueryCall {
 class ScriptedClient {
   calls: QueryCall[] = []
   readonly readOnly: string
+  readonly isolation: string
   readonly failOnObjects: boolean
 
-  constructor({ readOnly = 'on', failOnObjects = false } = {}) {
+  constructor({ readOnly = 'on', isolation = 'repeatable read', failOnObjects = false } = {}) {
     this.readOnly = readOnly
+    this.isolation = isolation
     this.failOnObjects = failOnObjects
   }
 
@@ -24,6 +26,7 @@ class ScriptedClient {
   async query(text: string, values?: unknown[]) {
     this.calls.push({ text, values })
     if (text === 'SHOW transaction_read_only') return { rows: [{ transaction_read_only: this.readOnly }] }
+    if (text === 'SHOW transaction_isolation') return { rows: [{ transaction_isolation: this.isolation }] }
     if (text.includes('FROM storage.buckets')) {
       return {
         rows: [{ id: 'motto_assets', public: false, file_size_limit: 3145728, allowed_mime_types: null }],
@@ -89,9 +92,10 @@ describe('OPS-02 read-only PostgreSQL inventory adapter', () => {
 
     const result = await collectStorageInventoryRows(client, { pageSize: 2 })
 
-    expect(client.sql[0]).toBe('BEGIN TRANSACTION READ ONLY')
+    expect(client.sql[0]).toBe('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
     expect(client.sql[1]).toContain("SET LOCAL statement_timeout = '30s'")
     expect(client.sql[2]).toBe('SHOW transaction_read_only')
+    expect(client.sql[3]).toBe('SHOW transaction_isolation')
     expect(result.objects.map((row) => `${row.bucket_id}/${row.name}`)).toEqual([
       'motto_assets/a.pdf',
       'motto_assets/b.pdf',
@@ -114,11 +118,22 @@ describe('OPS-02 read-only PostgreSQL inventory adapter', () => {
     await expect(collectStorageInventoryRows(client, { pageSize: 2 })).rejects.toThrow('read_only_transaction_required')
 
     expect(client.sql).toEqual([
-      'BEGIN TRANSACTION READ ONLY',
+      'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
       "SET LOCAL statement_timeout = '30s'",
       'SHOW transaction_read_only',
       'ROLLBACK',
     ])
+  })
+
+  it('rolls back before inventory queries when the transaction is not repeatable read', async () => {
+    const client = new ScriptedClient({ isolation: 'read committed' })
+
+    await expect(collectStorageInventoryRows(client, { pageSize: 2 })).rejects.toThrow(
+      'repeatable_read_transaction_required',
+    )
+
+    expect(client.sql.at(-1)).toBe('ROLLBACK')
+    expect(client.sql.some((sql) => sql.includes('FROM storage.buckets'))).toBe(false)
   })
 
   it('rolls back when an inventory query fails', async () => {

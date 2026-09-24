@@ -47,6 +47,7 @@ describeIntegration('OPS-02 local storage inventory integration', () => {
   const referencedObjectPath = `${organizationId}/investment-document/${randomUUID()}.pdf`
   const unreferencedObjectPath = `${organizationId}/investment-document/${randomUUID()}.pdf`
   const missingObjectPath = `${organizationId}/investment-document/${randomUUID()}.pdf`
+  const concurrentObjectPath = `${organizationId}/zz-concurrent/${randomUUID()}.pdf`
   const referencedInvestmentId = randomUUID()
   const missingInvestmentId = randomUUID()
   const slug = `ops02-${organizationId}`
@@ -109,27 +110,57 @@ describeIntegration('OPS-02 local storage inventory integration', () => {
   }, 30_000)
 
   afterAll(async () => {
+    const cleanupErrors: unknown[] = []
     if (storageClient) {
-      await storageClient.storage.from('motto_assets').remove([referencedObjectPath, unreferencedObjectPath])
+      try {
+        const { error } = await storageClient.storage
+          .from('motto_assets')
+          .remove([referencedObjectPath, unreferencedObjectPath, concurrentObjectPath])
+        if (error) cleanupErrors.push(new Error(`Local Storage fixture cleanup failed: ${error.message}`))
+      } catch (error) {
+        cleanupErrors.push(error)
+      }
     }
     if (adminClient) {
-      await adminClient.query('DELETE FROM public.investments WHERE id = ANY($1::uuid[])', [
-        [referencedInvestmentId, missingInvestmentId],
-      ])
-      await adminClient.query('DELETE FROM public.organizations WHERE id = $1', [organizationId])
-      await adminClient.end()
+      try {
+        await adminClient.query('DELETE FROM public.investments WHERE id = ANY($1::uuid[])', [
+          [referencedInvestmentId, missingInvestmentId],
+        ])
+        await adminClient.query('DELETE FROM public.organizations WHERE id = $1', [organizationId])
+      } catch (error) {
+        cleanupErrors.push(error)
+      } finally {
+        await adminClient.end().catch((error) => cleanupErrors.push(error))
+      }
     }
-    if (collectorClient) await collectorClient.end()
+    if (collectorClient) await collectorClient.end().catch((error) => cleanupErrors.push(error))
+    if (cleanupErrors.length > 0) throw new AggregateError(cleanupErrors, 'OPS-02 integration cleanup failed.')
   }, 30_000)
 
   it('proves read-only collection and pseudonymous reconciliation against local Storage', async () => {
     let observedReadOnly: string | undefined
+    let observedIsolation: string | undefined
+    let concurrentObjectUploaded = false
     const observingClient = {
       query: async (text: string, values?: unknown[]) => {
         const result = await collectorClient.query(text, values)
         if (text === 'SHOW transaction_read_only') {
           const readOnly = result.rows[0]?.transaction_read_only
           observedReadOnly = typeof readOnly === 'string' ? readOnly : undefined
+        }
+        if (text === 'SHOW transaction_isolation') {
+          const isolation = result.rows[0]?.transaction_isolation
+          observedIsolation = typeof isolation === 'string' ? isolation : undefined
+        }
+        if (text.includes('FROM storage.buckets') && !concurrentObjectUploaded) {
+          const { error } = await storageClient.storage
+            .from('motto_assets')
+            .upload(concurrentObjectPath, Buffer.from('OPS-02 concurrent fixture'), {
+              contentType: 'application/pdf',
+              upsert: false,
+            })
+          if (error) throw new Error(`Concurrent local Storage fixture upload failed: ${error.message}`)
+          concurrentObjectUploaded = true
         }
         return result
       },
@@ -146,14 +177,17 @@ describeIntegration('OPS-02 local storage inventory integration', () => {
     const referencedId = hashIdentity('motto_assets', referencedObjectPath)
     const unreferencedId = hashIdentity('motto_assets', unreferencedObjectPath)
     const missingId = hashIdentity('motto_assets', missingObjectPath)
+    const concurrentId = hashIdentity('motto_assets', concurrentObjectPath)
 
     expect(observedReadOnly).toBe('on')
+    expect(observedIsolation).toBe('repeatable read')
     expect(manifest.buckets).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'motto_assets' })]))
     expect(manifest.object_ids).toContain(referencedId)
     expect(manifest.object_ids).toContain(unreferencedId)
     expect(manifest.referenced_missing_object_ids).toContain(missingId)
     expect(manifest.unreferenced_object_ids).toContain(unreferencedId)
     expect(manifest.unreferenced_object_ids).not.toContain(referencedId)
+    expect(manifest.object_ids).not.toContain(concurrentId)
 
     const serialized = JSON.stringify(manifest)
     expect(serialized).not.toContain(organizationId)

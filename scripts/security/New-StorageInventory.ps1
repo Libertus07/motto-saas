@@ -1,7 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)]
-    [string]$DatabaseUrl,
+    [string]$DatabaseUrl = $env:OPS02_DATABASE_URL,
 
     [Parameter(Mandatory)]
     [string]$OutputFile,
@@ -17,6 +16,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Security
+
+if ([string]::IsNullOrWhiteSpace($DatabaseUrl)) {
+    throw 'OPS02_DATABASE_URL must be injected into the current process by the approved secret provider.'
+}
 
 if (-not (Test-Path -LiteralPath $KeyPath -PathType Leaf)) {
     throw "Protected storage inventory key was not found: $KeyPath"
