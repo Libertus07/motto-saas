@@ -46,14 +46,16 @@ afterAll(() => {
 })
 
 function baseEnvironment(outputFile = path.join(tempDirectory, 'manifest.json')) {
-  return {
+  const environment: NodeJS.ProcessEnv = {
     ...process.env,
+    NODE_ENV: process.env.NODE_ENV,
     OPS02_DATABASE_URL: databaseUrl,
     OPS02_TARGET_PROJECT_REF: projectRef,
     OPS02_CAPTURED_AT_UTC: capturedAt,
     OPS02_INVENTORY_HMAC_KEY: encodedKey,
     OPS02_OUTPUT_FILE: outputFile,
   }
+  return environment
 }
 
 function runCli(overrides: Record<string, string | undefined> = {}, mockPostgres = false) {
