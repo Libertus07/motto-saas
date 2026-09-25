@@ -24,7 +24,11 @@ bucket gerçekleri bulunur.
   `(source_table, source_id)` anahtarıyla OFFSET kullanmadan sayfalanır.
 - CLI hedef projeyi, Supabase direct/shared-pooler endpoint kimliğini, dedicated
   HMAC anahtarını ve Git/worktree dışındaki çıktı yolunu bağlantı kurulmadan
-  önce doğrular; manifesti `0600`, fsync ve rename sırasıyla atomik yazar.
+  önce doğrular. PostgreSQL istemcisine ham URL yerine doğrulanmış alanlar
+  verilir; query/fragment override'ları reddedilir ve TLS sertifika doğrulaması
+  açıktır. Manifest fsync ve rename sırasıyla atomik yazılır; POSIX'te `0600`
+  istenir, Windows'ta gizlilik onaylı şifreli dizin ve NTFS ACL ile
+  sağlanmalıdır.
 - Windows sarmalayıcısı anahtarı CurrentUser DPAPI ile korur ve süreç
   değişkenlerini `finally` içinde eski değerlerine getirir.
 - Yerel entegrasyon testi resmi Storage API'siyle yüklenen iki fixture üzerinde

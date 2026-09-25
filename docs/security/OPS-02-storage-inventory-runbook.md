@@ -30,7 +30,9 @@ nesne kopyalama, silme veya restore yetkisi vermez.
 - Bağlantı URL'si resmi Supabase biçimlerinden biri olmalıdır: doğrudan
   bağlantıda proje ref'i `db.<project-ref>.supabase.co` hostunda, shared pooler'da
   ise `<role>.<project-ref>` kullanıcı adında bulunur. Araç bu bağı bağlantıdan
-  önce doğrular.
+  önce doğrular; query/fragment parametrelerini reddeder ve node-postgres'a ham
+  URL yerine ayrıştırılmış host, port, kullanıcı, parola ve veritabanı alanlarını
+  TLS sertifika doğrulaması açık olarak verir.
 
 Anahtar ilk kez aşağıdaki komutla kaydedilir. Var olan dosya bilinçli rotasyon
 olmadan üzerine yazılmaz:

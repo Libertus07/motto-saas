@@ -20,6 +20,12 @@ beforeAll(() => {
   preloadPath = path.join(tempDirectory, 'mock-pg.mjs')
   const mockModule = `
 export class Client {
+  constructor(options) {
+    if ('connectionString' in options) throw new Error('raw_connection_string_forbidden')
+    if (!options.host || !options.port || !options.user || options.database !== 'postgres') {
+      throw new Error('explicit_database_config_required')
+    }
+  }
   async connect() {}
   async end() {}
   async query(text) {
@@ -108,17 +114,46 @@ describe('OPS-02 storage inventory CLI', () => {
     expect(`${result.stdout}${result.stderr}`).not.toContain(untrustedDatabaseUrl)
   })
 
-  it('accepts the approved project identity in a shared-pooler username', () => {
-    const outputFile = path.join(tempDirectory, 'pooler-success.json')
+  it.each([
+    [`postgresql://postgres:database-secret@db.${projectRef}.supabase.co:5432/postgres`, 'direct-5432'],
+    [`postgresql://postgres:database-secret@db.${projectRef}.supabase.co:6543/postgres`, 'dedicated-6543'],
+    [
+      `postgresql://inventory_reader.${projectRef}:database-secret@aws-1-eu-central-1.pooler.supabase.com:5432/postgres`,
+      'shared-5432',
+    ],
+    [
+      `postgresql://inventory_reader.${projectRef}:database-secret@aws-1-eu-central-1.pooler.supabase.com:6543/postgres`,
+      'shared-6543',
+    ],
+  ])('accepts an official approved-project endpoint: %s', (approvedDatabaseUrl, outputName) => {
+    const outputFile = path.join(tempDirectory, `${outputName}.json`)
     const result = runCli(
       {
-        OPS02_DATABASE_URL: `postgresql://inventory_reader.${projectRef}:database-secret@aws-1-eu-central-1.pooler.supabase.com:5432/postgres`,
+        OPS02_DATABASE_URL: approvedDatabaseUrl,
         OPS02_OUTPUT_FILE: outputFile,
       },
       true,
     )
 
     expect(result.status).toBe(0)
+  })
+
+  it.each(['host', 'port', 'user', 'password', 'dbname', 'database', 'sslmode', 'sslcert', 'sslkey', 'sslrootcert'])(
+    'rejects the database connection query override: %s',
+    (parameter) => {
+      const separator = parameter === 'host' ? '198.51.100.10' : 'override'
+      const result = runCli({ OPS02_DATABASE_URL: `${databaseUrl}?${parameter}=${separator}` })
+
+      expect(result.status).toBe(1)
+      expect(parseFailure(result)).toEqual({ status: 'FAIL', code: 'database_url_overrides_forbidden' })
+    },
+  )
+
+  it('rejects a database URL fragment before loading the database client', () => {
+    const result = runCli({ OPS02_DATABASE_URL: `${databaseUrl}#redirected` })
+
+    expect(result.status).toBe(1)
+    expect(parseFailure(result)).toEqual({ status: 'FAIL', code: 'database_url_overrides_forbidden' })
   })
 
   const commonDirectory = path.resolve(

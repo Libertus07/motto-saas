@@ -20,6 +20,7 @@ const SAFE_ERROR_CODES = new Set([
   'target_project_mismatch',
   'capture_time_invalid',
   'database_url_invalid',
+  'database_url_overrides_forbidden',
   'database_project_mismatch',
   'inventory_hmac_key_invalid',
   'unsafe_output_path',
@@ -69,7 +70,15 @@ function decodeInventoryKey(encodedKey) {
   return key
 }
 
-function validateDatabaseUrl(value) {
+function decodeUrlComponent(value) {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    fail('database_url_invalid')
+  }
+}
+
+function createApprovedDatabaseConfig(value) {
   let databaseUrl
   try {
     databaseUrl = new URL(value)
@@ -77,17 +86,35 @@ function validateDatabaseUrl(value) {
     fail('database_url_invalid')
   }
   if (!['postgres:', 'postgresql:'].includes(databaseUrl.protocol)) fail('database_url_invalid')
+  if (databaseUrl.search !== '' || databaseUrl.hash !== '') fail('database_url_overrides_forbidden')
 
   const directHost = `db.${EXPECTED_PROJECT_REF}.supabase.co`
   const port = databaseUrl.port || '5432'
   const supportedPort = port === '5432' || port === '6543'
+  const username = decodeUrlComponent(databaseUrl.username)
+  const password = decodeUrlComponent(databaseUrl.password)
   const directConnection = databaseUrl.hostname === directHost
   const poolerConnection =
     /^[a-z0-9-]+[.]pooler[.]supabase[.]com$/u.test(databaseUrl.hostname) &&
-    databaseUrl.username.endsWith(`.${EXPECTED_PROJECT_REF}`)
+    username.endsWith(`.${EXPECTED_PROJECT_REF}`)
 
-  if (!supportedPort || databaseUrl.pathname !== '/postgres' || (!directConnection && !poolerConnection)) {
+  if (
+    !supportedPort ||
+    databaseUrl.pathname !== '/postgres' ||
+    username === '' ||
+    password === '' ||
+    (!directConnection && !poolerConnection)
+  ) {
     fail('database_project_mismatch')
+  }
+
+  return {
+    host: databaseUrl.hostname,
+    port: Number(port),
+    user: username,
+    password,
+    database: 'postgres',
+    ssl: { rejectUnauthorized: true },
   }
 }
 
@@ -162,7 +189,7 @@ export async function createStorageInventory(environment = process.env) {
     const values = readRequiredEnvironment(environment)
     if (values.OPS02_TARGET_PROJECT_REF !== EXPECTED_PROJECT_REF) fail('target_project_mismatch')
     validateCapturedAt(values.OPS02_CAPTURED_AT_UTC)
-    validateDatabaseUrl(values.OPS02_DATABASE_URL)
+    const databaseConfig = createApprovedDatabaseConfig(values.OPS02_DATABASE_URL)
     key = decodeInventoryKey(values.OPS02_INVENTORY_HMAC_KEY)
     const outputFile = await resolveSafeOutput(values.OPS02_OUTPUT_FILE)
     temporaryOutput = `${outputFile}.tmp-${process.pid}`
@@ -171,7 +198,7 @@ export async function createStorageInventory(environment = process.env) {
     const Client = pg.Client ?? pg.default?.Client
     if (typeof Client !== 'function') throw new Error('inventory_postgres_client_unavailable')
     client = new Client({
-      connectionString: values.OPS02_DATABASE_URL,
+      ...databaseConfig,
       application_name: 'motto-saas-ops02-readonly-inventory',
       connectionTimeoutMillis: 10_000,
     })

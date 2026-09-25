@@ -40,7 +40,33 @@ function assertLocalEndpoint(value: string, kind: 'database' | 'api') {
   if (kind === 'database' && !['postgres:', 'postgresql:'].includes(endpoint.protocol)) {
     throw new Error('OPS-02 integration expects a PostgreSQL database endpoint.')
   }
+  if (endpoint.search !== '' || endpoint.hash !== '') {
+    throw new Error(`OPS-02 integration rejects ${kind} endpoint overrides.`)
+  }
 }
+
+function createLocalDatabaseConfig(value: string) {
+  assertLocalEndpoint(value, 'database')
+  const endpoint = new URL(value)
+  return {
+    host: endpoint.hostname,
+    port: Number(endpoint.port || '5432'),
+    user: decodeURIComponent(endpoint.username),
+    password: decodeURIComponent(endpoint.password),
+    database: decodeURIComponent(endpoint.pathname.slice(1)),
+    ssl: false,
+  }
+}
+
+describe('OPS-02 local endpoint guard', () => {
+  it.each([
+    ['postgresql://postgres:postgres@127.0.0.1:54322/postgres?host=198.51.100.10', 'database'],
+    ['postgresql://postgres:postgres@localhost:54322/postgres?sslmode=require', 'database'],
+    ['http://127.0.0.1:54321?redirect=https://example.com', 'api'],
+  ] as const)('rejects connection-routing overrides before local integration: %s', (value, kind) => {
+    expect(() => assertLocalEndpoint(value, kind)).toThrow('endpoint overrides')
+  })
+})
 
 describeIntegration('OPS-02 local storage inventory integration', () => {
   const organizationId = randomUUID()
@@ -62,9 +88,10 @@ describeIntegration('OPS-02 local storage inventory integration', () => {
     assertLocalEndpoint(databaseUrl, 'database')
     assertLocalEndpoint(supabaseUrl, 'api')
 
-    adminClient = new Client({ connectionString: databaseUrl, application_name: 'motto-saas-ops02-integration-setup' })
+    const localDatabaseConfig = createLocalDatabaseConfig(databaseUrl)
+    adminClient = new Client({ ...localDatabaseConfig, application_name: 'motto-saas-ops02-integration-setup' })
     collectorClient = new Client({
-      connectionString: databaseUrl,
+      ...localDatabaseConfig,
       application_name: 'motto-saas-ops02-integration-collector',
     })
     storageClient = createClient(supabaseUrl, serviceRoleKey, {
