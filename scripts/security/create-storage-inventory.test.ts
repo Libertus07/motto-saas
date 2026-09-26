@@ -159,16 +159,17 @@ describe('OPS-02 storage inventory CLI', () => {
   const commonDirectory = path.resolve(
     execFileSync('git', ['rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim(),
   )
+  const protectedCheckoutRoots = [...new Set([path.dirname(commonDirectory), path.resolve(process.cwd())])]
 
-  it.each([
-    path.join(process.cwd(), 'unsafe-inventory.json'),
-    path.join(path.dirname(commonDirectory), '.worktrees', 'unsafe-inventory.json'),
-  ])('rejects output beneath a repository or linked worktree: %s', (outputFile) => {
-    const result = runCli({ OPS02_OUTPUT_FILE: outputFile })
+  it.each(protectedCheckoutRoots.map((root) => path.join(root, 'unsafe-inventory.json')))(
+    'rejects output beneath a repository or linked worktree: %s',
+    (outputFile) => {
+      const result = runCli({ OPS02_OUTPUT_FILE: outputFile })
 
-    expect(result.status).toBe(1)
-    expect(parseFailure(result)).toEqual({ status: 'FAIL', code: 'unsafe_output_path' })
-  })
+      expect(result.status).toBe(1)
+      expect(parseFailure(result)).toEqual({ status: 'FAIL', code: 'unsafe_output_path' })
+    },
+  )
 
   it.each(['not-base64', Buffer.alloc(31, 1).toString('base64')])('rejects invalid HMAC key material', (key) => {
     const result = runCli({ OPS02_INVENTORY_HMAC_KEY: key })
