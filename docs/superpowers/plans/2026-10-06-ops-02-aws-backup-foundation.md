@@ -295,13 +295,15 @@ git commit -m "feat: define immutable OPS-02 backup vault"
 
 **Interfaces:**
 
-- Consumes: `Ops02FoundationConfig`, `Ops02BackupVault.backupBucket`, `backupKey`, and `auditKey`.
+- Consumes: `Ops02FoundationConfig`, `Ops02BackupVault.backupBucket`,
+  `auditBucket`, `backupKey`, and `auditKey`.
 - Produces:
 
 ```ts
 export interface Ops02AccessBoundaryProps {
   readonly config: Ops02FoundationConfig
   readonly backupBucket: s3.IBucket
+  readonly auditBucket: s3.IBucket
   readonly backupKey: kms.IKey
   readonly auditKey: kms.IKey
 }
@@ -353,9 +355,10 @@ secretsmanager:GetSecretValue
 ```
 
 `s3:PutObject` and multipart resources must resolve only beneath the
-`backup-sets/` object prefix. `s3:PutObjectRetention` is permitted only with
-conditions that require `COMPLIANCE` and bound the approved retention range;
-`s3:BypassGovernanceRetention` is always forbidden.
+`backup-sets/daily/` and `backup-sets/monthly/` object prefixes.
+`s3:PutObjectRetention` resolves only beneath `backup-sets/monthly/` and is
+permitted only with conditions that require `COMPLIANCE` and exactly the fixed
+365-day retention value; `s3:BypassGovernanceRetention` is always forbidden.
 
 - [ ] **Step 2: Run the access test and verify it fails**
 
@@ -371,11 +374,25 @@ Create a dedicated rotating customer-managed `secretKey`. Create two Secrets Man
 
 Create the writer with `ServicePrincipal('ecs-tasks.amazonaws.com')`. Create verifier, restore, key-administrator, and security-auditor roles from their exact configured principals. Attach narrowly scoped inline policies; do not use AWS managed administrator, S3 full-access, Secrets Manager full-access, or KMS power-user policies. Add the key-administrator role to the backup, audit, and secret-key policies without adding cryptographic data-use permissions to that role.
 
-The writer can read only the two OPS-02 secret ARNs, use only the required KMS cryptographic operations, and write only in the backup namespace. It cannot call `s3:GetObject`, `s3:GetObjectVersion`, or either attributes action on data objects. Upload responses supply the version and checksum evidence recorded by the future operator. The verifier reads only manifest/attestation prefixes, S3-generated inventory/checksum reports, retention metadata, and audit evidence; it cannot read `objects/` bytes. The restore role alone can read approved data-object versions and decrypt them; a later restore plan adds target Supabase behavior. The key administrator cannot decrypt S3 objects.
+The writer can read only the two OPS-02 secret ARNs, use only the required KMS cryptographic operations, and write only beneath `backup-sets/daily/` or `backup-sets/monthly/`. It cannot call `s3:GetObject`, `s3:GetObjectVersion`, or either attributes action on data objects. Upload responses supply the version and checksum evidence recorded by the future operator. The verifier reads only `manifests/` and `attestations/` objects beneath either backup class, `reports/inventory/`, `reports/checksums/`, retention metadata, and CloudTrail objects beneath the separate audit bucket's `AWSLogs/` namespace; it cannot read either backup class's `objects/` bytes. The restore role alone can read approved data-object versions and decrypt them; a later restore plan adds target Supabase behavior. The key administrator cannot decrypt S3 objects.
+
+The key-administrator allowlist is limited to KMS key metadata, policy,
+rotation, enable/disable, deletion scheduling/cancellation, description, and
+tag administration for the backup, audit, and secret keys. It excludes
+`kms:Encrypt`, `kms:Decrypt`, data-key generation, re-encryption, grant
+creation, and S3 object access. The security-auditor role may read resource
+configuration and audit evidence but receives no content-decryption or
+mutation permission.
 
 - [ ] **Step 5: Enforce monthly retention and TLS/KMS resource policies**
 
-Add resource-policy constraints for TLS, the expected KMS key, and monthly `COMPLIANCE` retention. Use the fixed 365-day value from `OPS02_RETENTION`; do not accept a context override. Ensure the policy does not block CloudFormation from managing the bucket itself and does not grant a new principal.
+Add resource-policy constraints for TLS, the expected KMS key, and monthly
+`COMPLIANCE` retention. Use the fixed 365-day value from `OPS02_RETENTION`; do
+not accept a context override. Bind the explicit-retention allow and deny
+conditions to `backup-sets/monthly/` so the daily namespace continues to use
+the bucket's fixed 90-day default. Ensure the policy does not block
+CloudFormation from managing the bucket itself and does not grant a new
+principal.
 
 - [ ] **Step 6: Run the access-boundary assertions**
 

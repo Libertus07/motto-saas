@@ -233,12 +233,28 @@ suffix.
 Conceptual target layout:
 
 ```text
-backup-sets/<backup-set-id>/
-  objects/<pseudonymous-object-id>
-  manifests/draft.json
-  manifests/completed.json
-  attestations/completed.json
+backup-sets/
+  daily/<backup-set-id>/
+    objects/<pseudonymous-object-id>
+    manifests/draft.json
+    manifests/completed.json
+    attestations/completed.json
+  monthly/<backup-set-id>/
+    objects/<pseudonymous-object-id>
+    manifests/draft.json
+    manifests/completed.json
+    attestations/completed.json
+reports/
+  inventory/<report-id>/...
+  checksums/<report-id>/...
 ```
+
+Daily objects inherit the bucket's 90-day default `COMPLIANCE` retention.
+Monthly objects are written only beneath `backup-sets/monthly/` and receive an
+explicit 365-day `COMPLIANCE` retention request. IAM and bucket policies bind
+that longer-retention operation to the monthly namespace. Verifiers may read
+manifests, attestations, generated inventory/checksum reports, retention
+metadata, and the separate audit destination, but not `objects/` payload bytes.
 
 Target object keys do not expose bucket names, tenant IDs, organization IDs,
 source row IDs, filenames, or paths. The pseudonymous object ID is derived with
