@@ -58,6 +58,26 @@ describe('parseOps02FoundationConfig', () => {
     ).toThrowError(/^recoveryPrincipalArn: üretim görevleri farklı rol ARN değerleri gerektirir$/)
   })
 
+  it('rejects a production verification principal shared with security', () => {
+    expect(() =>
+      parseOps02FoundationConfig({
+        ...offlineConfig,
+        stage: 'production',
+        verificationPrincipalArn: offlineConfig.securityPrincipalArn,
+      }),
+    ).toThrowError(/^verificationPrincipalArn: üretim görevleri farklı rol ARN değerleri gerektirir$/)
+  })
+
+  it('rejects a production recovery principal shared with verification', () => {
+    expect(() =>
+      parseOps02FoundationConfig({
+        ...offlineConfig,
+        stage: 'production',
+        recoveryPrincipalArn: offlineConfig.verificationPrincipalArn,
+      }),
+    ).toThrowError(/^recoveryPrincipalArn: üretim görevleri farklı rol ARN değerleri gerektirir$/)
+  })
+
   it('pins daily and monthly retention to 90 and 365 days', () => {
     const result = parseOps02FoundationConfig({
       ...offlineConfig,
