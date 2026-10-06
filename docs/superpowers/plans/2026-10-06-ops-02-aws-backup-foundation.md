@@ -6,7 +6,7 @@
 
 **Architecture:** An isolated TypeScript CDK v2 package models the protected S3/KMS vault, audit destination, secrets, least-privilege roles, and configuration-change alerting as focused constructs composed by one foundation stack. Vitest and CDK fine-grained assertions validate the generated CloudFormation offline; a credential-free GitHub workflow runs the infrastructure gate without bootstrapping or deploying an AWS account.
 
-**Tech Stack:** Node.js 22, TypeScript 5.9.3, AWS CDK CLI 2.1144.0, `aws-cdk-lib` 2.272.0, `constructs` 10.8.1, `tsx` 4.23.15, Vitest 1.6.1, Prettier 3.9.6, GitHub Actions
+**Tech Stack:** Node.js 22 (>=22.12.0), `@types/node` 22.20.2, TypeScript 5.9.3, AWS CDK CLI 2.1144.0, `aws-cdk-lib` 2.272.0, `constructs` 10.8.1, `tsx` 4.23.15, Vitest 5.0.3, Vite 8.3.2, Prettier 3.9.6, GitHub Actions
 
 **Spec:** `docs/superpowers/specs/2026-10-06-ops-02-physical-storage-backup-design.md`
 
@@ -135,6 +135,8 @@ Expected: FAIL because the package and `parseOps02FoundationConfig` do not exist
 
 - [ ] **Step 3: Create the isolated package manifest and lockfile**
 
+Security pin refresh (2026-10-06): the read-only audit of Vitest 1.6.1 reported two critical, two high, and two moderate findings. Use the refreshed exact pins below: Vitest 5.0.3, its explicitly pinned Vite 8.3.2 peer, and Node 22-aligned `@types/node` 22.20.2. [Vitest 5 requires Node.js >=22.12.0 and Vite >=6.4.0](https://vitest.dev/guide/migration/); preserve this runtime floor. Regenerate the isolated lockfile and repeat the audit and package gates before claiming the refreshed dependency tree is verified. All other pins and task scope remain unchanged.
+
 Use exact dependencies:
 
 ```json
@@ -144,12 +146,13 @@ Use exact dependencies:
     "constructs": "10.8.1"
   },
   "devDependencies": {
-    "@types/node": "20.19.43",
+    "@types/node": "22.20.2",
     "aws-cdk": "2.1144.0",
     "prettier": "3.9.6",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
-    "vitest": "1.6.1"
+    "vite": "8.3.2",
+    "vitest": "5.0.3"
   }
 }
 ```
