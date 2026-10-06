@@ -2,6 +2,13 @@
 
 **Durum:** Devam ediyor. Salt okunur envanter aracı yerel Supabase üzerinde doğrulandı; production envanteri, fiziksel yedek ve geri yükleme yapılmadı. Bu belge production işlem yetkisi vermez.
 
+**Onaylı hedef mimari:** Ayrı AWS hesabı, S3 Versioning, Object Lock
+`COMPLIANCE`, müşteri yönetimli KMS anahtarı, ölçülebilir RPO/RTO ve izole
+restore modelini tanımlayan ayrıntılı tasarım için
+[2026-10-06 OPS-02 fiziksel Storage yedekleme ve kurtarma tasarımına](../superpowers/specs/2026-10-06-ops-02-physical-storage-backup-design.md)
+bakın. Bu onay, AWS kaynağı oluşturma veya production verisi okuma/yazma yetkisi
+vermez.
+
 ## Problem ve kapsam
 
 Mevcut [production veritabanı yedeği](production-database-deployment.md) `storage.objects` kayıtlarını içerebilir; nesnelerin fiziksel baytlarını içermez. Supabase de veritabanı yedeğinin Storage nesnelerini geri getirmediğini [belirtir](https://supabase.com/docs/guides/platform/backups). Bu nedenle veritabanı yedeği ile Storage yedeği ayrı ama eşleştirilebilir kanıt paketleri olmalıdır.
