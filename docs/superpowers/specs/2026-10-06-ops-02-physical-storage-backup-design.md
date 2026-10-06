@@ -1,10 +1,14 @@
 # OPS-02 Physical Storage Backup and Recovery Design
 
-**Status:** Approved design; implementation not started  
-**Date:** 2026-10-06  
-**Owner:** Motto SaaS platform owner  
-**Related roadmap item:** `OPS-02`  
-**Predecessor:** [OPS-02 Storage backup design](../../security/OPS-02-storage-backup-design.md)  
+**Status:** Approved design; implementation not started
+
+**Date:** 2026-10-06
+
+**Owner:** Motto SaaS platform owner
+
+**Related roadmap item:** `OPS-02`
+
+**Predecessor:** [OPS-02 Storage backup design](../../security/OPS-02-storage-backup-design.md)
 **Inventory runbook:** [OPS-02 read-only Storage inventory](../../security/OPS-02-storage-inventory-runbook.md)
 
 ## 1. Decision Summary
