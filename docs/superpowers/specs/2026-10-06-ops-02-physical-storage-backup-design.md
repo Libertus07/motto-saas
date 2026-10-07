@@ -252,8 +252,15 @@ reports/
 Daily objects inherit the bucket's 90-day default `COMPLIANCE` retention.
 Monthly objects are written only beneath `backup-sets/monthly/` and receive an
 explicit 365-day `COMPLIANCE` retention request. IAM and bucket policies bind
-that longer-retention operation to the monthly namespace. Verifiers may read
-manifests, attestations, generated inventory/checksum reports, retention
+`PutObjectRetention` to the monthly namespace, `COMPLIANCE` mode, and the fixed
+365-day value. Phase A does not add a blanket missing-header deny to
+`s3:PutObject`: the same action authorizes multipart initiation, parts, and
+completion, and a deny based on absent object-lock headers can block valid
+multipart operations. The Phase B operator must supply retention at object
+creation and fail the set closed unless `GetObjectRetention` proves at least
+365 days before completion evidence is written. A live, multipart-compatible
+bucket-policy enforcement pattern remains a deployment gate. Verifiers may
+read manifests, attestations, generated inventory/checksum reports, retention
 metadata, and the separate audit destination, but not `objects/` payload bytes.
 
 Target object keys do not expose bucket names, tenant IDs, organization IDs,

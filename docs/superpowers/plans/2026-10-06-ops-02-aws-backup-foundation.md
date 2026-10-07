@@ -389,10 +389,14 @@ mutation permission.
 Add resource-policy constraints for TLS, the expected KMS key, and monthly
 `COMPLIANCE` retention. Use the fixed 365-day value from `OPS02_RETENTION`; do
 not accept a context override. Bind the explicit-retention allow and deny
-conditions to `backup-sets/monthly/` so the daily namespace continues to use
-the bucket's fixed 90-day default. Ensure the policy does not block
-CloudFormation from managing the bucket itself and does not grant a new
-principal.
+conditions for `s3:PutObjectRetention` to `backup-sets/monthly/` so the daily
+namespace continues to use the bucket's fixed 90-day default. Do not add a
+blanket `s3:PutObject` deny for missing retention headers in Phase A: S3 uses
+that action for multipart initiation, part upload, and completion, and the
+header condition is not valid uniformly across those requests. Record the
+remaining live multipart enforcement proof as a Phase B/deployment gate.
+Ensure the policy does not block CloudFormation from managing the bucket itself
+and does not grant a new principal.
 
 - [ ] **Step 6: Run the access-boundary assertions**
 
