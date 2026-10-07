@@ -225,7 +225,7 @@ describe('OPS-02 access boundary', () => {
 
   it('grants verifier report and retention access without backup-object reads', () => {
     const { boundary, vault, resolve, roleStatements } = fixture()
-    const statements = roleStatements(boundary.backupVerifierRole)
+    const statements = roleStatements(boundary.backupVerifierRole).filter((statement) => statement.Effect === 'Allow')
     const readable = statements.filter((statement) =>
       array(statement.Action).some((action) => ['s3:GetObject', 's3:GetObjectVersion'].includes(action)),
     )
@@ -264,6 +264,57 @@ describe('OPS-02 access boundary', () => {
       resolve(vault.backupBucket.arnForObjects('backup-sets/daily/*')),
       resolve(vault.backupBucket.arnForObjects('backup-sets/monthly/*')),
     ])
+  })
+
+  it('explicitly denies all verifier payload reads and attributes in both backup classes', () => {
+    const { boundary, vault, resolve, roleStatements } = fixture()
+    const denied = roleStatements(boundary.backupVerifierRole).filter((statement) => statement.Effect === 'Deny')
+    expect(denied).toHaveLength(1)
+    expect(array(denied[0].Action).sort()).toEqual([
+      's3:GetObject',
+      's3:GetObjectAttributes',
+      's3:GetObjectVersion',
+      's3:GetObjectVersionAttributes',
+    ])
+    expect(array(denied[0].Resource)).toEqual([
+      resolve(vault.backupBucket.arnForObjects('backup-sets/daily/*/objects/*')),
+      resolve(vault.backupBucket.arnForObjects('backup-sets/monthly/*/objects/*')),
+    ])
+    expect(denied[0].Condition).toBeUndefined()
+  })
+
+  it('covers nested payload keys even when they also match evidence allow wildcards', () => {
+    const { boundary, roleStatements } = fixture()
+    const statements = roleStatements(boundary.backupVerifierRole)
+    // The fixture's synthesized object ARNs share the same bucket token. Compare
+    // their literal key suffix using IAM '*' semantics, which include slashes.
+    // This demonstrates the overlap; it is not a general IAM policy simulator.
+    const matchesKey = (resource: unknown, key: string): boolean => {
+      const suffix = (resource as { 'Fn::Join': [string, unknown[]] })['Fn::Join'][1].at(-1)
+      expect(typeof suffix).toBe('string')
+      const pattern = (suffix as string)
+        .split('*')
+        .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('.*')
+      return new RegExp(`^${pattern}$`).test(`/${key}`)
+    }
+    const matchingStatements = (effect: string, key: string) =>
+      statements.filter(
+        (statement) =>
+          statement.Effect === effect &&
+          array(statement.Action).includes('s3:GetObject') &&
+          array(statement.Resource).some((resource) => matchesKey(resource, key)),
+      )
+    for (const kind of ['daily', 'monthly']) {
+      for (const evidence of ['manifests', 'attestations']) {
+        const craftedKey = `backup-sets/${kind}/set/objects/id/${evidence}/leak`
+        expect(matchingStatements('Allow', craftedKey)).toHaveLength(1)
+        expect(matchingStatements('Deny', craftedKey)).toHaveLength(1)
+        const legitimateKey = `backup-sets/${kind}/set/${evidence}/report.json`
+        expect(matchingStatements('Allow', legitimateKey)).toHaveLength(1)
+        expect(matchingStatements('Deny', legitimateKey)).toHaveLength(0)
+      }
+    }
   })
 
   it('permits restore version reads only in approved data-object namespaces', () => {

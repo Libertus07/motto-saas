@@ -73,6 +73,10 @@ export class Ops02AccessBoundary extends Construct {
 
     const backupPrefixes = ['backup-sets/daily/*', 'backup-sets/monthly/*']
     const backupObjects = backupPrefixes.map((prefix) => backupBucket.arnForObjects(prefix))
+    const payloadObjects = [
+      backupBucket.arnForObjects('backup-sets/daily/*/objects/*'),
+      backupBucket.arnForObjects('backup-sets/monthly/*/objects/*'),
+    ]
     const monthlyObjects = [backupBucket.arnForObjects('backup-sets/monthly/*')]
     const evidencePrefixes = ['daily', 'monthly']
       .flatMap((kind) => ['manifests', 'attestations'].map((type) => `backup-sets/${kind}/*/${type}/*`))
@@ -124,19 +128,21 @@ export class Ops02AccessBoundary extends Construct {
     list(this.backupVerifierRole, backupBucket, evidencePrefixes)
     list(this.backupVerifierRole, auditBucket, ['AWSLogs/*'])
     allow(this.backupVerifierRole, ['s3:GetObject', 's3:GetObjectVersion'], [...evidenceObjects, ...auditObjects])
+    // IAM '*' spans slashes: a nested objects/.../manifests/... key can match
+    // the evidence allowlist. Explicit denial keeps payload reads restore-only.
+    this.backupVerifierRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.DENY,
+        actions: ['s3:GetObject', 's3:GetObjectVersion', 's3:GetObjectAttributes', 's3:GetObjectVersionAttributes'],
+        resources: payloadObjects,
+      }),
+    )
     allow(this.backupVerifierRole, ['s3:GetObjectRetention'], backupObjects)
     allow(this.backupVerifierRole, ['s3:GetBucketLocation'], [backupBucket.bucketArn, auditBucket.bucketArn])
     decrypt(this.backupVerifierRole, backupKey)
     decrypt(this.backupVerifierRole, auditKey)
 
-    allow(
-      this.restoreOperatorRole,
-      ['s3:GetObjectVersion'],
-      [
-        backupBucket.arnForObjects('backup-sets/daily/*/objects/*'),
-        backupBucket.arnForObjects('backup-sets/monthly/*/objects/*'),
-      ],
-    )
+    allow(this.restoreOperatorRole, ['s3:GetObjectVersion'], payloadObjects)
     decrypt(this.restoreOperatorRole, backupKey)
 
     const keyAdministrationActions = [
