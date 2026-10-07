@@ -27,9 +27,9 @@ function array<T>(value: T | T[]): T[] {
   return Array.isArray(value) ? value : [value]
 }
 
-function fixture() {
+function fixture(stackId = 'AuditTest', monitoringId = 'Monitoring') {
   const app = new App()
-  const stack = new Stack(app, 'AuditTest', { env: { account: config.account, region: config.region } })
+  const stack = new Stack(app, stackId, { env: { account: config.account, region: config.region } })
   const vault = new Ops02BackupVault(stack, 'Vault', { stage: config.stage })
   const access = new Ops02AccessBoundary(stack, 'Access', {
     config,
@@ -38,7 +38,7 @@ function fixture() {
     backupKey: vault.backupKey,
     auditKey: vault.auditKey,
   })
-  const monitoring = new Ops02AuditMonitoring(stack, 'Monitoring', {
+  const monitoring = new Ops02AuditMonitoring(stack, monitoringId, {
     backupBucket: vault.backupBucket,
     auditBucket: vault.auditBucket,
     auditKey: vault.auditKey,
@@ -72,6 +72,16 @@ function fixture() {
 }
 
 describe('OPS-02 audit monitoring', () => {
+  it('keeps security rule names within 64 characters for long valid construct paths and synthesizes deterministically', () => {
+    const stackId = 'Ops02BackupFoundationForTheProductionSecurityAuditEnvironmentAndNameBoundaryRegression'
+    const scopeId = 'AuditMonitoringForTheSeparateImmutableBackupDestinationAndSecurityNotificationBoundary'
+    const first = fixture(stackId, scopeId)
+    const second = fixture(stackId, scopeId)
+    expect(first.rule.Properties.Name.length).toBeLessThanOrEqual(64)
+    expect(first.rule.Properties.Name).toMatch(/-security$/)
+    expect(first.template.toJSON()).toEqual(second.template.toJSON())
+  })
+
   // Removing encryption, validation, delivery, or retention must break this contract.
   it('writes an encrypted validated multi-region trail to the separate audit bucket', () => {
     const { template, vault, monitoring, resolve, trail } = fixture()
@@ -237,11 +247,16 @@ describe('OPS-02 audit monitoring', () => {
     const cloudtrailStatements = keyStatements.filter(
       (statement) => statement.Principal?.Service === 'cloudtrail.amazonaws.com',
     )
-    expect(cloudtrailStatements).toHaveLength(2)
+    expect(cloudtrailStatements).toHaveLength(3)
+    expect(cloudtrailStatements.map((statement) => array(statement.Action)).sort()).toEqual(
+      [['kms:Decrypt'], ['kms:DescribeKey'], ['kms:GenerateDataKey*']].sort(),
+    )
     for (const statement of cloudtrailStatements) {
       expect(statement.Condition?.StringEquals?.['aws:SourceArn']).toEqual(resolve(trailArn))
       expect(
-        array(statement.Action).every((action) => ['kms:GenerateDataKey*', 'kms:DescribeKey'].includes(action)),
+        array(statement.Action).every((action) =>
+          ['kms:GenerateDataKey*', 'kms:DescribeKey', 'kms:Decrypt'].includes(action),
+        ),
       ).toBe(true)
     }
     const dataKeyStatement = cloudtrailStatements.find((statement) =>
@@ -250,6 +265,14 @@ describe('OPS-02 audit monitoring', () => {
     expect(dataKeyStatement.Condition?.StringLike?.['kms:EncryptionContext:aws:cloudtrail:arn']).toEqual(
       resolve(trailArn),
     )
+    const decryptStatement = cloudtrailStatements.find((statement) => array(statement.Action).includes('kms:Decrypt'))!
+    expect(decryptStatement).toEqual({
+      Effect: 'Allow',
+      Principal: { Service: 'cloudtrail.amazonaws.com' },
+      Action: 'kms:Decrypt',
+      Resource: '*',
+      Condition: { StringEquals: { 'aws:SourceArn': resolve(trailArn) } },
+    })
     const logsStatements = keyStatements.filter(
       (statement) => statement.Principal?.Service === 'logs.eu-central-1.amazonaws.com',
     )

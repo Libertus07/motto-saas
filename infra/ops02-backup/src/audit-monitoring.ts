@@ -29,7 +29,8 @@ export class Ops02AuditMonitoring extends Construct {
   constructor(scope: Construct, id: string, props: Ops02AuditMonitoringProps) {
     super(scope, id)
     const stack = Stack.of(this)
-    const resourceName = Names.uniqueResourceName(this, { maxLength: 100, separator: '-' })
+    // EventBridge caps names at 64; reserve nine characters for '-security'.
+    const resourceName = Names.uniqueResourceName(this, { maxLength: 55, separator: '-' })
     const trailName = `${resourceName}-trail`
     const ruleName = `${resourceName}-security`
     const logGroupName = `/motto-saas/ops02/${resourceName}/cloudtrail`
@@ -72,6 +73,16 @@ export class Ops02AuditMonitoring extends Construct {
       new iam.PolicyStatement({
         principals: [new iam.ServicePrincipal('cloudtrail.amazonaws.com')],
         actions: ['kms:DescribeKey'],
+        resources: ['*'],
+        conditions: { StringEquals: { 'aws:SourceArn': trailArn } },
+      }),
+    )
+    // Existing audit buckets use S3 Bucket Keys, which require CloudTrail to
+    // decrypt during trail setup. Scope by SourceArn, not the data-key context.
+    props.auditKey.addToResourcePolicy(
+      new iam.PolicyStatement({
+        principals: [new iam.ServicePrincipal('cloudtrail.amazonaws.com')],
+        actions: ['kms:Decrypt'],
         resources: ['*'],
         conditions: { StringEquals: { 'aws:SourceArn': trailArn } },
       }),
