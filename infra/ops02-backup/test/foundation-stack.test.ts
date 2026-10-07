@@ -75,6 +75,52 @@ function array<T>(value: T | T[]): T[] {
 
 type Statement = { Effect: string; Action: string | string[]; Resource?: unknown }
 
+const administrativeActions = new Set([
+  'kms:DescribeKey',
+  'kms:GetKeyPolicy',
+  'kms:GetKeyRotationStatus',
+  'kms:ListResourceTags',
+  'kms:PutKeyPolicy',
+  'kms:EnableKeyRotation',
+  'kms:DisableKeyRotation',
+  'kms:EnableKey',
+  'kms:DisableKey',
+  'kms:ScheduleKeyDeletion',
+  'kms:CancelKeyDeletion',
+  'kms:UpdateKeyDescription',
+  'kms:TagResource',
+  'kms:UntagResource',
+  'kms:CreateGrant',
+  'kms:RevokeGrant',
+  's3:PutBucketPolicy',
+  's3:DeleteBucketPolicy',
+  's3:PutBucketVersioning',
+  's3:PutBucketObjectLockConfiguration',
+  's3:PutObjectLockConfiguration',
+  's3:PutBucketPublicAccessBlock',
+  's3:DeleteBucketPublicAccessBlock',
+])
+
+function resourceLiteralStrings(value: unknown): string[] {
+  if (typeof value === 'string') return [value]
+  if (Array.isArray(value)) return value.flatMap(resourceLiteralStrings)
+  if (value !== null && typeof value === 'object') return Object.values(value).flatMap(resourceLiteralStrings)
+  return []
+}
+
+function assertNoWildcardAdministrativeResource(statement: Statement) {
+  if (
+    statement.Effect === 'Allow' &&
+    array(statement.Action).some(
+      (action) =>
+        administrativeActions.has(action) ||
+        /^iam:(Attach|Detach|Put|Delete|Update|Create|Set|Add|Remove|PassRole|Tag|Untag|Enable|Disable)/.test(action),
+    )
+  ) {
+    expect(resourceLiteralStrings(statement.Resource).some((resource) => resource.includes('*'))).toBe(false)
+  }
+}
+
 describe('OPS-02 foundation stack', () => {
   let appRun: ReturnType<typeof runApp>
   let invalidAppRun: ReturnType<typeof runApp>
@@ -215,6 +261,45 @@ describe('OPS-02 foundation stack', () => {
   })
 
   it('contains no plaintext secret, customer identifier, production project reference, or wildcard administrative policy', () => {
+    // Exercise the assertion with malformed policies, not a mutated production template.
+    const wildcardKey = 'arn:aws:kms:eu-central-1:111111111111:key/*'
+    const wildcardBucket = 'arn:aws:s3:::ops02-backup-*'
+    for (const [action, resource] of [
+      ['kms:PutKeyPolicy', wildcardKey],
+      ['kms:ScheduleKeyDeletion', [wildcardKey]],
+      ['kms:TagResource', { 'Fn::Join': ['', ['arn:aws:kms:eu-central-1:111111111111:key/', '*']] }],
+      [
+        ['kms:Encrypt', 'kms:PutKeyPolicy'],
+        { 'Fn::Sub': ['arn:aws:kms:eu-central-1:111111111111:key/${KeyId}', { KeyId: '*' }] },
+      ],
+      ['s3:PutBucketPolicy', { 'Fn::Sub': wildcardBucket }],
+      ['s3:PutBucketVersioning', [wildcardBucket]],
+      ['s3:PutBucketObjectLockConfiguration', { 'Fn::Join': ['', [wildcardBucket]] }],
+      ['iam:PutRolePolicy', 'arn:aws:iam::111111111111:role/*'],
+    ] as const) {
+      expect(() =>
+        assertNoWildcardAdministrativeResource({
+          Effect: 'Allow',
+          Action: typeof action === 'string' ? action : [...action],
+          Resource: resource,
+        }),
+      ).toThrow()
+    }
+    for (const [action, resource] of [
+      ['s3:PutObject', 'arn:aws:s3:::ops02-backup/backup-sets/daily/*'],
+      ['s3:PutObjectRetention', 'arn:aws:s3:::ops02-backup/backup-sets/monthly/*'],
+      ['logs:DescribeLogGroups', '*'],
+      ['cloudtrail:DescribeTrails', '*'],
+      ['kms:PutKeyPolicy', { 'Fn::GetAtt': ['BackupKey', 'Arn'] }],
+    ] as const) {
+      expect(() =>
+        assertNoWildcardAdministrativeResource({ Effect: 'Allow', Action: action, Resource: resource }),
+      ).not.toThrow()
+    }
+    expect(() =>
+      assertNoWildcardAdministrativeResource({ Effect: 'Deny', Action: 'kms:PutKeyPolicy', Resource: wildcardKey }),
+    ).not.toThrow()
+
     const { template } = fixture()
     const json = JSON.stringify(template.toJSON())
     expect(json).not.toMatch(/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b|eyJ[A-Za-z0-9_-]+\.|supabase\.co|service_role/i)
@@ -236,6 +321,7 @@ describe('OPS-02 foundation stack', () => {
         if (statement.Effect !== 'Allow') continue
         const actions = array(statement.Action)
         expect(actions.some((action) => action.includes('*'))).toBe(false)
+        assertNoWildcardAdministrativeResource(statement)
         if (array(statement.Resource).includes('*')) {
           expect(
             actions.every((action) => ['logs:DescribeLogGroups', 'cloudtrail:DescribeTrails'].includes(action)),
