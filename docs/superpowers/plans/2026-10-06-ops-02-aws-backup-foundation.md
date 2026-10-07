@@ -376,13 +376,27 @@ Create the writer with `ServicePrincipal('ecs-tasks.amazonaws.com')`. Create ver
 
 The writer can read only the two OPS-02 secret ARNs, use only the required KMS cryptographic operations, and write only beneath `backup-sets/daily/` or `backup-sets/monthly/`. It cannot call `s3:GetObject`, `s3:GetObjectVersion`, or either attributes action on data objects. Upload responses supply the version and checksum evidence recorded by the future operator. The verifier reads only `manifests/` and `attestations/` objects beneath either backup class, `reports/inventory/`, `reports/checksums/`, retention metadata, and CloudTrail objects beneath the separate audit bucket's `AWSLogs/` namespace; it cannot read either backup class's `objects/` bytes. The restore role alone can read approved data-object versions and decrypt them; a later restore plan adds target Supabase behavior. The key administrator cannot decrypt S3 objects.
 
+The verifier may decrypt with the backup key only because it can read the
+manifest, attestation, inventory, and checksum evidence allowlist; its S3
+policy still denies access to `objects/` payloads. The verifier and security
+auditor may decrypt with the audit key only for `AWSLogs/` evidence. The
+security auditor receives no backup-key or secret-key cryptographic use. The
+writer's required `s3:ListBucketMultipartUploads` grant is bucket scoped
+without an `s3:prefix` IAM condition because that action does not support the
+prefix condition; the dedicated bucket and pseudonymous key policy bound the
+remaining metadata exposure. Phase B must confirm the live action/condition
+matrix before deployment.
+
 The key-administrator allowlist is limited to KMS key metadata, policy,
 rotation, enable/disable, deletion scheduling/cancellation, description, and
 tag administration for the backup, audit, and secret keys. It excludes
 `kms:Encrypt`, `kms:Decrypt`, data-key generation, re-encryption, grant
 creation, and S3 object access. The security-auditor role may read resource
-configuration and audit evidence but receives no content-decryption or
-mutation permission.
+configuration and audit evidence, including audit-key decryption, but receives
+no backup/secret content-decryption or mutation permission. In an attached KMS
+key resource policy, `Resource: "*"` means only that policy's key and is the
+sole wildcard-resource exception; workload and human identity policies use
+exact resource ARNs.
 
 - [ ] **Step 5: Enforce monthly retention and TLS/KMS resource policies**
 

@@ -162,7 +162,7 @@ The minimum role model is:
 | `backup-verifier`   | Read manifests, S3 inventory/checksum reports, retention metadata, and audit evidence                                                                                                           | Backup object bytes, object writes/deletes, retention changes, key administration                   |
 | `restore-operator`  | Read explicitly approved object versions and decrypt them for an approved isolated restore                                                                                                      | Backup writes, deletion, policy changes, unrestricted production restore                            |
 | `key-administrator` | Administer the dedicated KMS key policy and lifecycle                                                                                                                                           | Reading backup objects or assuming restore permissions                                              |
-| `security-auditor`  | Read configuration, CloudTrail, alarms, and access-analysis evidence                                                                                                                            | Backup content decryption or mutation                                                               |
+| `security-auditor`  | Read configuration, CloudTrail, alarms, and access-analysis evidence; decrypt only audit-log objects with the audit key                                                                         | Backup/secret content decryption or mutation                                                        |
 
 The writer cannot call `DeleteObject`, `DeleteObjectVersion`,
 `PutObjectLegalHold`, `PutBucketPolicy`, `PutBucketVersioning`, retention bypass,
