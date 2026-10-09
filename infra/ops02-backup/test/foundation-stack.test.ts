@@ -167,7 +167,7 @@ describe('OPS-02 foundation stack', () => {
     expect(assembly.manifest.missing ?? []).toEqual([])
     for (const [type, count] of Object.entries({
       'AWS::S3::Bucket': 2,
-      'AWS::KMS::Key': 3,
+      'AWS::KMS::Key': 4,
       'AWS::SecretsManager::Secret': 2,
       'AWS::IAM::Role': 7,
       'AWS::CloudTrail::Trail': 1,
@@ -241,6 +241,7 @@ describe('OPS-02 foundation stack', () => {
         'AuditBucketName',
         'BackupKeyArn',
         'AuditKeyArn',
+        'AlertKeyArn',
         'BackupWriterRoleArn',
         'BackupVerifierRoleArn',
         'RestoreOperatorRoleArn',
@@ -258,6 +259,7 @@ describe('OPS-02 foundation stack', () => {
           AuditBucketName: vault.auditBucket.bucketName,
           BackupKeyArn: vault.backupKey.keyArn,
           AuditKeyArn: vault.auditKey.keyArn,
+          AlertKeyArn: vault.alertKey.keyArn,
           BackupWriterRoleArn: access.backupWriterRole.roleArn,
           BackupVerifierRoleArn: access.backupVerifierRole.roleArn,
           RestoreOperatorRoleArn: access.restoreOperatorRole.roleArn,
@@ -361,5 +363,10 @@ describe('OPS-02 foundation stack', () => {
     expect(result.status, result.stderr).toBe(0)
     const manifest = JSON.parse(readFileSync(join(outdir, 'manifest.json'), 'utf8'))
     expect(manifest.artifacts['Ops02BackupFoundation-test'].properties.terminationProtection).toBe(true)
+  })
+
+  it('enforces the documented Node.js runtime floor', () => {
+    const packageJson = JSON.parse(readFileSync(join(packageDirectory, 'package.json'), 'utf8'))
+    expect(packageJson.engines).toEqual({ node: '>=22.12.0' })
   })
 })

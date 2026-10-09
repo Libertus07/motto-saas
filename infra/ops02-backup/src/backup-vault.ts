@@ -11,6 +11,7 @@ export class Ops02BackupVault extends Construct {
   public readonly auditBucket: s3.Bucket
   public readonly backupKey: kms.Key
   public readonly auditKey: kms.Key
+  public readonly alertKey: kms.Key
 
   constructor(scope: Construct, id: string, props: Ops02BackupVaultProps) {
     super(scope, id)
@@ -23,6 +24,15 @@ export class Ops02BackupVault extends Construct {
     })
     this.auditKey = new kms.Key(this, 'AuditKey', {
       description: `OPS-02 ${props.stage} audit encryption`,
+      enableKeyRotation: true,
+      pendingWindow: Duration.days(30),
+      removalPolicy: RemovalPolicy.RETAIN,
+    })
+    // Keep the alert path independent from the audit key it monitors. The
+    // OPS-02 key-administrator role intentionally receives no administration
+    // grant on this key; account-level break-glass administration remains.
+    this.alertKey = new kms.Key(this, 'AlertKey', {
+      description: `OPS-02 ${props.stage} security alert encryption`,
       enableKeyRotation: true,
       pendingWindow: Duration.days(30),
       removalPolicy: RemovalPolicy.RETAIN,
@@ -43,6 +53,8 @@ export class Ops02BackupVault extends Construct {
     })
     this.auditBucket = new s3.Bucket(this, 'AuditBucket', {
       versioned: true,
+      objectLockEnabled: true,
+      objectLockDefaultRetention: s3.ObjectLockRetention.compliance(Duration.days(OPS02_RETENTION.auditDays)),
       encryption: s3.BucketEncryption.KMS,
       encryptionKey: this.auditKey,
       bucketKeyEnabled: true,

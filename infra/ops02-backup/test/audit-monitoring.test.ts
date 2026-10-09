@@ -37,11 +37,13 @@ function synthesizeFixture(stackId = 'AuditTest', monitoringId = 'Monitoring') {
     auditBucket: vault.auditBucket,
     backupKey: vault.backupKey,
     auditKey: vault.auditKey,
+    alertKey: vault.alertKey,
   })
   const monitoring = new Ops02AuditMonitoring(stack, monitoringId, {
     backupBucket: vault.backupBucket,
     auditBucket: vault.auditBucket,
     auditKey: vault.auditKey,
+    alertKey: vault.alertKey,
     securityAuditorRole: access.securityAuditorRole,
   })
   const template = Template.fromStack(stack)
@@ -200,7 +202,8 @@ describe('OPS-02 audit monitoring', () => {
     expect(rule.Properties.Targets).toHaveLength(1)
     expect(rule.Properties.Targets[0].Arn).toEqual(resolve(monitoring.securityTopic.topicArn))
     const topic = Object.values(template.findResources('AWS::SNS::Topic'))[0]
-    expect(topic.Properties.KmsMasterKeyId).toEqual(resolve(vault.auditKey.keyArn))
+    expect(topic.Properties.KmsMasterKeyId).toEqual(resolve(vault.alertKey.keyArn))
+    expect(topic.Properties.KmsMasterKeyId).not.toEqual(resolve(vault.auditKey.keyArn))
   })
 
   it('creates no email, webhook, or external subscription before owner approval', () => {
@@ -341,7 +344,7 @@ describe('OPS-02 audit monitoring', () => {
       if (array(statement.Action).includes('sns:Publish')) {
         expect(array(statement.Resource)).toEqual([resolve(monitoring.securityTopic.topicArn)])
       } else {
-        expect(array(statement.Resource)).toEqual([resolve(vault.auditKey.keyArn)])
+        expect(array(statement.Resource)).toEqual([resolve(vault.alertKey.keyArn)])
         expect(statement.Condition?.StringEquals).toEqual({
           'kms:ViaService': 'sns.eu-central-1.amazonaws.com',
           'kms:EncryptionContext:aws:sns:topicArn': resolve(monitoring.securityTopic.topicArn),

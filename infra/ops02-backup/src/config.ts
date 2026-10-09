@@ -9,12 +9,14 @@ export interface Ops02FoundationConfig {
   readonly recoveryPrincipalArn: string
   readonly dailyRetentionDays: 90
   readonly monthlyRetentionDays: 365
+  readonly auditRetentionDays: 365
 }
 
 export const OPS02_RETENTION: {
   readonly dailyDays: 90
   readonly monthlyDays: 365
-} = Object.freeze({ dailyDays: 90, monthlyDays: 365 })
+  readonly auditDays: 365
+} = Object.freeze({ dailyDays: 90, monthlyDays: 365, auditDays: 365 })
 
 function readContextString(input: Readonly<Record<string, unknown>>, field: string): string {
   const descriptor = Object.getOwnPropertyDescriptor(input, field)
@@ -73,5 +75,6 @@ export function parseOps02FoundationConfig(input: Readonly<Record<string, unknow
     recoveryPrincipalArn,
     dailyRetentionDays: OPS02_RETENTION.dailyDays,
     monthlyRetentionDays: OPS02_RETENTION.monthlyDays,
+    auditRetentionDays: OPS02_RETENTION.auditDays,
   }
 }

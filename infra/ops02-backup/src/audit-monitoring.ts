@@ -17,6 +17,7 @@ export interface Ops02AuditMonitoringProps {
   readonly backupBucket: s3.IBucket
   readonly auditBucket: s3.IBucket
   readonly auditKey: kms.IKey
+  readonly alertKey: kms.IKey
   readonly securityAuditorRole: iam.IRole
 }
 
@@ -133,7 +134,7 @@ export class Ops02AuditMonitoring extends Construct {
       this.trail.node.addDependency(policy.policyDependable)
     }
 
-    this.securityTopic = new sns.Topic(this, 'SecurityTopic', { masterKey: props.auditKey })
+    this.securityTopic = new sns.Topic(this, 'SecurityTopic', { masterKey: props.alertKey })
     const deliveryRole = new iam.Role(this, 'SecurityDeliveryRole', {
       assumedBy: new iam.ServicePrincipal('events.amazonaws.com', {
         conditions: {
@@ -148,7 +149,7 @@ export class Ops02AuditMonitoring extends Construct {
     deliveryRole.addToPrincipalPolicy(
       new iam.PolicyStatement({
         actions: ['kms:Decrypt', 'kms:GenerateDataKey'],
-        resources: [props.auditKey.keyArn],
+        resources: [props.alertKey.keyArn],
         conditions: {
           StringEquals: {
             'kms:ViaService': `sns.${stack.region}.amazonaws.com`,

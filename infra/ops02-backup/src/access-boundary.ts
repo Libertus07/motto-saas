@@ -1,6 +1,7 @@
 import {
   Duration,
   RemovalPolicy,
+  Stack,
   aws_iam as iam,
   aws_kms as kms,
   aws_s3 as s3,
@@ -15,6 +16,7 @@ export interface Ops02AccessBoundaryProps {
   readonly auditBucket: s3.IBucket
   readonly backupKey: kms.IKey
   readonly auditKey: kms.IKey
+  readonly alertKey: kms.IKey
 }
 
 export class Ops02AccessBoundary extends Construct {
@@ -29,7 +31,7 @@ export class Ops02AccessBoundary extends Construct {
 
   constructor(scope: Construct, id: string, props: Ops02AccessBoundaryProps) {
     super(scope, id)
-    const { config, backupBucket, auditBucket, backupKey, auditKey } = props
+    const { config, backupBucket, auditBucket, backupKey, auditKey, alertKey } = props
     this.secretKey = new kms.Key(this, 'SecretKey', {
       description: `OPS-02 ${config.stage} credential container encryption`,
       enableKeyRotation: true,
@@ -56,7 +58,14 @@ export class Ops02AccessBoundary extends Construct {
     })
 
     this.backupWriterRole = new iam.Role(this, 'BackupWriterRole', {
-      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com', {
+        conditions: {
+          ArnLike: {
+            'aws:SourceArn': Stack.of(this).formatArn({ service: 'ecs', resource: '*' }),
+          },
+          StringEquals: { 'aws:SourceAccount': config.account },
+        },
+      }),
     })
     this.backupVerifierRole = new iam.Role(this, 'BackupVerifierRole', {
       assumedBy: new iam.ArnPrincipal(config.verificationPrincipalArn),
@@ -84,6 +93,7 @@ export class Ops02AccessBoundary extends Construct {
     const evidenceObjects = evidencePrefixes.map((prefix) => backupBucket.arnForObjects(prefix))
     const auditObjects = [auditBucket.arnForObjects('AWSLogs/*')]
     const keys = [backupKey, auditKey, this.secretKey]
+    const auditableKeys = [...keys, alertKey]
     const secrets = [this.sourceCredentialSecret.secretArn, this.identityHmacSecret.secretArn]
 
     const allow = (role: iam.Role, actions: string[], resources: string[], conditions?: iam.Conditions) => {
@@ -199,7 +209,7 @@ export class Ops02AccessBoundary extends Construct {
     allow(
       this.securityAuditorRole,
       ['kms:DescribeKey', 'kms:GetKeyPolicy', 'kms:GetKeyRotationStatus', 'kms:ListResourceTags'],
-      keys.map((key) => key.keyArn),
+      auditableKeys.map((key) => key.keyArn),
     )
 
     const deny = (bucket: s3.IBucket, actions: string[], resources: string[], conditions: iam.Conditions) => {

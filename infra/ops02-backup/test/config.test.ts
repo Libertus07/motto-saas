@@ -23,6 +23,7 @@ describe('parseOps02FoundationConfig', () => {
       recoveryPrincipalArn: 'arn:aws:iam::111111111111:role/Ops02Recovery',
       dailyRetentionDays: 90,
       monthlyRetentionDays: 365,
+      auditRetentionDays: 365,
     })
     expect(input.stage).toBe(' test ')
   })
@@ -87,7 +88,8 @@ describe('parseOps02FoundationConfig', () => {
 
     expect(result.dailyRetentionDays).toBe(90)
     expect(result.monthlyRetentionDays).toBe(365)
-    expect(OPS02_RETENTION).toEqual({ dailyDays: 90, monthlyDays: 365 })
+    expect(result.auditRetentionDays).toBe(365)
+    expect(OPS02_RETENTION).toEqual({ dailyDays: 90, monthlyDays: 365, auditDays: 365 })
   })
 
   it('accepts distinct production principals including IAM role paths', () => {

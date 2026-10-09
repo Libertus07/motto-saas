@@ -36,6 +36,7 @@ function synthesizeFixture() {
     auditBucket: vault.auditBucket,
     backupKey: vault.backupKey,
     auditKey: vault.auditKey,
+    alertKey: vault.alertKey,
   })
   const template = Template.fromStack(stack)
   const resolve = (value: unknown): unknown => stack.resolve(value)
@@ -82,7 +83,7 @@ describe('OPS-02 access boundary', () => {
       expect(secret.Properties.GenerateSecretString.GenerateStringKey).toBe('bootstrapNonce')
       expect(secret.DeletionPolicy).toBe('Retain')
     }
-    template.resourceCountIs('AWS::KMS::Key', 3)
+    template.resourceCountIs('AWS::KMS::Key', 4)
     for (const key of Object.values(template.findResources('AWS::KMS::Key'))) {
       expect(key.Properties.EnableKeyRotation).toBe(true)
       expect(key.DeletionPolicy).toBe('Retain')
@@ -90,13 +91,25 @@ describe('OPS-02 access boundary', () => {
   })
 
   it('trusts ECS tasks only for the backup writer role', () => {
-    const { template } = fixture()
+    const { template, boundary, resolve } = fixture()
     const roles = Object.values(template.findResources('AWS::IAM::Role'))
     expect(roles).toHaveLength(5)
     const trusts = roles.flatMap((role) => role.Properties.AssumeRolePolicyDocument.Statement as Statement[])
     expect(
       trusts.filter((statement) => JSON.stringify(statement.Principal).includes('ecs-tasks.amazonaws.com')),
-    ).toEqual([{ Effect: 'Allow', Action: 'sts:AssumeRole', Principal: { Service: 'ecs-tasks.amazonaws.com' } }])
+    ).toEqual([
+      {
+        Effect: 'Allow',
+        Action: 'sts:AssumeRole',
+        Principal: { Service: 'ecs-tasks.amazonaws.com' },
+        Condition: {
+          ArnLike: {
+            'aws:SourceArn': resolve(Stack.of(boundary).formatArn({ service: 'ecs', resource: '*' })),
+          },
+          StringEquals: { 'aws:SourceAccount': '111111111111' },
+        },
+      },
+    ])
     expect(trusts.every((statement) => array(statement.Action).every((action) => action === 'sts:AssumeRole'))).toBe(
       true,
     )
@@ -347,7 +360,7 @@ describe('OPS-02 access boundary', () => {
     ).toBe(false)
   })
 
-  it('adds non-cryptographic key administration to all three attached key policies', () => {
+  it('keeps alert-key administration independent from the three OPS-02 administrative keys', () => {
     const { template, boundary, vault, resolve, roleStatements } = fixture()
     const expectedActions = [
       'kms:DescribeKey',
@@ -373,12 +386,17 @@ describe('OPS-02 access boundary', () => {
       resolve(vault.auditKey.keyArn),
       resolve(boundary.secretKey.keyArn),
     ])
-    for (const key of Object.values(template.findResources('AWS::KMS::Key'))) {
+    const alertKeyReference = resolve(vault.alertKey.keyId) as { Ref: string }
+    for (const [logicalId, key] of Object.entries(template.findResources('AWS::KMS::Key'))) {
       const policies = (key.Properties.KeyPolicy.Statement as Statement[]).filter(
         (statement) =>
           JSON.stringify(statement.Principal) ===
           JSON.stringify({ AWS: resolve(boundary.keyAdministratorRole.roleArn) }),
       )
+      if (logicalId === alertKeyReference.Ref) {
+        expect(policies).toEqual([])
+        continue
+      }
       expect(policies).toHaveLength(1)
       expect(array(policies[0].Action).sort()).toEqual(expectedActions)
       expect(policies[0].Resource).toBe('*')

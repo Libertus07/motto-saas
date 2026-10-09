@@ -21,11 +21,13 @@ export class Ops02FoundationStack extends Stack {
       auditBucket: vault.auditBucket,
       backupKey: vault.backupKey,
       auditKey: vault.auditKey,
+      alertKey: vault.alertKey,
     })
     const monitoring = new Ops02AuditMonitoring(this, 'Monitoring', {
       backupBucket: vault.backupBucket,
       auditBucket: vault.auditBucket,
       auditKey: vault.auditKey,
+      alertKey: vault.alertKey,
       securityAuditorRole: access.securityAuditorRole,
     })
 
@@ -40,6 +42,7 @@ export class Ops02FoundationStack extends Stack {
       AuditBucketName: vault.auditBucket.bucketName,
       BackupKeyArn: vault.backupKey.keyArn,
       AuditKeyArn: vault.auditKey.keyArn,
+      AlertKeyArn: vault.alertKey.keyArn,
       BackupWriterRoleArn: access.backupWriterRole.roleArn,
       BackupVerifierRoleArn: access.backupVerifierRole.roleArn,
       RestoreOperatorRoleArn: access.restoreOperatorRole.roleArn,

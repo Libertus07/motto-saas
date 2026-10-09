@@ -12,6 +12,7 @@ function synthesizeVault(stage: Ops02Stage) {
   const auditBucketId = stack.getLogicalId(vault.auditBucket.node.defaultChild as CfnResource)
   const backupKeyId = stack.getLogicalId(vault.backupKey.node.defaultChild as CfnResource)
   const auditKeyId = stack.getLogicalId(vault.auditKey.node.defaultChild as CfnResource)
+  const alertKeyId = stack.getLogicalId(vault.alertKey.node.defaultChild as CfnResource)
 
   return {
     stack,
@@ -21,6 +22,7 @@ function synthesizeVault(stage: Ops02Stage) {
     auditBucketId,
     backupKeyId,
     auditKeyId,
+    alertKeyId,
   }
 }
 
@@ -66,7 +68,7 @@ describe.each<Ops02Stage>(['test', 'production'])('Ops02BackupVault (%s)', (stag
   it('encrypts backup objects with a rotating customer-managed KMS key', () => {
     const { template, resources, backupBucketId, backupKeyId } = createVault()
 
-    template.resourceCountIs('AWS::KMS::Key', 2)
+    template.resourceCountIs('AWS::KMS::Key', 3)
     expect(resources[backupKeyId]).toMatchObject({
       Type: 'AWS::KMS::Key',
       DeletionPolicy: 'Retain',
@@ -87,10 +89,18 @@ describe.each<Ops02Stage>(['test', 'production'])('Ops02BackupVault (%s)', (stag
   })
 
   it('creates a distinct retained audit bucket and audit KMS key', () => {
-    const { resources, backupBucketId, auditBucketId, backupKeyId, auditKeyId } = createVault()
+    const { resources, backupBucketId, auditBucketId, backupKeyId, auditKeyId, alertKeyId } = createVault()
 
     expect(auditBucketId).not.toBe(backupBucketId)
     expect(auditKeyId).not.toBe(backupKeyId)
+    expect(alertKeyId).not.toBe(auditKeyId)
+    expect(alertKeyId).not.toBe(backupKeyId)
+    expect(resources[alertKeyId]).toMatchObject({
+      Type: 'AWS::KMS::Key',
+      DeletionPolicy: 'Retain',
+      UpdateReplacePolicy: 'Retain',
+      Properties: { EnableKeyRotation: true, PendingWindowInDays: 30 },
+    })
     expect(resources[auditKeyId]).toMatchObject({
       Type: 'AWS::KMS::Key',
       DeletionPolicy: 'Retain',
@@ -103,6 +113,11 @@ describe.each<Ops02Stage>(['test', 'production'])('Ops02BackupVault (%s)', (stag
       UpdateReplacePolicy: 'Retain',
       Properties: {
         VersioningConfiguration: { Status: 'Enabled' },
+        ObjectLockEnabled: true,
+        ObjectLockConfiguration: {
+          ObjectLockEnabled: 'Enabled',
+          Rule: { DefaultRetention: { Mode: 'COMPLIANCE', Days: 365 } },
+        },
         PublicAccessBlockConfiguration: {
           BlockPublicAcls: true,
           BlockPublicPolicy: true,
