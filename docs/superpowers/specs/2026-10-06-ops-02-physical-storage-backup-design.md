@@ -1,6 +1,6 @@
 # OPS-02 Physical Storage Backup and Recovery Design
 
-**Status:** Approved design; implementation not started
+**Status:** Approved design; Phase A foundation locally verified, no deployment
 
 **Date:** 2026-10-06
 
@@ -478,6 +478,34 @@ restore testing.
   statically and in a disposable non-production AWS environment.
 - Prove that writer credentials cannot delete, read outside scope, change
   retention, change policy, or administer KMS.
+
+The selected implementation boundary is an isolated AWS CDK v2 and TypeScript
+package under `infra/ops02-backup/`, with its own exact-version lockfile and a
+credential-free synth contract. The application root does not absorb CDK
+dependencies. The local package pins `aws-cdk-lib 2.272.0`, AWS CDK CLI
+`2.1144.0`, and Vitest `5.0.3`.
+
+On 2026-10-09 the clean package install, formatting, TypeScript, `87/87` CDK
+tests, and offline synth passed. The root quality gate passed with `582` tests
+and `4` intentional skips; the application build passed `35/35`. The
+synthetic template contains `27` resources and `12` outputs and has SHA-256
+`AE77C5471D13335F04BE64FCA07A3BA3CBC06DBA808821D634C9A5FF04FF8FA5`.
+The secret/reference scan found no access key, `service_role`, Supabase host, or
+plaintext `SecretString`; the two `GenerateSecretString` structures are
+uninitialized placeholders. Tests reject wildcard administrative permissions
+and unauthorized writer delete/bypass actions. The template also contains 14
+literal wildcard resources required by scoped KMS resource policies and AWS
+service/describe policy structures, so Phase A does not claim that every
+`Resource` value is non-wildcard.
+
+This proof used local Node.js `24.11.1` and npm `11.6.2`. The defined GitHub
+Node.js 22 workflow did not run. One high-severity transitive
+`brace-expansion` advisory remains recorded without an unsafe override. No AWS
+resource, production inventory, byte copy, restore, credential population,
+bootstrap, deploy, destroy, push, or GitHub workflow run occurred. Phase A
+therefore proves only the local foundation; OPS-02 remains in progress and the
+next deliverable is the separately planned synthetic physical-byte copy
+prototype.
 
 ### Phase B — Synthetic backup prototype
 

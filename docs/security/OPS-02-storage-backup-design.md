@@ -44,6 +44,36 @@ bucket gerçekleri bulunur.
 Bu kanıt production'da çalıştırma, nesne baytı indirme, dış hedefe kopyalama,
 restore veya kurtarılabilirlik iddiası değildir.
 
+## Yerelde doğrulanan AWS foundation aşaması
+
+Phase A için AWS CDK v2 ve TypeScript altyapısı bağımsız
+`infra/ops02-backup/` npm paketinde, kendi exact-version lockfile'ıyla
+tanımlandı. Bu paket root uygulama bağımlılıklarını genişletmez; yalnız sentetik
+hesap/rol context'i ve `eu-central-1` test Region'ıyla credential-free synth
+üretir. Çalıştırma ve inceleme ayrıntıları
+[AWS foundation yerel doğrulama runbook'unda](OPS-02-aws-foundation-runbook.md)
+yer alır.
+
+2026-10-09 yerel kanıtında temiz izole kurulum; altyapı format, typecheck,
+`87/87` test ve synth kapısı; root `582` başarılı/`4` skipped testli kalite
+kapısı ve `35/35` production build'i geçti. Sentetik CloudFormation
+şablonu `27` kaynak, `12` output ve
+`AE77C5471D13335F04BE64FCA07A3BA3CBC06DBA808821D634C9A5FF04FF8FA5`
+SHA-256 değeri üretti. Secret/reference taramasında access key, `service_role`,
+Supabase host'u veya plaintext secret görülmedi; iki `GenerateSecretString`
+kaynağı yalnız `UNINITIALIZED` placeholder'dır. Şablondaki 14 literal wildcard
+resource, KMS/service/describe policy yapılarıdır; kanıt yalnız testlerin
+wildcard yönetici grant'lerini ve yazar rolündeki yetkisiz delete/bypass
+izinlerini reddettiğini söyler, şablonda hiç wildcard olmadığını iddia etmez.
+
+İzole dependency ağacında bir yüksek önem dereceli transitive
+`brace-expansion` advisory'si açık kalır; güvensiz override veya zorlanmış audit
+fix uygulanmadı. GitHub'ın Node 22 altyapı workflow'u bu teslimatta
+çalıştırılmadı. AWS kaynağı, production envanteri, byte kopyası, restore,
+credential population, bootstrap, deploy, destroy veya push yapılmadı. Bu
+foundation fiziksel backup veya kurtarılabilirlik kanıtı değildir; OPS-02
+**Devam ediyor** kalır ve sıradaki iş sentetik fiziksel-byte kopya prototipidir.
+
 ## Önerilen koruma modeli
 
 1. **Envanter ve eşleme:** Yetkili salt okunur erişimle bucket yapılandırması, nesne yolları ve ilgili veritabanı referansları çıkarılır. Manifest bucket, path, byte uzunluğu, mümkünse nesne sürüm/ETag bilgisi, indirme sonrası SHA-256, deneme zamanı ve kullanılan DB yedeği kimliğini içerir. ETag tek başına içerik hash'i sayılmaz.
