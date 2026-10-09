@@ -43,7 +43,7 @@ function readWorkflow() {
 }
 
 const forbiddenTokens =
-  /id-token\s*:|aws[-_]access[-_]key|aws[-_]secret[-_]access[-_]key|aws[-_]session[-_]token|configure-aws-credentials|web[-_]identity[-_]token|container[-_]credentials|\b(?:bootstrap|deploy|destroy)\b|supabase_|\.supabase\.co|\bsecrets\s*[.[]|\benvironment\s*:|https?:\/\/|\b(?:curl|wget)\b/i
+  /id-token\s*:|aws[-_]access[-_]key|aws[-_]secret[-_]access[-_]key|aws[-_]session[-_]token|\baws(?:\.exe)?\s+|configure-aws-credentials|web[-_]identity[-_]token|container[-_]credentials|\b(?:bootstrap|deploy|destroy)\b|supabase_|\.supabase\.co|\bsecrets\s*[.[]|\benvironment\s*:|https?:\/\/|\b(?:curl|wget)\b/i
 
 function expectNoAuthorityOrLiveCalls(source: string) {
   expect(source).not.toMatch(forbiddenTokens)
@@ -113,6 +113,9 @@ describe('OPS-02 infrastructure workflow contract', () => {
     expect(scripts.check).toBe('npm run format:check && npm run typecheck && npm run test && npm run synth:test')
     expectNoAuthorityOrLiveCalls(source)
     expectNoAuthorityOrLiveCalls(JSON.stringify(scripts))
+    expectNoAuthorityOrLiveCalls(
+      'AWS_EC2_METADATA_DISABLED=true AWS_CONFIG_FILE=absent-config AWS_SHARED_CREDENTIALS_FILE=absent-credentials',
+    )
     for (const token of [
       'Id-ToKeN: WrItE',
       'AwS-AcCeSs-KeY',
@@ -126,8 +129,12 @@ describe('OPS-02 infrastructure workflow contract', () => {
       '.SuPaBaSe.Co',
       '${{ SeCrEtS.TEST }}',
       'EnViRoNmEnT: production',
+      'aws sts get-caller-identity --no-sign-request',
+      'AwS.ExE s3api list-buckets',
+      'AWS STS GET-CALLER-IDENTITY --NO-SIGN-REQUEST',
     ]) {
       expect(() => expectNoAuthorityOrLiveCalls(`${source}\n${token}`), token).toThrow()
+      expect(() => expectNoAuthorityOrLiveCalls(JSON.stringify({ ...scripts, probe: token })), token).toThrow()
     }
   })
 
