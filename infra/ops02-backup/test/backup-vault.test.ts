@@ -1,25 +1,44 @@
 import { App, CfnResource, Stack } from 'aws-cdk-lib'
 import { Match, Template } from 'aws-cdk-lib/assertions'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { Ops02BackupVault } from '../src/backup-vault.js'
 import type { Ops02Stage } from '../src/config.js'
 
-function createVault(stage: Ops02Stage) {
+function synthesizeVault(stage: Ops02Stage) {
   const stack = new Stack(new App(), `Vault-${stage}`)
   const vault = new Ops02BackupVault(stack, 'Vault', { stage })
   const template = Template.fromStack(stack)
-  const resources = template.toJSON().Resources
   const backupBucketId = stack.getLogicalId(vault.backupBucket.node.defaultChild as CfnResource)
   const auditBucketId = stack.getLogicalId(vault.auditBucket.node.defaultChild as CfnResource)
   const backupKeyId = stack.getLogicalId(vault.backupKey.node.defaultChild as CfnResource)
   const auditKeyId = stack.getLogicalId(vault.auditKey.node.defaultChild as CfnResource)
 
-  return { stack, vault, template, resources, backupBucketId, auditBucketId, backupKeyId, auditKeyId }
+  return {
+    stack,
+    vault,
+    templateSource: JSON.stringify(template.toJSON()),
+    backupBucketId,
+    auditBucketId,
+    backupKeyId,
+    auditKeyId,
+  }
 }
 
 describe.each<Ops02Stage>(['test', 'production'])('Ops02BackupVault (%s)', (stage) => {
+  let synthesizedVault: ReturnType<typeof synthesizeVault>
+
+  beforeAll(() => {
+    synthesizedVault = synthesizeVault(stage)
+  })
+
+  function createVault() {
+    const { templateSource, ...artifacts } = synthesizedVault
+    const template = Template.fromString(templateSource)
+    return { ...artifacts, template, resources: template.toJSON().Resources }
+  }
+
   it('creates a retained private versioned backup bucket with 90-day compliance lock', () => {
-    const { template, resources, backupBucketId } = createVault(stage)
+    const { template, resources, backupBucketId } = createVault()
 
     template.resourceCountIs('AWS::S3::Bucket', 2)
     expect(resources[backupBucketId]).toMatchObject({
@@ -45,7 +64,7 @@ describe.each<Ops02Stage>(['test', 'production'])('Ops02BackupVault (%s)', (stag
   })
 
   it('encrypts backup objects with a rotating customer-managed KMS key', () => {
-    const { template, resources, backupBucketId, backupKeyId } = createVault(stage)
+    const { template, resources, backupBucketId, backupKeyId } = createVault()
 
     template.resourceCountIs('AWS::KMS::Key', 2)
     expect(resources[backupKeyId]).toMatchObject({
@@ -68,7 +87,7 @@ describe.each<Ops02Stage>(['test', 'production'])('Ops02BackupVault (%s)', (stag
   })
 
   it('creates a distinct retained audit bucket and audit KMS key', () => {
-    const { resources, backupBucketId, auditBucketId, backupKeyId, auditKeyId } = createVault(stage)
+    const { resources, backupBucketId, auditBucketId, backupKeyId, auditKeyId } = createVault()
 
     expect(auditBucketId).not.toBe(backupBucketId)
     expect(auditKeyId).not.toBe(backupKeyId)
@@ -106,7 +125,7 @@ describe.each<Ops02Stage>(['test', 'production'])('Ops02BackupVault (%s)', (stag
   })
 
   it('denies non-TLS access and disables ACL ownership', () => {
-    const { stack, vault, template, resources, backupBucketId, auditBucketId } = createVault(stage)
+    const { stack, vault, template, resources, backupBucketId, auditBucketId } = createVault()
 
     for (const [bucketId, bucket] of [
       [backupBucketId, vault.backupBucket],
@@ -133,7 +152,7 @@ describe.each<Ops02Stage>(['test', 'production'])('Ops02BackupVault (%s)', (stag
   })
 
   it('never configures automatic bucket deletion', () => {
-    const { template } = createVault(stage)
+    const { template } = createVault()
 
     template.resourceCountIs('Custom::S3AutoDeleteObjects', 0)
     template.resourceCountIs('AWS::Lambda::Function', 0)

@@ -1,6 +1,6 @@
 import { App, Stack } from 'aws-cdk-lib'
 import { Template } from 'aws-cdk-lib/assertions'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { Ops02AccessBoundary } from '../src/access-boundary.js'
 import { Ops02BackupVault } from '../src/backup-vault.js'
 import { parseOps02FoundationConfig } from '../src/config.js'
@@ -26,7 +26,7 @@ function array<T>(value: T | T[]): T[] {
   return Array.isArray(value) ? value : [value]
 }
 
-function fixture() {
+function synthesizeFixture() {
   const app = new App()
   const stack = new Stack(app, 'AccessTest', { env: { account: config.account, region: config.region } })
   const vault = new Ops02BackupVault(stack, 'Vault', { stage: config.stage })
@@ -39,6 +39,15 @@ function fixture() {
   })
   const template = Template.fromStack(stack)
   const resolve = (value: unknown): unknown => stack.resolve(value)
+  return { templateSource: JSON.stringify(template.toJSON()), boundary, vault, resolve }
+}
+
+let synthesizedFixture: ReturnType<typeof synthesizeFixture>
+
+function fixture() {
+  const { templateSource, boundary, vault, resolve } = synthesizedFixture
+  // Template.toJSON() exposes mutable references. Give each test its own view.
+  const template = Template.fromString(templateSource)
   const policies = Object.values(template.findResources('AWS::IAM::Policy'))
   const roleStatements = (role: { roleName: string }): Statement[] =>
     policies
@@ -52,6 +61,10 @@ function fixture() {
 }
 
 describe('OPS-02 access boundary', () => {
+  beforeAll(() => {
+    synthesizedFixture = synthesizeFixture()
+  })
+
   it('creates only uninitialized generated secret containers encrypted by a dedicated key', () => {
     const { template, boundary, resolve } = fixture()
     const secrets = Object.values(template.findResources('AWS::SecretsManager::Secret'))

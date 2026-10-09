@@ -33,7 +33,7 @@ afterAll(() => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
-function fixture() {
+function synthesizeFixture() {
   const app = new App({ outdir: temporaryDirectory(), autoSynth: false })
   const config = parseOps02FoundationConfig(context)
   const stack = new Ops02FoundationStack(app, 'Ops02BackupFoundation-test', {
@@ -42,7 +42,14 @@ function fixture() {
     terminationProtection: true,
   })
   const template = Template.fromStack(stack)
-  return { app, stack, template }
+  return { app, stack, templateSource: JSON.stringify(template.toJSON()) }
+}
+
+let synthesizedFixture: ReturnType<typeof synthesizeFixture>
+
+function fixture(synthesized = synthesizedFixture) {
+  const { templateSource, ...artifacts } = synthesized
+  return { ...artifacts, template: Template.fromString(templateSource) }
 }
 
 function runApp(input: Record<string, unknown>) {
@@ -124,15 +131,22 @@ function assertNoWildcardAdministrativeResource(statement: Statement) {
 describe('OPS-02 foundation stack', () => {
   let appRun: ReturnType<typeof runApp>
   let invalidAppRun: ReturnType<typeof runApp>
+  let independentFixture: ReturnType<typeof synthesizeFixture>
 
   beforeAll(() => {
     appRun = runApp({ ...context, unapprovedContext: 'OPS02_PRIVATE_CANARY' })
     invalidAppRun = runApp({ ...context, account: undefined })
   })
 
+  beforeAll(() => {
+    synthesizedFixture = synthesizeFixture()
+    independentFixture = synthesizeFixture()
+  })
+
   it('composes one deterministic foundation template without lookups', () => {
     const first = fixture()
-    const second = fixture()
+    const second = fixture(independentFixture)
+    expect(first.app).not.toBe(second.app)
     expect(first.template.toJSON()).toEqual(second.template.toJSON())
     expect(first.stack.node.children.filter((child) => child instanceof Ops02BackupVault)).toHaveLength(1)
     expect(first.stack.node.children.filter((child) => child instanceof Ops02AccessBoundary)).toHaveLength(1)

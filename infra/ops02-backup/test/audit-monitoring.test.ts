@@ -1,6 +1,6 @@
 import { App, ArnFormat, Stack } from 'aws-cdk-lib'
 import { Template } from 'aws-cdk-lib/assertions'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { Ops02AccessBoundary } from '../src/access-boundary.js'
 import { Ops02AuditMonitoring } from '../src/audit-monitoring.js'
 import { Ops02BackupVault } from '../src/backup-vault.js'
@@ -27,7 +27,7 @@ function array<T>(value: T | T[]): T[] {
   return Array.isArray(value) ? value : [value]
 }
 
-function fixture(stackId = 'AuditTest', monitoringId = 'Monitoring') {
+function synthesizeFixture(stackId = 'AuditTest', monitoringId = 'Monitoring') {
   const app = new App()
   const stack = new Stack(app, stackId, { env: { account: config.account, region: config.region } })
   const vault = new Ops02BackupVault(stack, 'Vault', { stage: config.stage })
@@ -62,21 +62,55 @@ function fixture(stackId = 'AuditTest', monitoringId = 'Monitoring') {
     resourceName: group.Properties.LogGroupName,
     arnFormat: ArnFormat.COLON_RESOURCE_NAME,
   })
+  return {
+    app,
+    templateSource: JSON.stringify(template.toJSON()),
+    vault,
+    access,
+    monitoring,
+    resolve,
+    trailArn,
+    ruleArn,
+    logGroupArn,
+  }
+}
+
+let synthesizedFixture: ReturnType<typeof synthesizeFixture>
+
+function fixture(synthesized = synthesizedFixture) {
+  const { templateSource, ...artifacts } = synthesized
+  const template = Template.fromString(templateSource)
+  const trail = Object.values(template.findResources('AWS::CloudTrail::Trail'))[0]
+  const rule = Object.values(template.findResources('AWS::Events::Rule'))[0]
   const roleStatements = (roleName: unknown): Statement[] =>
     Object.values(template.findResources('AWS::IAM::Policy'))
       .filter((policy) =>
         policy.Properties.Roles.some((name: unknown) => JSON.stringify(name) === JSON.stringify(roleName)),
       )
       .flatMap((policy) => policy.Properties.PolicyDocument.Statement)
-  return { template, vault, access, monitoring, resolve, trail, rule, roleStatements, trailArn, ruleArn, logGroupArn }
+  return { ...artifacts, template, trail, rule, roleStatements }
 }
 
 describe('OPS-02 audit monitoring', () => {
-  it('keeps security rule names within 64 characters for long valid construct paths and synthesizes deterministically', () => {
+  let firstLongName: ReturnType<typeof synthesizeFixture>
+  let secondLongName: ReturnType<typeof synthesizeFixture>
+
+  beforeAll(() => {
+    synthesizedFixture = synthesizeFixture()
+  })
+
+  beforeAll(() => {
     const stackId = 'Ops02BackupFoundationForTheProductionSecurityAuditEnvironmentAndNameBoundaryRegression'
     const scopeId = 'AuditMonitoringForTheSeparateImmutableBackupDestinationAndSecurityNotificationBoundary'
-    const first = fixture(stackId, scopeId)
-    const second = fixture(stackId, scopeId)
+    // Do not satisfy determinism by comparing two views of the same synthesis.
+    firstLongName = synthesizeFixture(stackId, scopeId)
+    secondLongName = synthesizeFixture(stackId, scopeId)
+  })
+
+  it('keeps security rule names within 64 characters for long valid construct paths and synthesizes deterministically', () => {
+    const first = fixture(firstLongName)
+    const second = fixture(secondLongName)
+    expect(first.app).not.toBe(second.app)
     expect(first.rule.Properties.Name.length).toBeLessThanOrEqual(64)
     expect(first.rule.Properties.Name).toMatch(/-security$/)
     expect(first.template.toJSON()).toEqual(second.template.toJSON())
