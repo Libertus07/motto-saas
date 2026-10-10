@@ -1,0 +1,29 @@
+{
+  "name": "@motto-saas/ops02-backup",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "synth:test": "cdk synth Ops02BackupFoundation-test --quiet -c stage=test -c account=111111111111 -c region=eu-central-1 -c securityPrincipalArn=arn:aws:iam::111111111111:role/Ops02Security -c verificationPrincipalArn=arn:aws:iam::111111111111:role/Ops02Verification -c recoveryPrincipalArn=arn:aws:iam::111111111111:role/Ops02Recovery",
+    "check": "npm run format:check && npm run typecheck && npm run test && npm run synth:test"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.272.0",
+    "constructs": "10.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.2",
+    "aws-cdk": "2.1144.0",
+    "prettier": "3.9.6",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "8.3.2",
+    "vitest": "5.0.3"
+  }
+}
