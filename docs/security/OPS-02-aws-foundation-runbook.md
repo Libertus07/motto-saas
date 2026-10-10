@@ -14,7 +14,7 @@ değerleriyle CloudFormation üretir ve AWS hesabına bağlanmaz.
 Bu aşamadaki olumlu sonuç yalnız şunları kanıtlar:
 
 - bağımlılıklar izole lockfile'dan temiz kurulabiliyor;
-- format, TypeScript, 87 CDK assertion testi ve offline synth geçiyor;
+- format, TypeScript, 88 CDK assertion testi ve offline synth geçiyor;
 - root kalite kapısı ve production uygulama build'i geçiyor;
 - üretilen sentetik şablon beklenen kaynak ve güvenlik sözleşmesine uyuyor.
 
@@ -106,17 +106,17 @@ try {
 Placeholder değerleri yalnız Next.js build-time public configuration
 doğrulamasını karşılar; production projesine bağlanmaz ve credential değildir.
 
-2026-10-09 yerel kanıtı:
+2026-10-10 yerel kanıtı:
 
 - temiz `npm ci --prefix infra/ops02-backup`: geçti;
-- altyapı format/typecheck/test/synth kapısı: geçti, `87/87` test;
-- root `npm run check`: geçti, `582` test başarılı ve `4` test bilinçli
+- altyapı format/typecheck/test/synth kapısı: geçti, `88/88` test;
+- root `npm run check`: geçti, `583` test başarılı ve `4` test bilinçli
   olarak skipped;
 - `npm run build`: geçti, `35/35` build adımı tamamlandı.
 
 ## Beklenen kaynaklar ve güvenlik assertion'ları
 
-Sentetik şablon tam olarak `27` kaynak ve `12` output üretir:
+Sentetik şablon tam olarak `28` kaynak ve `13` output üretir:
 
 | Adet | CloudFormation türü           |
 | ---: | ----------------------------- |
@@ -124,14 +124,14 @@ Sentetik şablon tam olarak `27` kaynak ve `12` output üretir:
 |    1 | `AWS::Events::Rule`           |
 |    7 | `AWS::IAM::Policy`            |
 |    7 | `AWS::IAM::Role`              |
-|    3 | `AWS::KMS::Key`               |
+|    4 | `AWS::KMS::Key`               |
 |    1 | `AWS::Logs::LogGroup`         |
 |    2 | `AWS::S3::Bucket`             |
 |    2 | `AWS::S3::BucketPolicy`       |
 |    2 | `AWS::SecretsManager::Secret` |
 |    1 | `AWS::SNS::Topic`             |
 
-On iki output yalnız bucket adları ile KMS key, görev rolü, güvenlik topic'i ve
+On üç output yalnız bucket adları ile KMS key, görev rolü, güvenlik topic'i ve
 secret container ARN'lerini içerir; secret değeri içermez.
 
 Assertion'lar en az şu sınırları sabitler:
@@ -143,7 +143,13 @@ Assertion'lar en az şu sınırları sabitler:
   verir; yazar rolünde delete, governance bypass, bucket yönetimi, KMS yönetimi
   veya backup payload okuma yetkisi yoktur;
 - audit bucket ve KMS key'i backup hedefinden ayrıdır; CloudTrail yalnız backup
-  bucket object data event'lerini seçer;
+  bucket object data event'lerini seçer; audit bucket varsayılan `365` günlük
+  `COMPLIANCE` Object Lock ile CloudFormation dışı object silmeye karşı da
+  korunur;
+- backup writer ECS trust policy'si hem sentetik hesaba hem yalnız o hesabın
+  yapılandırılmış Region'daki ECS kaynak ARN'lerine bağlanır;
+- güvenlik topic'i audit KMS key'inden bağımsız, döndürülen ve retained bir alert
+  key ile şifrelenir; OPS-02 key-administrator rolü alert key'i yönetemez;
 - writer, verifier, restore, key administration ve security audit görevleri
   ayrıdır; production context'inde üç insan görevi aynı ARN'i kullanamaz;
 - verifier backup payload baytlarını okuyamaz; restore rolü yalnız onaylı
@@ -167,7 +173,7 @@ Get-FileHash -Algorithm SHA256 -LiteralPath infra/ops02-backup/cdk.out/Ops02Back
 İki hash aynı olmalıdır. Bu teslimattaki beklenen SHA-256:
 
 ```text
-AE77C5471D13335F04BE64FCA07A3BA3CBC06DBA808821D634C9A5FF04FF8FA5
+337828087FDE8EB7F9C3CD65B01C6D58CD18D2836E9CAC09A7550C2ACFA8A8D4
 ```
 
 Kaynak ve output sayıları deploy olmadan şöyle incelenir:
@@ -191,12 +197,23 @@ Redacted güvenlik incelemesinde `AKIA`, `service_role`, `supabase.co`, plaintex
 beklenen iki `GenerateSecretString` yalnız `UNINITIALIZED` placeholder üretir.
 Yetki testleri izinsiz delete/bypass ve wildcard yönetici grant'lerini reddeder.
 
-Literal `Resource: "*"` sayısı sıfır değildir: mevcut şablonda `14` adet vardır.
+Literal `Resource: "*"` sayısı sıfır değildir: mevcut şablonda `15` adet vardır.
 Bunlar KMS resource policy'nin kendi key'ini ifade eden yapısı ile belirli AWS
 service/describe policy şekilleridir. Bu nedenle kanıt “şablonda wildcard yok”
 değil, “wildcard administrative permission yok ve beklenen wildcard yapıları
 tek tek testlerle sınırlandı” şeklinde okunmalıdır. Sayının veya bağlamın
 değişmesi yeniden güvenlik incelemesi gerektirir.
+
+## Mimari grafik durumu
+
+Codebase-memory desteklenen MCP akışıyla güncellendi. Graphify incremental
+yenilemesi ise kaynak dosya silinmemesine rağmen kanonik grafiği `3.213`
+düğüm/`5.098` ilişkiden `2.306` düğüm/`4.290` ilişkiye küçülttüğü için shrink
+guard kapsamında yayımlanmadı. Mevcut kanonik `graph.json` byte-identical
+korundu; başarısız deneme silinmeden
+`graphify-out/2026-10-10-aborted-incremental/` altında arşivlendi. Bu nedenle
+Graphify çıktısı güncel kabul edilmez ve küçülme nedeni ayrı bir araç-bütünlüğü
+çalışmasında çözülmelidir.
 
 ## Bu aşamada yasak komutlar
 
@@ -229,7 +246,7 @@ Aşağıdakilerden biri görülürse kanıt üretimini durdurun ve sonucu geçer
   günlük retention, `365` günlük aylık retention ya da retain policy eksilirse;
 - yeni veya açıklanamayan wildcard action/resource, delete, retention bypass,
   public access veya yönetici yetkisi oluşursa;
-- iki ardışık synth hash'i farklıysa ya da `27` kaynak/`12` output envanteri
+- iki ardışık synth hash'i farklıysa ya da `28` kaynak/`13` output envanteri
   inceleme olmadan değişirse;
 - test, typecheck, format, root check veya build kapılarından biri başarısızsa;
 - bilinen `brace-expansion` bulgusuna ek yeni bir yüksek/kritik dependency

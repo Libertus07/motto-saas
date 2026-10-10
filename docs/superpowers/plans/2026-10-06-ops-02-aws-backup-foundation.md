@@ -43,7 +43,7 @@
 infra/ops02-backup/
   bin/ops02-backup.ts                   # CDK app entry point; context parsing and stack composition only
   src/config.ts                         # Pure configuration parser and fixed OPS-02 constants
-  src/backup-vault.ts                   # Backup/audit buckets and dedicated KMS keys
+  src/backup-vault.ts                   # Backup/audit buckets and independent backup/audit/alert KMS keys
   src/access-boundary.ts                # Secrets and least-privilege IAM roles/policies
   src/audit-monitoring.ts               # CloudTrail, logs, SNS topic, and EventBridge alerts
   src/ops02-foundation-stack.ts          # Composition, outputs, and tags
@@ -257,7 +257,9 @@ Assert the backup bucket contains:
 - `OwnershipControls` set to `BucketOwnerEnforced`; and
 - both `DeletionPolicy` and `UpdateReplacePolicy` equal to `Retain`.
 
-Assert audit resources are separate logical resources and the audit bucket is not the backup bucket.
+Assert audit resources are separate logical resources, the audit bucket is not
+the backup bucket, audit objects receive 365-day `COMPLIANCE` Object Lock, and
+the alert key is distinct from both data keys.
 
 - [ ] **Step 2: Run the vault test and verify it fails**
 
@@ -372,7 +374,14 @@ Create a dedicated rotating customer-managed `secretKey`. Create two Secrets Man
 
 - [ ] **Step 4: Implement workload and human roles**
 
-Create the writer with `ServicePrincipal('ecs-tasks.amazonaws.com')`. Create verifier, restore, key-administrator, and security-auditor roles from their exact configured principals. Attach narrowly scoped inline policies; do not use AWS managed administrator, S3 full-access, Secrets Manager full-access, or KMS power-user policies. Add the key-administrator role to the backup, audit, and secret-key policies without adding cryptographic data-use permissions to that role.
+Create the writer with `ServicePrincipal('ecs-tasks.amazonaws.com')`, constrained
+by `aws:SourceAccount` and the configured Region/account ECS source ARN. Create
+verifier, restore, key-administrator, and security-auditor roles from their exact
+configured principals. Attach narrowly scoped inline policies; do not use AWS
+managed administrator, S3 full-access, Secrets Manager full-access, or KMS
+power-user policies. Add the key-administrator role to the backup, audit, and
+secret-key policies without adding cryptographic data-use permissions to that
+role; do not grant it administration over the independent alert key.
 
 The writer can read only the two OPS-02 secret ARNs, use only the required KMS cryptographic operations, and write only beneath `backup-sets/daily/` or `backup-sets/monthly/`. It cannot call `s3:GetObject`, `s3:GetObjectVersion`, or either attributes action on data objects. Upload responses supply the version and checksum evidence recorded by the future operator. The verifier reads only `manifests/` and `attestations/` objects beneath either backup class, `reports/inventory/`, `reports/checksums/`, retention metadata, and CloudTrail objects beneath the separate audit bucket's `AWSLogs/` namespace; it cannot read either backup class's `objects/` bytes. The restore role alone can read approved data-object versions and decrypt them; a later restore plan adds target Supabase behavior. The key administrator cannot decrypt S3 objects.
 
@@ -436,7 +445,8 @@ git commit -m "feat: enforce OPS-02 backup access boundaries"
 
 **Interfaces:**
 
-- Consumes: backup bucket, audit bucket, audit KMS key, and security-auditor role from Tasks 2–3.
+- Consumes: backup bucket, audit bucket, audit KMS key, independent alert KMS
+  key, and security-auditor role from Tasks 2–3.
 - Produces:
 
 ```ts
@@ -491,7 +501,12 @@ Expected: FAIL because `Ops02AuditMonitoring` does not exist.
 
 - [ ] **Step 3: Implement the protected audit trail**
 
-Create a multi-Region trail with log-file validation, the separate audit bucket, CloudWatch Logs delivery, and S3 object data events scoped to the backup bucket prefix. Encrypt the trail log group and SNS topic with the audit key. Set explicit retention and `RemovalPolicy.RETAIN` for the log group.
+Create a multi-Region trail with log-file validation, the separate audit
+bucket, CloudWatch Logs delivery, and S3 object data events scoped to the backup
+bucket prefix. Encrypt the trail log group with the audit key and the SNS topic
+with the independent alert key so disabling the monitored audit key cannot blind
+the alert path. Set explicit retention and `RemovalPolicy.RETAIN` for the log
+group.
 
 - [ ] **Step 4: Implement high-risk EventBridge alerts**
 

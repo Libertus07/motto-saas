@@ -485,18 +485,24 @@ credential-free synth contract. The application root does not absorb CDK
 dependencies. The local package pins `aws-cdk-lib 2.272.0`, AWS CDK CLI
 `2.1144.0`, and Vitest `5.0.3`.
 
-On 2026-10-09 the clean package install, formatting, TypeScript, `87/87` CDK
-tests, and offline synth passed. The root quality gate passed with `582` tests
+On 2026-10-10 the clean package install, formatting, TypeScript, `88/88` CDK
+tests, and offline synth passed. The root quality gate passed with `583` tests
 and `4` intentional skips; the application build passed `35/35`. The
-synthetic template contains `27` resources and `12` outputs and has SHA-256
-`AE77C5471D13335F04BE64FCA07A3BA3CBC06DBA808821D634C9A5FF04FF8FA5`.
+synthetic template contains `28` resources and `13` outputs and has SHA-256
+`337828087FDE8EB7F9C3CD65B01C6D58CD18D2836E9CAC09A7550C2ACFA8A8D4`.
 The secret/reference scan found no access key, `service_role`, Supabase host, or
 plaintext `SecretString`; the two `GenerateSecretString` structures are
 uninitialized placeholders. Tests reject wildcard administrative permissions
-and unauthorized writer delete/bypass actions. The template also contains 14
+and unauthorized writer delete/bypass actions. The template also contains 15
 literal wildcard resources required by scoped KMS resource policies and AWS
 service/describe policy structures, so Phase A does not claim that every
 `Resource` value is non-wildcard.
+
+The writer role trust is constrained by source account and the configured
+Region's ECS source ARN. Audit objects receive 365-day `COMPLIANCE` Object Lock
+retention. The encrypted alert channel uses a separate rotating retained KMS
+key that the OPS-02 key-administrator role cannot administer, so disabling the
+monitored audit key does not disable alert encryption.
 
 This proof used local Node.js `24.11.1` and npm `11.6.2`. The defined GitHub
 Node.js 22 workflow did not run. One high-severity transitive

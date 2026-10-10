@@ -54,17 +54,20 @@ hesap/rol context'i ve `eu-central-1` test Region'ıyla credential-free synth
 [AWS foundation yerel doğrulama runbook'unda](OPS-02-aws-foundation-runbook.md)
 yer alır.
 
-2026-10-09 yerel kanıtında temiz izole kurulum; altyapı format, typecheck,
-`87/87` test ve synth kapısı; root `582` başarılı/`4` skipped testli kalite
+2026-10-10 yerel kanıtında temiz izole kurulum; altyapı format, typecheck,
+`88/88` test ve synth kapısı; root `583` başarılı/`4` skipped testli kalite
 kapısı ve `35/35` production build'i geçti. Sentetik CloudFormation
-şablonu `27` kaynak, `12` output ve
-`AE77C5471D13335F04BE64FCA07A3BA3CBC06DBA808821D634C9A5FF04FF8FA5`
+şablonu `28` kaynak, `13` output ve
+`337828087FDE8EB7F9C3CD65B01C6D58CD18D2836E9CAC09A7550C2ACFA8A8D4`
 SHA-256 değeri üretti. Secret/reference taramasında access key, `service_role`,
 Supabase host'u veya plaintext secret görülmedi; iki `GenerateSecretString`
-kaynağı yalnız `UNINITIALIZED` placeholder'dır. Şablondaki 14 literal wildcard
+kaynağı yalnız `UNINITIALIZED` placeholder'dır. Şablondaki 15 literal wildcard
 resource, KMS/service/describe policy yapılarıdır; kanıt yalnız testlerin
 wildcard yönetici grant'lerini ve yazar rolündeki yetkisiz delete/bypass
 izinlerini reddettiğini söyler, şablonda hiç wildcard olmadığını iddia etmez.
+Writer trust'ı source account ve yapılandırılmış Region'ın ECS ARN'iyle
+sınırlıdır; audit object'leri 365 gün `COMPLIANCE` Object Lock altındadır ve
+güvenlik topic'i izlediği audit key'den bağımsız bir alert key kullanır.
 
 İzole dependency ağacında bir yüksek önem dereceli transitive
 `brace-expansion` advisory'si açık kalır; güvensiz override veya zorlanmış audit
