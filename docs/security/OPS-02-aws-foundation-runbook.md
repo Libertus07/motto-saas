@@ -35,15 +35,25 @@ Paketin Node.js alt sınırı `>=22.12.0` olarak ele alınır.
 
 | Bileşen       | Sürüm      |
 | ------------- | ---------- |
-| `aws-cdk-lib` | `2.272.0`  |
+| `aws-cdk-lib` | `2.273.0`  |
 | AWS CDK CLI   | `2.1144.0` |
 | Vitest        | `5.0.3`    |
 
-`aws-cdk-lib@2.272.0 > minimatch@10.2.5 > brace-expansion@5.0.9` yolunda bir
-yüksek önem dereceli transitive advisory açık kalır. Güvensiz bir
-`overrides`/`resolutions`, zorlanmış audit fix'i veya semver dışı yükseltme
-uygulanmadı. Bu bulgu yeni dependency sürümü seçilmeden önce tekrar denetlenmeli
-ve production deploy onayında açık risk olarak değerlendirilmelidir.
+2026-10-11 bağımlılık düzeltmesi: `aws-cdk-lib` resmi `2.273.0` sürümüne
+yükseltildi. Yayımlanmış tarball ve kurulu dependency ağacı, gömülü
+`brace-expansion@5.0.12` sürümünü doğruladı. Önceki `5.0.9` sürümündeki
+yüksek önem dereceli bulgu için izole paket `npm audit` sonucu artık sıfırdır.
+Override veya zorlanmış audit fix kullanılmadı; kök uygulama paketi değişmedi.
+
+İzole `npm run check --prefix infra/ops02-backup` geçti: format, typecheck,
+`88/88` test ve sentetik synth. Güncelleme öncesi/sonrası CloudFormation
+şablonları byte düzeyinde aynı SHA-256 değerine sahiptir:
+`337828087FDE8EB7F9C3CD65B01C6D58CD18D2836E9CAC09A7550C2ACFA8A8D4`.
+`28` kaynak ve `13` output korunmuştur. CLI'nin yapılandırılmamış feature
+flag bildirimi sürümle `83` yerine `84` oldu; flag etkinleştirilmedi.
+Bu kanıt yereldir; yeni dependency commit'inin hosted CI sonucu ayrıca gerekir.
+
+Kaynak: https://github.com/aws/aws-cdk/releases/tag/v2.273.0
 
 ## Sentetik context
 
@@ -249,7 +259,7 @@ Aşağıdakilerden biri görülürse kanıt üretimini durdurun ve sonucu geçer
 - iki ardışık synth hash'i farklıysa ya da `28` kaynak/`13` output envanteri
   inceleme olmadan değişirse;
 - test, typecheck, format, root check veya build kapılarından biri başarısızsa;
-- bilinen `brace-expansion` bulgusuna ek yeni bir yüksek/kritik dependency
+- herhangi bir yeni yüksek/kritik dependency
   bulgusu değerlendirilmeden bırakılırsa.
 
 ## Sonraki ayrı planlar
