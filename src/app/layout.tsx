@@ -11,7 +11,7 @@ import { NotificationProvider } from '@/components/NotificationProvider'
 import { ThemeProvider } from '@/components/ThemeProvider'
 
 export const metadata: Metadata = {
-  title: 'Motto SaaS - Restoran Zekası',
+  title: 'Motto OIP - Restoran Zekası',
   description: 'Restoran ve Kafe Yönetim Sistemi',
 }
 

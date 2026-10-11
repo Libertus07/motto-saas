@@ -5,8 +5,8 @@ import { LoginBrandingProvider } from '@/features/auth/components/LoginBrandingP
 import { LoginScreen } from '@/features/auth/components/LoginScreen'
 
 export const metadata: Metadata = {
-  title: 'Giriş Yap | Motto SaaS',
-  description: 'Motto SaaS restoran yönetim paneline güvenli giriş yapın.',
+  title: 'Giriş Yap | Motto OIP',
+  description: 'Motto OIP restoran yönetim paneline güvenli giriş yapın.',
 }
 
 export default function LoginPage() {
