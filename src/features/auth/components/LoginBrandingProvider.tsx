@@ -11,8 +11,8 @@ type LoginBranding = {
 }
 
 const DEFAULT_BRANDING: LoginBranding = {
-  businessName: 'Motto SaaS',
-  logoUrl: '/icons/logo.png',
+  businessName: 'Motto OIP',
+  logoUrl: '/icons/motto-oip.png',
 }
 
 const LoginBrandingContext = createContext<LoginBranding>(DEFAULT_BRANDING)
