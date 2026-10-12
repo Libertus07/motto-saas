@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "a35ac05f9777c3f413a7d7797e2ee8590b16df6b",
-    "indexed_at": "2026-10-10T00:01:28Z",
+    "commit": "902ab3507e4e97a2ff549c92c64c005c7d57777c",
+    "indexed_at": "2026-10-12T01:12:06Z",
     "project": "motto-saas-ops-02-storage-backup",
-    "nodes": 4598,
-    "edges": 8499,
-    "original_size": 11993088,
-    "compressed_size": 2230710,
+    "nodes": 4779,
+    "edges": 8682,
+    "original_size": 12058624,
+    "compressed_size": 2255755,
     "compression_level": 3
 }
