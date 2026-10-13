@@ -28,6 +28,15 @@ const result = (status, totals) => ({
   physicalBytesVerifiedInProduction: false,
 })
 
+/** Domain separation keeps checkpoint authentication distinct from final attestation. */
+function checkpointDigest(state, signingKey) {
+  const payload = Object.fromEntries(Object.entries(state).filter(([key]) => key !== 'checkpointHmacSha256'))
+  return createHmac('sha256', signingKey)
+    .update('motto-ops02-b1-checkpoint-v1\0')
+    .update(canonicalBytes(payload))
+    .digest('hex')
+}
+
 function entryValid(entry, config) {
   requireValue(
     exact(entry, ['objectId', 'revision', 'plaintextSha256', 'target', 'attempts']) &&
@@ -235,6 +244,12 @@ export async function runBackup({
   signal = /** @type {AbortSignal | undefined} */ (undefined),
 }) {
   let totals = { objects: 0, bytes: 0 }
+  let state
+  let trustedCheckpoint = false
+  const saveCheckpoint = async () => {
+    state.checkpointHmacSha256 = checkpointDigest(state, signingKey)
+    await journal.save(state)
+  }
   try {
     config = validateConfig(config)
     requireValue(
@@ -250,10 +265,17 @@ export async function runBackup({
     const first = await source.inventory()
     const before = snapshotView(first, config, identityKey, source.expectedEmpty)
     const configDigest = sha(canonicalBytes(config))
-    let state = await journal.load()
+    state = await journal.load()
     if (state === null) {
-      state = { schemaVersion: 1, configDigest, state: 'INCOMPLETE', entries: [] }
-      await journal.save(state)
+      state = {
+        schemaVersion: 1,
+        configDigest,
+        state: 'INCOMPLETE',
+        entries: [],
+        initialInventory: { id: first.id, digest: before.digest, capturedAtUtc: first.capturedAtUtc },
+        consistencyRejected: false,
+      }
+      await saveCheckpoint()
     }
     requireValue(
       state &&
@@ -262,9 +284,38 @@ export async function runBackup({
         ['INCOMPLETE', 'COMPLETE'].includes(state.state) &&
         Array.isArray(state.entries) &&
         Object.keys(state).every((k) =>
-          ['schemaVersion', 'configDigest', 'state', 'entries', 'manifest', 'attestation'].includes(k),
+          [
+            'schemaVersion',
+            'configDigest',
+            'state',
+            'entries',
+            'manifest',
+            'attestation',
+            'initialInventory',
+            'consistencyRejected',
+            'checkpointHmacSha256',
+          ].includes(k),
+        ) &&
+        typeof state.consistencyRejected === 'boolean' &&
+        exact(state.initialInventory, ['id', 'digest', 'capturedAtUtc']) &&
+        typeof state.initialInventory.id === 'string' &&
+        state.initialInventory.id.startsWith('synthetic:') &&
+        hex(state.initialInventory.digest) &&
+        validUtc(state.initialInventory.capturedAtUtc) &&
+        Date.parse(state.initialInventory.capturedAtUtc) >= Date.parse(config.startedAtUtc) &&
+        hex(state.checkpointHmacSha256) &&
+        timingSafeEqual(
+          Buffer.from(state.checkpointHmacSha256, 'hex'),
+          Buffer.from(checkpointDigest(state, signingKey), 'hex'),
         ),
       'JOURNAL_INVALID',
+    )
+    trustedCheckpoint = true
+    requireValue(
+      !state.consistencyRejected &&
+        state.initialInventory.digest === before.digest &&
+        Date.parse(first.capturedAtUtc) >= Date.parse(state.initialInventory.capturedAtUtc),
+      'INVENTORY_CHANGED',
     )
     const deps = { config, source, target, signal }
     const entries = new Map()
@@ -285,7 +336,7 @@ export async function runBackup({
         entryValid(entry, config)
         entries.set(objectId, entry)
         state.entries = [...entries.values()].sort((a, b) => (a.objectId < b.objectId ? -1 : 1))
-        await journal.save(state)
+        await saveCheckpoint()
       }
     }
     const second = await source.inventory()
@@ -306,7 +357,7 @@ export async function runBackup({
       schemaVersion: 1,
       config,
       inventories: [
-        { id: first.id, digest: before.digest },
+        { id: state.initialInventory.id, digest: state.initialInventory.digest },
         { id: second.id, digest: after.digest },
       ],
       objects: state.entries,
@@ -332,7 +383,7 @@ export async function runBackup({
     requireValue(!remote.attestation || same(remote.attestation, attestation), 'FINALIZATION_CONFLICT')
     if (state.state === 'COMPLETE') requireValue(remote.manifest && remote.attestation, 'FINALIZATION_MISSING')
     state.manifest = manifest
-    if (state.state !== 'COMPLETE') await journal.save(state)
+    if (state.state !== 'COMPLETE') await saveCheckpoint()
     check()
     if (!remote.manifest) await target.publishManifest(encoded)
     check()
@@ -348,12 +399,33 @@ export async function runBackup({
     if (state.state !== 'COMPLETE') {
       state.attestation = attestation
       state.state = 'COMPLETE'
-      await journal.save(state)
+      await saveCheckpoint()
     }
     check()
     totals = before.totals
     return result('COMPLETE', totals)
-  } catch {
+  } catch (error) {
+    if (
+      trustedCheckpoint &&
+      state.state === 'INCOMPLETE' &&
+      !state.consistencyRejected &&
+      [
+        'INVENTORY_CHANGED',
+        'INVENTORY_INVALID',
+        'INVENTORY_DUPLICATE',
+        'INVENTORY_EMPTY',
+        'SOURCE_CHANGED',
+        'SIZE_MISMATCH',
+        'CHECKSUM_MISMATCH',
+      ].includes(error?.message)
+    ) {
+      state.consistencyRejected = true
+      try {
+        await saveCheckpoint()
+      } catch {
+        /* Still incomplete; fixture persistence failure is not recoverability proof. */
+      }
+    }
     return result('INCOMPLETE', totals)
   }
 }

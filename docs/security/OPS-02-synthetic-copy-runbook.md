@@ -51,6 +51,11 @@ Her raporda `evidenceLevel: synthetic`, `productionReady: false` ve
 - Checkpoint yüklenince kaynak tekrar hash'lenir ve hedefin tam sürüm kanıtı
   doğrulanır. Sahte günlükler atlama yetkisi vermez. Seri hale getirilmiş günlük
   testi crash-durable veya şifreli kalıcılık kanıtı değildir.
+- İlk envanter kimliği/özeti/capture zamanı aktarım başlamadan checkpoint'e
+  kaydedilir. Checkpoint ayrı domain önekiyle HMAC doğrulamasına tabidir.
+  Envanter veya referans tutarsızlığı görülürse o set yeniden tamamlanamaz;
+  bilinçli tekrar yakalama için yeni set gerekir. Bu fixture koruması, kalıcı
+  journal'ın crash/rollback güvenliği veya production anahtar yönetimi değildir.
 - Manifest ve ayrı fixture anahtarıyla doğrulanmış attestation birlikte gerekir.
   Aynı tamamlanmış çalıştırma yeniden doğrulanır; tekrar yayınlanmaz.
 
@@ -76,8 +81,24 @@ npm run build
 
 Uygulama başlangıç commit'i `70eeecc`; sözleşme `ef695f0`, aktarım `de3309f`,
 tamamlanma/resume `4557dd5`. Node 24.11.1 yerel çalışma ortamıdır; CI Node 22
-kanıtı ayrıca değerlendirilir. Son kalite kapısı ve bağımsız inceleme kanıtı
-teslimat sırasında aşağıya eklenecektir. Hosted CI sonucu varsayılmaz.
+kanıtı ayrıca değerlendirilir. Hosted CI sonucu varsayılmaz.
+
+### 2026-10-13 yerel teslimat kanıtı
+
+- `npm run check`: exit 0; format, roadmap (19 görev), lint ve typecheck geçti.
+  Toplam 597 test başarılı, 4 atlandı; atlanan testler başarı sayılmaz.
+- `npm run build`: exit 0; 35/35 statik sayfa üretildi. Depodaki CI ile aynı
+  sahte Supabase URL/key kullanıldı; canlı kimlik bilgisi kullanılmadı.
+- B1 odaklı testler: 101 test. Dört CLI senaryosu beklenen `0/1/1/0` çıkışlarını verdi.
+- Bağımsız son incelemede bir önemli bulgu vardı: aynı setin ilk envanterinin
+  resume sırasında değiştirilebilmesi. Dört yeni test önce başarısız oldu,
+  sonra authenticated checkpoint ve terminal tutarsızlık işaretiyle geçti.
+  Açık kritik/önemli bulgu veya ertelenmiş küçük kod bulgusu kalmadı.
+- Graphify kapsamı dokuz kod/test dosyası ve üç belgedir; eski grafikler
+  korunur. Güncel grafik sayıları ve kaynak hash'leri yerel
+  `graphify-out/semantic-refresh-evidence.json` içindedir; tüm repo semantiğinin
+  yeniden çıkarıldığı iddia edilmez. Codebase-memory ayrı persistent/full
+  indeks olarak üretilir; kaynak commit'i kendi metadata'sında yazılıdır.
 
 ## Kaynaklar
 

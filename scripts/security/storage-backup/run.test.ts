@@ -18,6 +18,54 @@ function setup() {
 }
 
 describe('synthetic backup completion', () => {
+  it.each(['reference', 'addition'])('never adopts a changed %s baseline on serialized restart', async (change) => {
+    const d = setup()
+    const original = d.source.inventory
+    let calls = 0
+    d.source.inventory = async () => {
+      const snapshot = await original()
+      if (++calls >= 2) {
+        if (change === 'reference') snapshot.referenceDigest = 'f'.repeat(64)
+        else snapshot.objects.push({ ...snapshot.objects[0], path: 'new.pdf' })
+      }
+      return snapshot
+    }
+    expect((await runBackup(d)).status).toBe('INCOMPLETE')
+    const commits = d.target.metrics.commits
+    const restarted = { ...d, journal: createJournal(d.journal.serialize()) }
+    expect((await runBackup(restarted)).status).toBe('INCOMPLETE')
+    expect(d.target.metrics.commits).toBe(commits)
+    expect(d.target.metrics.publications).toBe(0)
+  })
+  it('requires a new set after observed inconsistency even if the source returns to its original state', async () => {
+    const d = setup()
+    const original = d.source.inventory
+    let calls = 0
+    d.source.inventory = async () => {
+      const snapshot = await original()
+      if (++calls === 2) snapshot.referenceDigest = 'f'.repeat(64)
+      return snapshot
+    }
+    expect((await runBackup(d)).status).toBe('INCOMPLETE')
+    expect((await runBackup({ ...d, journal: createJournal(d.journal.serialize()) })).status).toBe('INCOMPLETE')
+    const saved = JSON.parse(d.journal.serialize())
+    saved.consistencyRejected = false
+    expect((await runBackup({ ...d, journal: createJournal(JSON.stringify(saved)) })).status).toBe('INCOMPLETE')
+    expect(d.target.metrics.publications).toBe(0)
+  })
+  it('keeps the original inventory identity through legitimate interruption and rejects forged baseline metadata', async () => {
+    const d = setup()
+    d.journal.failSaveAt = 3
+    expect((await runBackup(d)).status).toBe('INCOMPLETE')
+    const serialized = d.journal.serialize()
+    const altered = JSON.parse(serialized)
+    altered.initialInventory = { ...altered.initialInventory, id: 'synthetic:forged' }
+    expect((await runBackup({ ...d, journal: createJournal(JSON.stringify(altered)) })).status).toBe('INCOMPLETE')
+    const restarted = { ...d, journal: createJournal(serialized) }
+    expect((await runBackup(restarted)).status).toBe('COMPLETE')
+    const saved = await restarted.journal.load()
+    expect(saved.manifest.inventories[0].id).toBe('synthetic:inventory-1')
+  })
   it('completes stable sorted inventories with authenticated evidence and no repeated writes', async () => {
     const d = setup()
     const result = await runBackup(d)

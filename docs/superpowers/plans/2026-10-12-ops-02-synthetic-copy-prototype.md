@@ -114,7 +114,11 @@ kmsKeyId, lockMode:'COMPLIANCE', retainUntilUtc}`. Fake evidence is modeled,
 attempts}`; never contains raw bucket/path. Raw mapping stays in fixture memory;
   encrypted recovery mapping is required in B2 before a restore-capable release.
 - `Journal`: `{schemaVersion:1, configDigest, state:'INCOMPLETE'|'COMPLETE',
-entries:ObjectEntry[], manifest?:Manifest, attestation?:Attestation}`.
+initialInventory:{id,digest,capturedAtUtc}, consistencyRejected:boolean,
+checkpointHmacSha256, entries:ObjectEntry[], manifest?:Manifest, attestation?:Attestation}`.
+  The initial capture is persisted before transfer. Domain-separated fixture
+  HMAC authenticates checkpoints; same-set resume cannot silently adopt another
+  inventory/reference digest. Observed inconsistency requires a new set.
 - `Manifest`: `{schemaVersion:1, config:BackupConfig, inventories:[{id,digest},
 {id,digest}], objects:ObjectEntry[], totals:{objects,bytes}, completedAtUtc}`.
 - `Attestation`: `{manifestSha256, keyVersion, hmacSha256}` over canonical manifest
