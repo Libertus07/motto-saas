@@ -1,8 +1,8 @@
 # OPS-02 Synthetic Copy Prototype Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Status:** Approved by user on 2026-10-12; native sequential execution in progress.
+**Status:** Implemented and locally verified on 2026-10-13. Final review correction passed; B2 and all live operations remain outside this delivery.
 
 **Goal:** Prove local, bounded-memory byte-copy and fail-closed completion behavior using generated fixtures, without reading customer objects or connecting to AWS/Supabase.
 
@@ -138,19 +138,19 @@ physicalBytesVerifiedInProduction:false}`. Use no arbitrary string interpolation
 `expected` contains `{key,sizeBytes,checksumType,checksum,kmsKeyId,
 minimumRetainUntilUtc}`. Errors use constant codes only.
 
-- [ ] Write failing tests: deterministic pseudonyms match `createIdentityHasher`;
+- [x] Write failing tests: deterministic pseudonyms match `createIdentityHasher`;
       different bucket/path boundaries and composed/decomposed Unicode stay distinct;
       traversal, `%`, NUL, empty segments, invalid keys/dates/sizes are rejected.
-- [ ] Test canonical object-key order recursively, stable array order, rejection
+- [x] Test canonical object-key order recursively, stable array order, rejection
       of undefined/nonfinite numbers and unsupported values. Config rejects unknown
       fields, non-synthetic mode, invalid set IDs, and missing provenance.
-- [ ] Test missing/wrong version, key, checksum/type, KMS, or `COMPLIANCE`, and
+- [x] Test missing/wrong version, key, checksum/type, KMS, or `COMPLIANCE`, and
       retention shorter than 90/365 days. Require a nonempty opaque version ID.
-- [ ] Run `node node_modules/vitest/vitest.mjs run scripts/security/storage-backup/contract.test.ts`;
+- [x] Run `node node_modules/vitest/vitest.mjs run scripts/security/storage-backup/contract.test.ts`;
       confirm tests fail because the contract implementation is absent.
-- [ ] Implement the exports without importing the CLI/database adapter or
+- [x] Implement the exports without importing the CLI/database adapter or
       weakening existing inventory guards. Reuse the pure identity/parser functions.
-- [ ] Rerun the focused tests; require all passing, then inspect/stage only the
+- [x] Rerun the focused tests; require all passing, then inspect/stage only the
       two task files and commit `feat(ops02): define synthetic backup evidence contracts`.
 
 ### Task 2: Bounded transfer and checksum verification
@@ -167,26 +167,26 @@ Target methods: `put({key,body,checksum,retention})`,
 `evidence({key,versionId})`. Put/complete return `TargetEvidence`; part returns
 `{partNumber,etag,checksum}`. Never add a committed-object delete method.
 
-- [ ] Write failing tests for empty, small, exactly 5 MiB, and 5 MiB + 1 byte;
+- [x] Write failing tests for empty, small, exactly 5 MiB, and 5 MiB + 1 byte;
       use 5 MiB parts, one part in flight, and source chunks capped at 64 KiB.
       The fake sink consumes/hashes and discards payloads; it never retains a full file.
-- [ ] Test byte-size mismatch (short/long), same-size revision change, corrupt
+- [x] Test byte-size mismatch (short/long), same-size revision change, corrupt
       part checksum, missing version, wrong retention/KMS, and cancellation.
-- [ ] Pin independent one-part and two-part vectors: whole SHA-256 uses original
+- [x] Pin independent one-part and two-part vectors: whole SHA-256 uses original
       bytes; composite uses SHA-256 of concatenated binary part digests, base64 plus
       `-N`. Assert composite is not accepted in a `FULL_OBJECT` field or vice versa.
-- [ ] Test peak operator payload allocation against `2 * 5 MiB + 64 KiB` using
+- [x] Test peak operator payload allocation against `2 * 5 MiB + 64 KiB` using
       allocation/in-flight instrumentation and a slow sink, not a flaky RSS threshold.
       Test 64 MiB generated input without accumulating it. Reject oversize chunks.
-- [ ] Run focused transfer tests and observe red. Implement sequential chunks,
+- [x] Run focused transfer tests and observe red. Implement sequential chunks,
       independent full hash, consecutive part numbers starting at 1, and validation
       of every returned receipt. Set algorithm/type at multipart initiation.
-- [ ] Retry only fixture `TRANSIENT` failures, at most three attempts total,
+- [x] Retry only fixture `TRANSIENT` failures, at most three attempts total,
       with injected full jitter bounded by 100/200 ms for the two retries. Reopen
       the source, reset hashes, and verify revision before another attempt. Never
       retry checksum/auth/config/mutation failures; abort unfinished multipart work.
       A lost commit response remains incomplete until journal/evidence reconciliation.
-- [ ] Require all transfer tests passing; inspect/stage the three task files and
+- [x] Require all transfer tests passing; inspect/stage the three task files and
       commit `feat(ops02): add bounded synthetic object transfer`.
 
 ### Task 3: Fail-closed sets and verified object-boundary resume
@@ -200,26 +200,26 @@ clock,sleep,random,signal}):Promise<Result>`; `source.inventory():Promise<Snapsh
 create-only operations. `isComplete(manifest,attestation,signingKey):boolean`
 validates both records. Clock returns canonical UTC timestamps.
 
-- [ ] Write failing tests: sorted stable inventories yield one completion;
+- [x] Write failing tests: sorted stable inventories yield one completion;
       additions/deletions/revisions/reference changes or missing/invalid references
       produce incomplete and no attestation. Empty inventory requires explicit
       expected empty fixture, not accidental success from a failed listing.
-- [ ] Test restart by serializing the journal, rebuilding runner dependencies,
+- [x] Test restart by serializing the journal, rebuilding runner dependencies,
       and retaining only fixture target state. Skip only entries whose config digest,
       source revision, size, immutable receipt, exact version, checksum, encryption,
       and retention all still match. Forged/malformed entries fail closed.
-- [ ] Test interruption before/after upload and manifest creation; a set with
+- [x] Test interruption before/after upload and manifest creation; a set with
       only a manifest is incomplete. Resume may publish only its missing matching
       attestation, never overwrite/reuse a complete set for a new run. Repeating a
       fully completed invocation returns its verified result without another write.
-- [ ] Test lost upload response cannot count as verified; existing key alone
+- [x] Test lost upload response cannot count as verified; existing key alone
       never permits skip. No source/committed-target deletion call is possible.
-- [ ] Run focused run tests and observe red. Implement first snapshot, transfers,
+- [x] Run focused run tests and observe red. Implement first snapshot, transfers,
       second snapshot comparison, validated journal checkpoints, canonical manifest,
       independent fixture HMAC attestation, and final completion gating. Sign only
       after all object and inventory evidence passes. Unexpected exceptions return
       a constant incomplete code without serializing the exception.
-- [ ] Require all operator tests passing; inspect/stage task files and commit
+- [x] Require all operator tests passing; inspect/stage task files and commit
       `feat(ops02): gate synthetic backup completion and resume`.
 
 ### Task 4: Fixture-only runner and reproducible delivery evidence
@@ -233,25 +233,25 @@ only to add `ops:storage-backup:synthetic`; create
 `main(args,io):Promise<number>` accepts only `--scenario <name>`; JSON aggregate
 output goes to injected `io.write`. No arbitrary file/endpoint/credential flags.
 
-- [ ] Write failing tests for unknown/missing flags, unknown scenarios, URL or
+- [x] Write failing tests for unknown/missing flags, unknown scenarios, URL or
       path arguments, and hostile provider errors including nested causes. Assert
       only allowlisted fields/codes appear. Successful scenario exits 0; incomplete
       exits 1; invalid input exits 2. All tests use dummy secret canaries only.
-- [ ] Test no environment configuration is read and no import-time I/O occurs.
+- [x] Test no environment configuration is read and no import-time I/O occurs.
       Test module dependency boundary prohibits cloud SDK, dotenv, database CLI,
       HTTP/HTTPS/net/tls/fetch clients; fixture mode cannot select a production adapter.
-- [ ] Run runner tests and observe red; implement fixture selection/reporting and
+- [x] Run runner tests and observe red; implement fixture selection/reporting and
       `ops:storage-backup:synthetic` as `node scripts/security/storage-backup/synthetic-cli.mjs`.
-- [ ] Run all four scenarios; verify exact status/exit expectations, no raw
+- [x] Run all four scenarios; verify exact status/exit expectations, no raw
       fixture paths, and explicit synthetic evidence flags. These are new local
       proofs, not live-provider integration results.
-- [ ] Run `npm run check` and `npm run build`; require exit 0. Do not weaken
+- [x] Run `npm run check` and `npm run build`; require exit 0. Do not weaken
       rules/timeouts or drop tests. Record runtime, source commit and actual counts.
       Existing root test exclusions remain unchanged.
-- [ ] Run and verify graph/index refresh with preservation of existing semantic
+- [x] Run and verify graph/index refresh with preservation of existing semantic
       artifacts; document limitations. Run `npm run roadmap:check`. The roadmap
       remains `Devam ediyor`, next gate B2 protocol integration, not production ready.
-- [ ] Review complete diff and secrets scan. Commit only task changes and
+- [x] Review complete diff and secrets scan. Commit only task changes and
       deliberately refreshed tracked index artifacts; do not stage local outputs.
 
 ## Self-review and coverage mapping
@@ -284,4 +284,4 @@ by this offline slice. Before B2, review these gaps against the approved design.
 Written plan approved by user on 2026-10-12. Method: native execution in
 this session, sequential TDD tasks and a separate final review. These four tasks
 share contracts closely; avoid parallel edits to the runner and fixture module.
-Execution started; no new dependency is required. Completion evidence follows each task.
+All four tasks are locally implemented and verified. No dependency was added. See the [B1 runbook](../../security/OPS-02-synthetic-copy-runbook.md) for 597 passing / 4 skipped tests, build evidence, the fixed review finding, and explicit synthetic-only limits.
