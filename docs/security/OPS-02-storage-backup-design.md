@@ -2,6 +2,13 @@
 
 **Durum:** Devam ediyor. Salt okunur envanter aracı yerel Supabase üzerinde doğrulandı; production envanteri, fiziksel yedek ve geri yükleme yapılmadı. Bu belge production işlem yetkisi vermez.
 
+**Onaylı hedef mimari:** Ayrı AWS hesabı, S3 Versioning, Object Lock
+`COMPLIANCE`, müşteri yönetimli KMS anahtarı, ölçülebilir RPO/RTO ve izole
+restore modelini tanımlayan ayrıntılı tasarım için
+[2026-10-06 OPS-02 fiziksel Storage yedekleme ve kurtarma tasarımına](../superpowers/specs/2026-10-06-ops-02-physical-storage-backup-design.md)
+bakın. Bu onay, AWS kaynağı oluşturma veya production verisi okuma/yazma yetkisi
+vermez.
+
 ## Problem ve kapsam
 
 Mevcut [production veritabanı yedeği](production-database-deployment.md) `storage.objects` kayıtlarını içerebilir; nesnelerin fiziksel baytlarını içermez. Supabase de veritabanı yedeğinin Storage nesnelerini geri getirmediğini [belirtir](https://supabase.com/docs/guides/platform/backups). Bu nedenle veritabanı yedeği ile Storage yedeği ayrı ama eşleştirilebilir kanıt paketleri olmalıdır.
@@ -36,6 +43,39 @@ bucket gerçekleri bulunur.
 
 Bu kanıt production'da çalıştırma, nesne baytı indirme, dış hedefe kopyalama,
 restore veya kurtarılabilirlik iddiası değildir.
+
+## Yerelde doğrulanan AWS foundation aşaması
+
+Phase A için AWS CDK v2 ve TypeScript altyapısı bağımsız
+`infra/ops02-backup/` npm paketinde, kendi exact-version lockfile'ıyla
+tanımlandı. Bu paket root uygulama bağımlılıklarını genişletmez; yalnız sentetik
+hesap/rol context'i ve `eu-central-1` test Region'ıyla credential-free synth
+üretir. Çalıştırma ve inceleme ayrıntıları
+[AWS foundation yerel doğrulama runbook'unda](OPS-02-aws-foundation-runbook.md)
+yer alır.
+
+2026-10-10 yerel kanıtında temiz izole kurulum; altyapı format, typecheck,
+`88/88` test ve synth kapısı; root `583` başarılı/`4` skipped testli kalite
+kapısı ve `35/35` production build'i geçti. Sentetik CloudFormation
+şablonu `28` kaynak, `13` output ve
+`337828087FDE8EB7F9C3CD65B01C6D58CD18D2836E9CAC09A7550C2ACFA8A8D4`
+SHA-256 değeri üretti. Secret/reference taramasında access key, `service_role`,
+Supabase host'u veya plaintext secret görülmedi; iki `GenerateSecretString`
+kaynağı yalnız `UNINITIALIZED` placeholder'dır. Şablondaki 15 literal wildcard
+resource, KMS/service/describe policy yapılarıdır; kanıt yalnız testlerin
+wildcard yönetici grant'lerini ve yazar rolündeki yetkisiz delete/bypass
+izinlerini reddettiğini söyler, şablonda hiç wildcard olmadığını iddia etmez.
+Writer trust'ı source account ve yapılandırılmış Region'ın ECS ARN'iyle
+sınırlıdır; audit object'leri 365 gün `COMPLIANCE` Object Lock altındadır ve
+güvenlik topic'i izlediği audit key'den bağımsız bir alert key kullanır.
+
+İzole dependency ağacında bir yüksek önem dereceli transitive
+`brace-expansion` advisory'si açık kalır; güvensiz override veya zorlanmış audit
+fix uygulanmadı. GitHub'ın Node 22 altyapı workflow'u bu teslimatta
+çalıştırılmadı. AWS kaynağı, production envanteri, byte kopyası, restore,
+credential population, bootstrap, deploy, destroy veya push yapılmadı. Bu
+foundation fiziksel backup veya kurtarılabilirlik kanıtı değildir; OPS-02
+**Devam ediyor** kalır ve sıradaki iş sentetik fiziksel-byte kopya prototipidir.
 
 ## Önerilen koruma modeli
 

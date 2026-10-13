@@ -1,0 +1,51 @@
+name: OPS-02 Infrastructure CI
+
+on:
+  push:
+    branches: ['main', 'master']
+    paths:
+      - 'infra/ops02-backup/**'
+      - '.github/workflows/ops02-infrastructure-ci.yml'
+      - 'scripts/ci/validate-ops02-infrastructure-workflow.test.ts'
+      - 'docs/superpowers/specs/2026-10-06-ops-02-physical-storage-backup-design.md'
+      - 'docs/superpowers/plans/2026-10-06-ops-02-aws-backup-foundation.md'
+  pull_request:
+    branches: ['main', 'master']
+    paths:
+      - 'infra/ops02-backup/**'
+      - '.github/workflows/ops02-infrastructure-ci.yml'
+      - 'scripts/ci/validate-ops02-infrastructure-workflow.test.ts'
+      - 'docs/superpowers/specs/2026-10-06-ops-02-physical-storage-backup-design.md'
+      - 'docs/superpowers/plans/2026-10-06-ops-02-aws-backup-foundation.md'
+
+permissions:
+  contents: read
+
+jobs:
+  infrastructure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: 'infra/ops02-backup/package-lock.json'
+
+      - name: Install infrastructure dependencies
+        run: npm ci --prefix infra/ops02-backup
+
+      - name: Check infrastructure offline
+        run: npm run check --prefix infra/ops02-backup
+        env:
+          AWS_EC2_METADATA_DISABLED: 'true'
+          AWS_CONFIG_FILE: '${{ runner.temp }}/ops02-no-aws-config'
+          AWS_SHARED_CREDENTIALS_FILE: '${{ runner.temp }}/ops02-no-aws-credentials'
+          CDK_DISABLE_CLI_TELEMETRY: 'true'
+          CDK_DISABLE_VERSION_CHECK: 'true'
+          npm_config_offline: 'true'
